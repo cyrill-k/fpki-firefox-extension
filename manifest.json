@@ -1,0 +1,7 @@
+{
+  "name": "f-pki extension",
+  "description": "Browser extension for f-pki",
+  "version": "1.0",
+  "manifest_version": 3,
+
+}
