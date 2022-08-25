@@ -7,7 +7,8 @@ import (
 )
 
 func main() {
-
+	truncateTable()
+	prepareMapServer()
 }
 
 func truncateTable() {
@@ -30,4 +31,13 @@ func truncateTable() {
 	if err != nil {
 		panic(err)
 	}
+
+	err = db.Close()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func prepareMapServer() {
+
 }
