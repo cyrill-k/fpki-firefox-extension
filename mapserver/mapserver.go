@@ -21,6 +21,8 @@ import (
 // global var for now
 var mapResponder *responder.MapResponder
 
+// ugly version.... I will refactor it later.
+
 func main() {
 	truncateTable()
 	mapResponder = prepareMapServer()
