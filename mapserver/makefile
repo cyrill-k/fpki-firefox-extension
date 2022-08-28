@@ -1,6 +1,6 @@
 .PHONY: generate_test_certs clean
 
-generate_test_certs: 
+generate_test_certs_and_RPC_SP: 
 	@./tools/scripts/generate_certs.sh
 
 clean:
