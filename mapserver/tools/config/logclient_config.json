@@ -1,0 +1,7 @@
+{
+ "TreeId": 55555555555,
+ "RPCAddress": "localhost:8090",
+ "MaxReceiveMessageSize": 10000,
+ "PolicyLogExchangePath": "./file_exchange/",
+ "NumOfWorker": 15
+}

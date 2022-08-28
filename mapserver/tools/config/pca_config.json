@@ -1,0 +1,6 @@
+{
+ "CAName": "pca",
+ "KeyPath": "./certs/pca_certs/ETHz_pca_key.pem",
+ "OutputPath": "./file_exchange/pcaoutput",
+ "PolicyLogExgPath": "./file_exchange"
+}

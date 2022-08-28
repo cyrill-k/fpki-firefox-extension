@@ -13,10 +13,15 @@ import (
 )
 
 func main() {
+	generateCert("ETHz_pca", "./certs/pca_certs")
+	generateCert("ETHz_mapserver", "./certs/mapserver_certs")
+}
+
+func generateCert(name, filePath string) {
 	ca := &x509.Certificate{
 		SerialNumber: big.NewInt(2019),
 		Subject: pkix.Name{
-			Organization: []string{"ETHz PCA & CA"},
+			Organization: []string{name},
 			Country:      []string{"CH"},
 			Province:     []string{""},
 			Locality:     []string{"Zurich"},
@@ -51,12 +56,12 @@ func main() {
 		Bytes: x509.MarshalPKCS1PrivateKey(caPrivKey),
 	})
 
-	err = os.WriteFile("./pca_certs/ca_cert.pem", caPEM.Bytes(), 0644)
+	err = os.WriteFile(filePath+"/"+name+"_cert.pem", caPEM.Bytes(), 0644)
 	if err != nil {
 		panic(err)
 	}
 
-	err = os.WriteFile("./pca_certs/ca_key.pem", caPrivKeyPEM.Bytes(), 0644)
+	err = os.WriteFile(filePath+"/"+name+"_key.pem", caPrivKeyPEM.Bytes(), 0644)
 	if err != nil {
 		panic(err)
 	}

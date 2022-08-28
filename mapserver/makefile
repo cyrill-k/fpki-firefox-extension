@@ -1,4 +1,9 @@
-.PHONY: generate_test_certs 
+.PHONY: generate_test_certs clean
 
 generate_test_certs: 
-	./scripts/generate_certs.sh
+	@./tools/scripts/generate_certs.sh
+
+clean:
+	@rm  -f ./certs/mapserver_certs/*
+	@rm  -f ./certs/pca_certs/*
+	@rm  -f ./rpc_and_sp/*

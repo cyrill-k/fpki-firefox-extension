@@ -1,6 +1,0 @@
-{
- "CAName": "swiss pca",
- "KeyPath": "./pca_certs/ca_key.pem",
- "OutputPath": "./test_data_output",
- "PolicyLogOutputPath": "./spts"
-}
