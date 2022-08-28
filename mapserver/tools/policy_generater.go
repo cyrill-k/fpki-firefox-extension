@@ -168,6 +168,11 @@ func issuePCandRPC(domainName string) {
 		panicAndQuit(fmt.Errorf("queue error SP"))
 	}
 
+	err = pca.OutputRPCAndSP()
+	if err != nil {
+		panicAndQuit(err)
+	}
+
 	fmt.Println("test succeed!")
 	os.RemoveAll("./file_exchange")
 }
