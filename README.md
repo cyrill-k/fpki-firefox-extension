@@ -1,5 +1,5 @@
 # fpki-browser-extension
-Google chrome extension for F-PKI
+Firefox extension for F-PKI
 
 ## Folder Structure
 The app folder contains the browser extension (not developed yet)
