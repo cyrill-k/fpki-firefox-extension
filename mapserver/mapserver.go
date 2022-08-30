@@ -41,13 +41,15 @@ func helloWorld(w http.ResponseWriter, r *http.Request) {
 		ctx, cancelF := context.WithTimeout(context.Background(), time.Minute)
 		defer cancelF()
 
-		response, err := mapResponder.GetDomainProofs(ctx, r.URL.Query()["domain"])
+		queriedDomain := r.URL.Query()["domain"][0]
+
+		response, err := mapResponder.GetProof(ctx, queriedDomain)
 		if err != nil {
 			log.Fatal(err)
 			return
 		}
 
-		bytes, err := serialiseMapResp(response["fpki.com"])
+		bytes, err := serialiseMapResp(response)
 		if err != nil {
 			log.Fatal(err)
 			return
@@ -59,7 +61,7 @@ func helloWorld(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func serialiseMapResp(response []*mapCommon.MapServerResponse) ([]byte, error) {
+func serialiseMapResp(response []mapCommon.MapServerResponse) ([]byte, error) {
 	bytes, err := json.MarshalIndent(response, "", " ")
 	if err != nil {
 		return nil, fmt.Errorf("serialiseMapResp | MarshalIndent | %w", err)
@@ -125,7 +127,7 @@ func prepareMapServer() *responder.MapResponder {
 	}
 
 	// get a new responder, and load an existing tree
-	mapResponder, err := responder.NewMapResponder(ctx, root, 233)
+	mapResponder, err := responder.NewMapResponder(ctx, root, 233, "./config/mapserver_config.json")
 	if err != nil {
 		panic(err)
 	}
