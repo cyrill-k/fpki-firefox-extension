@@ -1,6 +1,19 @@
 {
-  "name": "f-pki extension",
-  "description": "Browser extension for f-pki",
+  "name": "LF-PKI Browser Extension",
   "version": "1.0",
-  "manifest_version": 3,
+  "manifest_version": 2,
+  "description": "LF-PKI browser extension",
+  "background": {
+    "page": "./background/background.html",
+    "persistent": true
+  },
+  "permissions": [
+    "webNavigation",
+    "webRequest",
+    "webRequestBlocking",
+    "<all_urls>"
+  ],
+  "web_accessible_resources": [
+    "/pages/block.html"
+]
 }
