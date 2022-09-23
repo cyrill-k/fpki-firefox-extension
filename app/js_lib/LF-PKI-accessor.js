@@ -1,16 +1,17 @@
-
 import * as domainFunc from "./domain.js"
 import * as verifier from "./verifier.js"
-
 
 async function getMapServerResponseAndAnalyse(url, needVerification){
     const mapResponse = await queryMapServer(domainFunc.getDomainNameFromURL(url))
     
     if (needVerification){
-        await verifier.verifyProofs(mapResponse)
+        let isVerified = await verifier.verifyProofs(mapResponse)
+        if (isVerified){
+            console.log("succeed!")
+        }
     }
     
-    console.log(mapResponse[0])
+    //console.log(mapResponse[0])
 }
 
 async function queryMapServer(domainName) {
