@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -22,26 +24,27 @@ import (
 var mapResponder *responder.MapResponder
 
 // ugly version.... I will refactor it later.
-
 func main() {
 	truncateTable()
 	mapResponder = prepareMapServer()
 
-	http.HandleFunc("/", helloWorld)
+	http.HandleFunc("/", mapServerQueryHandler)
 	http.ListenAndServe(":8080", nil)
 }
 
-func helloWorld(w http.ResponseWriter, r *http.Request) {
+func mapServerQueryHandler(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
 		return
 	}
+
 	switch r.Method {
 	case "GET":
 		ctx, cancelF := context.WithTimeout(context.Background(), time.Minute)
 		defer cancelF()
 
 		queriedDomain := r.URL.Query()["domain"][0]
+		fmt.Println("get domain request: ", queriedDomain)
 
 		response, err := mapResponder.GetProof(ctx, queriedDomain)
 		if err != nil {
@@ -49,25 +52,98 @@ func helloWorld(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		bytes, err := serialiseMapResp(response)
-		if err != nil {
-			log.Fatal(err)
-			return
-		}
-		w.Write(bytes)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(response)
+
+		inspectResponse(response)
+
 	default:
 		w.WriteHeader(http.StatusNotImplemented)
 		w.Write([]byte(http.StatusText(http.StatusNotImplemented)))
 	}
 }
 
-func serialiseMapResp(response []mapCommon.MapServerResponse) ([]byte, error) {
-	bytes, err := json.MarshalIndent(response, "", " ")
+func inspectResponse(response []mapCommon.MapServerResponse) {
+	//spew.Dump(response[0].DomainEntryBytes)
+	key := common.SHA256Hash([]byte(response[0].Domain))
+	value := common.SHA256Hash([]byte(response[0].DomainEntryBytes))
+
+	//fmt.Println(value)
+	//fmt.Println(key)
+	//fmt.Println(SHA256Hash(key, value, []byte{byte(256 - len(response[0].PoI.Proof))}))
+	hT := append(append(key, value...), []byte{byte(256 - len(response[0].PoI.Proof))}...)
+
+	fmt.Println("first hash", common.SHA256Hash(hT))
+	fmt.Println(VerifyInclusion(response[0].PoI.Root, response[0].PoI.Proof, common.SHA256Hash([]byte(response[0].Domain)),
+		value))
+
+	uEnc := base64.URLEncoding.EncodeToString(response[0].PoI.Root)
+	fmt.Println(uEnc)
+
+	//sss, _ := json.Marshal(response)
+	//spew.Dump(sss)
+
+	fmt.Println("root value", response[0].PoI.Root)
+
+	sDec, err := base64.StdEncoding.DecodeString("u+ZkpW54sUIb+DvvB5JO9vprCQAo6fChy1j92YwZ0Lo=")
 	if err != nil {
-		return nil, fmt.Errorf("serialiseMapResp | MarshalIndent | %w", err)
+		panic(err)
 	}
-	return bytes, nil
+	fmt.Println(sDec)
+	fmt.Println()
 }
+
+// VerifyInclusion verifies that key/value is included in the trie with latest root
+func VerifyInclusion(root []byte, ap [][]byte, key, value []byte) bool {
+	leafHash := common.SHA256Hash(key, value, []byte{byte(256 - len(ap))})
+	return bytes.Equal(root, verifyInclusion(ap, 0, key, leafHash))
+}
+
+// verifyInclusion returns the merkle root by hashing the merkle proof items
+func verifyInclusion(ap [][]byte, keyIndex int, key, leafHash []byte) []byte {
+	if keyIndex == len(ap) {
+		fmt.Println("hash at ", keyIndex, " ", leafHash)
+		return leafHash
+	}
+	if bitIsSet(key, keyIndex) {
+		neighbor := verifyInclusion(ap, keyIndex+1, key, leafHash)
+		result := common.SHA256Hash(ap[len(ap)-keyIndex-1], neighbor)
+		fmt.Println("hash at ", keyIndex, " ", result, " ", len(ap)-keyIndex-1)
+		fmt.Println(ap[len(ap)-keyIndex-1])
+		fmt.Println(neighbor)
+		fmt.Println("*******************************")
+		return result
+	}
+
+	neighbor := verifyInclusion(ap, keyIndex+1, key, leafHash)
+	result := common.SHA256Hash(neighbor, ap[len(ap)-keyIndex-1])
+	fmt.Println("hash at ", keyIndex, " ", result, " ", len(ap)-keyIndex-1)
+	fmt.Println(neighbor)
+	fmt.Println(ap[len(ap)-keyIndex-1])
+	fmt.Println("*******************************")
+
+	return result
+}
+
+func bitIsSet(bits []byte, i int) bool {
+	return bits[i/8]&(1<<uint(7-i%8)) != 0
+}
+
+/*
+// Hash exports default hash function for trie
+var SHA256Hash = func(data ...[]byte) []byte {
+	hash := sha256.New()
+
+	for i := 0; i < len(data); i++ {
+		hash.Write(data[i])
+		fmt.Println(data[i])
+		fmt.Println(len(data[i]))
+	}
+
+	//fmt.Println(hash.Size())
+	return hash.Sum(nil)
+}*/
 
 func truncateTable() {
 	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/fpki?maxAllowedPacket=1073741824")

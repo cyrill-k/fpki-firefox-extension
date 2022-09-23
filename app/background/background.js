@@ -1,38 +1,27 @@
 'use strict'
 
 import * as domainFunc from "../js_lib/domain.js"
+import * as LFPKI_accessor from "../js_lib/LF-PKI-accessor.js"
 
 const cancelUrl = chrome.runtime.getURL('/pages/block.html')
 
-function checkCert() {
-    return true
-}
-
 async function checkInfo(details) {
-    console.log("hi")
     const remoteInfo = await browser.webRequest.getSecurityInfo(details.requestId, {
         certificateChain: true,
         rawDER: true
     })
 
     try {
-        console.log(domainFunc.getDomainNameFromURL(details.url))
-    } catch (error) {
-        console.error(error);
-        // expected output: ReferenceError: nonExistentFunction is not defined
-        // Note - error messages will vary depending on browser
+        await LFPKI_accessor.getMapServerResponseAndAnalyse(details.url, true)
     }
-
-    //console.log(remoteInfo.certificates[0].rawDER)
-
-    //if (checkCert()){
-    //    return {redirectUrl: cancelUrl}
-    //}
+    catch (error) {
+        console.error(error)
+    }
 }
 
 
 browser.webRequest.onHeadersReceived.addListener(
     checkInfo, {
-    urls: ["https://www.google.com/"]
+    urls: ["https://www.google.com/", "https://www.baidu.com/"]
 },
     ['blocking'])

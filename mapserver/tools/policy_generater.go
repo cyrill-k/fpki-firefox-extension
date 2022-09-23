@@ -33,7 +33,7 @@ func issuePCandRPC(domainName string) {
 	}
 
 	// first rcsr
-	rcsr, err := do.GenerateRCSR("abc.com", 1)
+	rcsr, err := do.GenerateRCSR("google.com", 1)
 	if err != nil {
 		panicAndQuit(err)
 	}
@@ -49,7 +49,7 @@ func issuePCandRPC(domainName string) {
 	}
 
 	// second rcsr
-	rcsr, err = do.GenerateRCSR("fpki.com", 1)
+	rcsr, err = do.GenerateRCSR("baidu.com", 1)
 	if err != nil {
 		panicAndQuit(err)
 	}
@@ -137,12 +137,12 @@ func issuePCandRPC(domainName string) {
 		TrustedCA: []string{"US CA"},
 	}
 
-	psr1, err := do.GeneratePSR("abc.com", policy1)
+	psr1, err := do.GeneratePSR("google.com", policy1)
 	if err != nil {
 		panicAndQuit(err)
 	}
 
-	psr2, err := do.GeneratePSR("fpki.com", policy2)
+	psr2, err := do.GeneratePSR("baidu.com", policy2)
 	if err != nil {
 		panicAndQuit(err)
 	}

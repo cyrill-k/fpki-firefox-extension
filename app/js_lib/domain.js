@@ -15,4 +15,4 @@ function getDomainNameFromURL(url) {
 
 export {
     getDomainNameFromURL
-  };
+  }

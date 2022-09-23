@@ -7,11 +7,18 @@
     "page": "./background/background.html",
     "persistent": true
   },
+  "browser_action": {
+    "default_icon": {                
+      "16": "images/icon.png"
+    },
+    "default_popup": "./popup/popup.html" 
+  },
   "permissions": [
     "webNavigation",
     "webRequest",
     "webRequestBlocking",
-    "<all_urls>"
+    "<all_urls>",
+    "tabs"
   ],
   "web_accessible_resources": [
     "/pages/block.html"
