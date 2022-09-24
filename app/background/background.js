@@ -21,6 +21,6 @@ async function checkInfo(details) {
 
 browser.webRequest.onHeadersReceived.addListener(
     checkInfo, {
-    urls: ["https://www.google.com/", "https://www.baidu.com/", "https://www.amazon.com/", "https://www.kth.se/en"]
+    urls: ["https://www.google.com/", "https://www.baidu.com/", "https://www.amazon.com/", "https://www.kth.se/en", "https://support.google.com/"]
 },
     ['blocking'])

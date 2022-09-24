@@ -60,6 +60,18 @@ func issuePCandRPC(domainName string) {
 		panicAndQuit(err)
 	}
 
+	// third rcsr
+	rcsr, err = do.GenerateRCSR("support.google.com", 1)
+	if err != nil {
+		panicAndQuit(err)
+	}
+
+	// sign and log the second rcsr
+	err = pca.SignAndLogRCSR(rcsr)
+	if err != nil {
+		panicAndQuit(err)
+	}
+
 	adminClient, err := client.GetAdminClient("./tools/config/adminclient_config.json")
 	if err != nil {
 		panicAndQuit(err)
@@ -102,6 +114,7 @@ func issuePCandRPC(domainName string) {
 	}
 
 	if len(fileNames) != 0 {
+		fmt.Println(len(fileNames))
 		panicAndQuit(fmt.Errorf("rpc num error"))
 	}
 
@@ -125,16 +138,23 @@ func issuePCandRPC(domainName string) {
 		}
 	}
 
-	if len(rpcs) != 2 {
+	if len(rpcs) != 3 {
 		panicAndQuit(fmt.Errorf("rpcs num error"))
 	}
 
 	policy1 := common.Policy{
-		TrustedCA: []string{"swiss CA"},
+		TrustedCA:         []string{"swiss CA"},
+		AllowedSubdomains: []string{"pay.google.com"},
 	}
 
 	policy2 := common.Policy{
-		TrustedCA: []string{"US CA"},
+		TrustedCA:         []string{"US CA"},
+		AllowedSubdomains: []string{""},
+	}
+
+	policy3 := common.Policy{
+		TrustedCA:         []string{"US CA"},
+		AllowedSubdomains: []string{""},
 	}
 
 	psr1, err := do.GeneratePSR("google.com", policy1)
@@ -147,12 +167,22 @@ func issuePCandRPC(domainName string) {
 		panicAndQuit(err)
 	}
 
+	psr3, err := do.GeneratePSR("support.google.com", policy3)
+	if err != nil {
+		panicAndQuit(err)
+	}
+
 	err = pca.SignAndLogSP(psr1)
 	if err != nil {
 		panicAndQuit(err)
 	}
 
 	err = pca.SignAndLogSP(psr2)
+	if err != nil {
+		panicAndQuit(err)
+	}
+
+	err = pca.SignAndLogSP(psr3)
 	if err != nil {
 		panicAndQuit(err)
 	}

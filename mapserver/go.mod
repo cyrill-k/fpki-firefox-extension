@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/go-sql-driver/mysql v1.6.0
-	github.com/netsec-ethz/fpki v0.0.0-20220831235355-8d7215c0f573
+	github.com/netsec-ethz/fpki v0.0.0-20220924134249-86d57eaded47
 )
 
 require (

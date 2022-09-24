@@ -56,7 +56,7 @@ func mapServerQueryHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(response)
 
-		inspectResponse(response)
+		//inspectResponse(response)
 
 	default:
 		w.WriteHeader(http.StatusNotImplemented)
