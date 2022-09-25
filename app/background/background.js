@@ -12,15 +12,16 @@ async function checkInfo(details) {
     })
 
     try {
-        await LFPKI_accessor.getMapServerResponseAndAnalyse(details.url, true)
+        await LFPKI_accessor.getMapServerResponseAndCheck(details.url, true, remoteInfo, details)
+        console.log("succeed!")
     }
     catch (error) {
-        console.error(error)
+        console.log(error)
     }
 }
 
 browser.webRequest.onHeadersReceived.addListener(
     checkInfo, {
-    urls: ["https://www.google.com/", "https://www.baidu.com/", "https://www.amazon.com/", "https://www.kth.se/en", "https://support.google.com/"]
+    urls: ["https://www.google.com/", "https://www.baidu.com/", "https://www.amazon.com/", "https://www.kth.se/en", "https://support.google.com/", "https://docs.google.com/*"]
 },
     ['blocking'])

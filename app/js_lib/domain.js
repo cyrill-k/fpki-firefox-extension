@@ -6,13 +6,24 @@ function normalise(url) {
         uri.hostname = uri.hostname.slice(0, -1)
     }
 
+    if(uri.hostname.startsWith("www.")){
+        uri.hostname = uri.hostname.slice(4)
+    }
+
     return uri
 }
 
 function getDomainNameFromURL(url) {
-    return normalise(url).hostname
+    let domainName = normalise(url).hostname
+    return domainName
+}
+
+function getParentDomain(domainName){
+    const after = domainName.slice(domainName.indexOf('.') + 1)
+    return after
 }
 
 export {
-    getDomainNameFromURL
+    getDomainNameFromURL,
+    getParentDomain
   }

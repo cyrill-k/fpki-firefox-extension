@@ -1,52 +1,44 @@
 // verify the map server response
 async function verifyProofs(domainEntryList) {
-    try {
-        // verify all the map server response
-        for (var i = 0; i < domainEntryList.length; i++) {
-            let isCorrect = await verifyProof(domainEntryList[i])
-            if (!isCorrect) {
-                console.log("verification error")
-                return false
-            }
+    var ValidationException = "verification failed"
+    // verify all the map server response
+    for (var i = 0; i < domainEntryList.length; i++) {
+        let isCorrect = await verifyProof(domainEntryList[i])
+        if (!isCorrect) {
+            throw ValidationException
         }
-        return true
-    } catch (error) {
-        console.error(error)
     }
 }
 
 // verify individual map server response
 async function verifyProof(domainEntry) {
-    try {
-        let keyHash = await sha256Hash_1(domainEntry.Domain)
-        // if it is a PoP
-        if (domainEntry.PoI.ProofType == 1) {
-            // hash the domain entries, and domain name, to get the key-value pair in the merkle tree
-            // NOTE: in the SMT, we store the (domain name hash, domain material hash) as key-value pair
-            let leafHash = await sha256Hash_1(domainEntry.DomainEntryBytes)
+    let keyHash = await sha256Hash_1(domainEntry.Domain)
+    // if it is a PoP
+    if (domainEntry.PoI.ProofType == 1) {
+        // hash the domain entries, and domain name, to get the key-value pair in the merkle tree
+        // NOTE: in the SMT, we store the (domain name hash, domain material hash) as key-value pair
+        let leafHash = await sha256Hash_1(domainEntry.DomainEntryBytes)
 
-            // verify the PoP
-            if (verifyInclusion(domainEntry.PoI, keyHash, leafHash)){
-                return true
-            }
-            return false
+        // verify the PoP
+        if (verifyInclusion(domainEntry.PoI, keyHash, leafHash)) {
+            return true
         }
-        else if (domainEntry.PoI.ProofType == 0) {
-            // verify the PoA
-            if(verifyNonInclusion(domainEntry.PoI, keyHash)){
-                return true
-            }
-            return false
-        }
-    } catch (error) {
-        console.error(error)
+        return false
     }
+    else if (domainEntry.PoI.ProofType == 0) {
+        // verify the PoA
+        if (verifyNonInclusion(domainEntry.PoI, keyHash)) {
+            return true
+        }
+        return false
+    }
+
 }
 
 // verify the PoA
 async function verifyNonInclusion(PoI, keyHash) {
-    if (PoI.ProofKey.length == 0) {
-        let defaultLeaf = Uint8Array(1)
+    if (PoI.ProofKey == null || PoI.ProofKey.length == 0) {
+        let defaultLeaf = new Uint8Array(1)
         return verifyInclusion(PoI, keyHash, stringToArrayBuf(defaultLeaf))
     }
     let proofKeyDecoded = _base64ToArrayBuffer(PoI.ProofKey)
@@ -56,34 +48,32 @@ async function verifyNonInclusion(PoI, keyHash) {
 }
 
 async function verifyInclusion(PoI, keyHash, valueHash) {
-    try {
-        let root = _base64ToArrayBuffer(PoI.Root)
-        let keyView = new Uint8Array(keyHash)
 
-        // init a depth buffer with 
-        let depthArrayBuf = new ArrayBuffer(1)
-        let depthView = new Uint8Array(depthArrayBuf)
-        depthView[0] = 256 - PoI.Proof.length
+    let root = _base64ToArrayBuffer(PoI.Root)
+    let keyView = new Uint8Array(keyHash)
 
-        let leafHash = await sha256Hash_3(keyHash, valueHash, depthArrayBuf)
+    // init a depth buffer with 
+    let depthArrayBuf = new ArrayBuffer(1)
+    let depthView = new Uint8Array(depthArrayBuf)
+    depthView[0] = 256 - PoI.Proof.length
 
-        for (var i = PoI.Proof.length - 1; i >= 0; i--) {
-            let proofDecoded = _base64ToArrayBuffer(PoI.Proof[PoI.Proof.length - 1 - i])
-            if (!bitIsSet(keyView, i)) {
-                leafHash = await sha256Hash_2(proofDecoded, leafHash)
-            } else {
-                leafHash = await sha256Hash_2(leafHash, proofDecoded)
-            }
+    let leafHash = await sha256Hash_3(keyHash, valueHash, depthArrayBuf)
+
+    for (var i = PoI.Proof.length - 1; i >= 0; i--) {
+        let proofDecoded = _base64ToArrayBuffer(PoI.Proof[PoI.Proof.length - 1 - i])
+        if (!bitIsSet(keyView, i)) {
+            leafHash = await sha256Hash_2(proofDecoded, leafHash)
+        } else {
+            leafHash = await sha256Hash_2(leafHash, proofDecoded)
         }
-        //console.log(checkArrayBuffer(leafHash, root))
-        if (checkArrayBuffer(leafHash, root)) {
-            return true
-        }
-        return false
-
-    } catch (error) {
-        console.error(error)
     }
+    //console.log(checkArrayBuffer(leafHash, root))
+    if (checkArrayBuffer(leafHash, root)) {
+        return true
+    }
+    return false
+
+
 }
 
 
@@ -124,19 +114,17 @@ async function sha256Hash_3(input1, input2, input3) {
 }
 
 function bitIsSet(keyView, index) {
-    try {
-        let bitIndex = index % 8
-        let uint8Index = (index - bitIndex) / 8
-        var mask = 1 << bitIndex
 
-        if ((keyView[uint8Index] & mask) != 0) {
-            return true
-        } else {
-            return false
-        }
-    } catch (error) {
-        console.error(error)
+    let bitIndex = index % 8
+    let uint8Index = (index - bitIndex) / 8
+    var mask = 1 << bitIndex
+
+    if ((keyView[uint8Index] & mask) != 0) {
+        return true
+    } else {
+        return false
     }
+
 }
 
 function encode_utf8(s) {
@@ -156,41 +144,37 @@ function stringToArrayBuf(str) {
 function appendTwoArrayBuf(str1, str2) {
     let str1View = new Uint8Array(str1)
     let str2View = new Uint8Array(str2)
-    try {
-        var buf = new ArrayBuffer(str1View.length + str2View.length);
-        var bufView = new Uint8Array(buf);
-        for (var i = 0, strLen = str1View.length; i < strLen; i++) {
-            bufView[i] = str1View[i];
-        }
-        for (var i = 0, strLen = str2View.length; i < strLen; i++) {
-            bufView[i + str1View.length] = str2View[i];
-        }
-        return buf;
-    } catch (error) {
-        console.error(error)
+
+    var buf = new ArrayBuffer(str1View.length + str2View.length);
+    var bufView = new Uint8Array(buf);
+    for (var i = 0, strLen = str1View.length; i < strLen; i++) {
+        bufView[i] = str1View[i];
     }
+    for (var i = 0, strLen = str2View.length; i < strLen; i++) {
+        bufView[i + str1View.length] = str2View[i];
+    }
+    return buf;
+
 }
 
 function appendThreeArrayBuf(str1, str2, str3) {
     let str1View = new Uint8Array(str1)
     let str2View = new Uint8Array(str2)
     let str3View = new Uint8Array(str3)
-    try {
-        var buf = new ArrayBuffer(str1View.length + str2View.length + str3View.length);
-        var bufView = new Uint8Array(buf);
-        for (var i = 0, strLen = str1View.length; i < strLen; i++) {
-            bufView[i] = str1View[i];
-        }
-        for (var i = 0, strLen = str2View.length; i < strLen; i++) {
-            bufView[i + str1View.length] = str2View[i];
-        }
-        for (var i = 0, strLen = str3View.length; i < strLen; i++) {
-            bufView[i + str2View.length + str1View.length] = str3View[i];
-        }
-        return buf;
-    } catch (error) {
-        console.error(error)
+
+    var buf = new ArrayBuffer(str1View.length + str2View.length + str3View.length);
+    var bufView = new Uint8Array(buf);
+    for (var i = 0, strLen = str1View.length; i < strLen; i++) {
+        bufView[i] = str1View[i];
     }
+    for (var i = 0, strLen = str2View.length; i < strLen; i++) {
+        bufView[i + str1View.length] = str2View[i];
+    }
+    for (var i = 0, strLen = str3View.length; i < strLen; i++) {
+        bufView[i + str2View.length + str1View.length] = str3View[i];
+    }
+    return buf;
+
 }
 
 export {

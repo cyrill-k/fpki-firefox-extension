@@ -143,8 +143,8 @@ func issuePCandRPC(domainName string) {
 	}
 
 	policy1 := common.Policy{
-		TrustedCA:         []string{"swiss CA"},
-		AllowedSubdomains: []string{"pay.google.com"},
+		TrustedCA:         []string{"US CA"},
+		AllowedSubdomains: []string{"support.google.com"},
 	}
 
 	policy2 := common.Policy{
