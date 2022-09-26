@@ -3,8 +3,6 @@
 import * as domainFunc from "../js_lib/domain.js"
 import * as LFPKI_accessor from "../js_lib/LF-PKI-accessor.js"
 
-const cancelUrl = chrome.runtime.getURL('/pages/block.html')
-
 async function checkInfo(details) {
     const remoteInfo = await browser.webRequest.getSecurityInfo(details.requestId, {
         certificateChain: true,
@@ -17,6 +15,13 @@ async function checkInfo(details) {
     }
     catch (error) {
         console.log(error)
+        console.log(chrome.extension.getURL("../htmls/block.html"))
+
+        let { tabId } = details;
+        chrome.tabs.update(tabId, {
+            url: chrome.extension.getURL("../htmls/block.html") + "?reason=" + error
+        })
+
     }
 }
 

@@ -13,7 +13,7 @@ function normalise(url) {
     return uri
 }
 
-function getDomainNameFromURL(url) {
+async function getDomainNameFromURL(url) {
     let domainName = normalise(url).hostname
     return domainName
 }

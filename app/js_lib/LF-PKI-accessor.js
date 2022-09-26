@@ -1,7 +1,7 @@
 import * as domainFunc from "./domain.js"
 import * as verifier from "./verifier.js"
 
-async function getMapServerResponseAndCheck(url, needVerification, remoteInfo, details) {
+async function getMapServerResponseAndCheck(url, needVerification, remoteInfo) {
     let domainName = await domainFunc.getDomainNameFromURL(url)
     const mapResponse = await queryMapServer(domainName)
 
