@@ -33,7 +33,7 @@ func issuePCandRPC(domainName string) {
 	}
 
 	// first rcsr
-	rcsr, err := do.GenerateRCSR("google.com", 1)
+	rcsr, err := do.GenerateRCSR("amazon.com", 1)
 	if err != nil {
 		panicAndQuit(err)
 	}
@@ -61,7 +61,7 @@ func issuePCandRPC(domainName string) {
 	}
 
 	// third rcsr
-	rcsr, err = do.GenerateRCSR("support.google.com", 1)
+	rcsr, err = do.GenerateRCSR("pay.amazon.com", 1)
 	if err != nil {
 		panicAndQuit(err)
 	}
@@ -144,7 +144,7 @@ func issuePCandRPC(domainName string) {
 
 	policy1 := common.Policy{
 		TrustedCA:         []string{"US CA"},
-		AllowedSubdomains: []string{"support.google.com"},
+		AllowedSubdomains: []string{"pay.amazon.com"},
 	}
 
 	policy2 := common.Policy{
@@ -157,7 +157,7 @@ func issuePCandRPC(domainName string) {
 		AllowedSubdomains: []string{""},
 	}
 
-	psr1, err := do.GeneratePSR("google.com", policy1)
+	psr1, err := do.GeneratePSR("amazon.com", policy1)
 	if err != nil {
 		panicAndQuit(err)
 	}
@@ -167,7 +167,7 @@ func issuePCandRPC(domainName string) {
 		panicAndQuit(err)
 	}
 
-	psr3, err := do.GeneratePSR("support.google.com", policy3)
+	psr3, err := do.GeneratePSR("pay.amazon.com", policy3)
 	if err != nil {
 		panicAndQuit(err)
 	}

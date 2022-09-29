@@ -13,14 +13,16 @@ function normalise(url) {
     return uri
 }
 
+// get domain name from URL
 async function getDomainNameFromURL(url) {
     let domainName = normalise(url).hostname
     return domainName
 }
 
+// get parent domain
 function getParentDomain(domainName){
-    const after = domainName.slice(domainName.indexOf('.') + 1)
-    return after
+    const parentDomain = domainName.slice(domainName.indexOf('.') + 1)
+    return parentDomain
 }
 
 export {

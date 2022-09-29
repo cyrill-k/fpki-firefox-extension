@@ -32,7 +32,6 @@ async function verifyProof(domainEntry) {
         }
         return false
     }
-
 }
 
 // verify the PoA
@@ -47,8 +46,8 @@ async function verifyNonInclusion(PoI, keyHash) {
     return verifyInclusion(PoI, proofKeyDecoded, proofValueDecoded)
 }
 
+// verify PoP
 async function verifyInclusion(PoI, keyHash, valueHash) {
-
     let root = _base64ToArrayBuffer(PoI.Root)
     let keyView = new Uint8Array(keyHash)
 
@@ -67,13 +66,11 @@ async function verifyInclusion(PoI, keyHash, valueHash) {
             leafHash = await sha256Hash_2(leafHash, proofDecoded)
         }
     }
-    //console.log(checkArrayBuffer(leafHash, root))
+
     if (checkArrayBuffer(leafHash, root)) {
         return true
     }
     return false
-
-
 }
 
 
@@ -124,7 +121,6 @@ function bitIsSet(keyView, index) {
     } else {
         return false
     }
-
 }
 
 function encode_utf8(s) {
@@ -154,7 +150,6 @@ function appendTwoArrayBuf(str1, str2) {
         bufView[i + str1View.length] = str2View[i];
     }
     return buf;
-
 }
 
 function appendThreeArrayBuf(str1, str2, str3) {
@@ -174,7 +169,6 @@ function appendThreeArrayBuf(str1, str2, str3) {
         bufView[i + str2View.length + str1View.length] = str3View[i];
     }
     return buf;
-
 }
 
 export {
