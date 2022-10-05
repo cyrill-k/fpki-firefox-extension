@@ -2,7 +2,6 @@ import * as domainFunc from "./domain.js"
 import * as verifier from "./verifier.js"
 
 // get map server response and check the connection
-// 
 async function getMapServerResponseAndCheck(url, needVerification, remoteInfo) {
     // get domain name
     let domainName = await domainFunc.getDomainNameFromURL(url)
@@ -24,13 +23,14 @@ async function getMapServerResponseAndCheck(url, needVerification, remoteInfo) {
 // check connection using the policies
 function checkConnection(policies, remoteInfo, domainName) {
     // countries to CA map
-    // countries => CAs in that country
+    // map countries => CAs in that country
     let countryToCAMap = new Map()
     countryToCAMap.set("US CA", ["CN=GTS CA 1C3,O=Google Trust Services LLC,C=US",
         "CN=GTS Root R1,O=Google Trust Services LLC,C=US",
-        "CN=GlobalSign Root CA,OU=Root CA,O=GlobalSign nv-sa,C=BE",
         "CN=Amazon,OU=Server CA 1B,O=Amazon,C=US",
-        "CN=Amazon Root CA 1,O=Amazon,C=US"])
+        "CN=Amazon Root CA 1,O=Amazon,C=US",
+        "CN=DigiCert Global CA G2,O=DigiCert Inc,C=US",
+        "CN=DigiCert Global Root G2,OU=www.digicert.com,O=DigiCert Inc,C=US"])
 
     var CertificateException = "invalid CA"
     var DomainNotAllowed = "domain not allowed"

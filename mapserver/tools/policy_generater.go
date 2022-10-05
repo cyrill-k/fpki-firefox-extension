@@ -124,7 +124,7 @@ func issuePCandRPC(domainName string) {
 	}
 
 	if len(fileNames) != 0 {
-		panicAndQuit(err)
+		panicAndQuit(fmt.Errorf("spt num error"))
 	}
 
 	verifier := logverifier.NewLogVerifier(nil)
@@ -142,6 +142,7 @@ func issuePCandRPC(domainName string) {
 		panicAndQuit(fmt.Errorf("rpcs num error"))
 	}
 
+	// generate SP
 	policy1 := common.Policy{
 		TrustedCA:         []string{"US CA"},
 		AllowedSubdomains: []string{"pay.amazon.com"},

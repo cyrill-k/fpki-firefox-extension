@@ -12,9 +12,10 @@ async function checkInfo(details) {
     try {
         // get map server response and check the connection
         await LFPKI_accessor.getMapServerResponseAndCheck(details.url, true, remoteInfo, details)
-        console.log("succeed!")
+        console.log(details.url+" verification succeed!")
     }
     catch (error) {
+        console.log(details.url+" verification failed! Reason: " + error)
         // if any error is caught, redirect to the blocking page, and show the error page
         let { tabId } = details;
         chrome.tabs.update(tabId, {

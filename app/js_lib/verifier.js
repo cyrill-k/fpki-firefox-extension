@@ -73,7 +73,6 @@ async function verifyInclusion(PoI, keyHash, valueHash) {
     return false
 }
 
-
 function checkArrayBuffer(buf1, buf2) {
     if (buf1.byteLength != buf2.byteLength) return false;
     var dv1 = new Int8Array(buf1);
@@ -83,7 +82,6 @@ function checkArrayBuffer(buf1, buf2) {
     }
     return true;
 }
-
 
 function _base64ToArrayBuffer(base64) {
     var binary_string = window.atob(base64);
@@ -137,6 +135,7 @@ function stringToArrayBuf(str) {
     return buf;
 }
 
+// append two array buffer; for hashing
 function appendTwoArrayBuf(str1, str2) {
     let str1View = new Uint8Array(str1)
     let str2View = new Uint8Array(str2)
@@ -152,6 +151,7 @@ function appendTwoArrayBuf(str1, str2) {
     return buf;
 }
 
+// append three array buffer; for hashing
 function appendThreeArrayBuf(str1, str2, str3) {
     let str1View = new Uint8Array(str1)
     let str2View = new Uint8Array(str2)
