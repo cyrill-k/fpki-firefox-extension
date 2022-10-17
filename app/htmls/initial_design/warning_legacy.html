@@ -13,7 +13,6 @@
 
   <body xmlns="http://www.w3.org/1999/xhtml" dir="ltr" class="certerror" code="MOZILLA_PKIX_ERROR_SELF_SIGNED_CERT">
     <!-- ERROR ITEM CONTAINER (removed during loading to avoid bug 39098) -->
-    <div id="errorContainer">
     <!-- PAGE CONTAINER (for styling purposes only) -->
     <div id="errorPageContainer" class="container">
       <div id="text-container">
@@ -27,71 +26,25 @@
 
           <!-- Short Description -->
           <div id="errorShortDesc">
-            <p id="errorShortDescText">Firefox detected a potential security threat and did not continue to <span xmlns="http://www.w3.org/1999/xhtml" class="hostname">192.168.1.1</span>. If you visit this site, attackers could try to steal information like your passwords, emails, or credit card details.</p>
+            <p id="errorShortDescText">The flexible web security plugin detected a potential security threat and did not continue to <span xmlns="http://www.w3.org/1999/xhtml" class="hostname">https://example.com</span>. If you visit this site, attackers could try to steal information like your passwords, emails, or credit card details.</p>
           </div>
-
 		</div>
       <div id="advancedPanelContainer">
         <div id="badCertAdvancedPanel" class="advanced-panel">
-          <p id="badCertTechnicalInfo"><label data-l10n-id="cert-error-intro" data-l10n-args="{&quot;hostname&quot;:&quot;192.168.1.1&quot;}">192.168.1.1 uses an invalid security certificate.</label>
+          <p id="badCertTechnicalInfo"><label data-l10n-id="cert-error-intro" data-l10n-args="{&quot;hostname&quot;:&quot;192.168.1.1&quot;}"><br>https://example.com</label>
  
-<label data-l10n-id="cert-error-trust-self-signed" data-l10n-args="{}">The certificate is not trusted because it is self-signed.</label>
+<label data-l10n-id="cert-error-trust-self-signed" data-l10n-args="{}">The server returned a certificate signed by <i>CA1</i>, but there exists a more highly trusted certificate from <i>CA2</i> that should be preferred.<br><br>This rule is defined in your imported preference: <b>Centre for Cyber Trust</b></label>
  
-<label data-l10n-id="cert-error-code-prefix-link" data-l10n-args="{&quot;error&quot;:&quot;MOZILLA_PKIX_ERROR_SELF_SIGNED_CERT&quot;}">Error code: <a id="errorCode" data-l10n-name="error-code-link" data-telemetry-id="error_code_link" href="#certificateErrorDebugInformation">MOZILLA_PKIX_ERROR_SELF_SIGNED_CERT</a></label>
- 
+<label data-l10n-id="cert-error-code-prefix-link" data-l10n-args="{&quot;error&quot;:&quot;MOZILLA_PKIX_ERROR_SELF_SIGNED_CERT&quot;}">Error code: <a id="errorCode" data-l10n-name="error-code-link" data-telemetry-id="error_code_link" href="#certificateErrorDebugInformation">E201</a></label>
+<label data-l10n-id="cert-error-trust-self-signed" data-l10n-args="{}"><br>Learn more about how the flexible web security plugin protects you here:</label> 
 </p>
-          <a id="viewCertificate" href="javascript:void(0)">View Certificate</a>
+
+          <a id="viewCertificate" href="javascript:void(0)">https://wiki.f-pki.ethz.ch</a>
           <div id="advancedPanelButtonContainer" class="button-container">
             <button id="advancedPanelReturnButton" class="primary" data-telemetry-id="return_button_adv">Go Back (Recommended)</button>
-            <button class="primary try-again">Try Again</button>
             <div class="exceptionDialogButtonContainer">
               <button id="exceptionDialogButton" data-telemetry-id="exception_button">Accept the Risk and Continue</button>
             </div>
           </div>
         </div>
-
-        <div id="blockingErrorReporting" class="advanced-panel" hidden="">
-            <p class="toggle-container-with-text">
-                <input type="checkbox" id="automaticallyReportBlockingInFuture" role="checkbox" />
-                <label for="automaticallyReportBlockingInFuture">Report errors like this to help Mozilla identify and block malicious sites</label>
-            </p>
-        </div>
-
-        <div id="certificateErrorDebugInformation" class="advanced-panel" hidden="">
-          <button id="copyToClipboardTop" data-telemetry-id="clipboard_button_top">Copy text to clipboard</button>
-          <div id="certificateErrorText">https://192.168.1.1/
-
-The certificate is not trusted because it is self-signed.
-
-HTTP Strict Transport Security: false
-HTTP Public Key Pinning: false
-
-Certificate chain:
-
------BEGIN CERTIFICATE-----
-MIIDgzCCAmugAwIBAgIJANeQZgcC3zUVMA0GCSqGSIb3DQEBCwUAMGYxCzAJBgNV
-BAYTAlVTMRkwFwYDVQQDDBBVYmlxdWl0aVJvdXRlclVJMRYwFAYDVQQKDA1VYmlx
-dWl0aSBJbmMuMREwDwYDVQQIDAhOZXcgWW9yazERMA8GA1UEBwwITmV3IFlvcmsw
-HhcNMjIwODIwMDYyNTM0WhcNMjQxMTIxMDYyNTM0WjBmMQswCQYDVQQGEwJVUzEZ
-MBcGA1UEAwwQVWJpcXVpdGlSb3V0ZXJVSTEWMBQGA1UECgwNVWJpcXVpdGkgSW5j
-LjERMA8GA1UECAwITmV3IFlvcmsxETAPBgNVBAcMCE5ldyBZb3JrMIIBIjANBgkq
-hkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAynFpEVasTsoqzMINrXedgUCkcC2dA3SE
-MFQQAuBgq0P82lcIF/FWBBEjtDp3O8dxnoyektcJ2UgfaH8ZziFxrsmSnJOjDovl
-hTH2CQhctrQYbWMlEFc7Cp003PIHqVDS02aABYfdAvv6t6wMOAn4ifB0UfHvH6UD
-h0kzAUeqaalRXbk5yxnCBIeEQayLoGhd2QR6aXzWJxX/LGLe96PA28kSU78vUEjj
-YACQE7gP5urCZ+6HYsGKKL9LJ95aO6bqM6c715IbYJj/BpBPFCe5qSNUqlY7le6R
-+teyn8Bl5cPxzoInt252I6RCEnIo1yiFkvRFnktGR8B5c6en9cSVAQIDAQABozQw
-MjAbBgNVHREEFDASghBVYmlxdWl0aVJvdXRlclVJMBMGA1UdJQQMMAoGCCsGAQUF
-BwMBMA0GCSqGSIb3DQEBCwUAA4IBAQADEoHELQkaUrh3X5Prw2VFhJ3oYfBEguxS
-oMcNrZBpCpREGAWRzaleirpcAj9xrxO9cDna3SR3O0yLM03oNJcUY2IbpYnJkNbt
-q10zYEh4w62uRs9AkfCJxpKl/9hCpxVuJ7DHCvdPdTMopVp1XP/DRBSWQvJEph29
-PdRl53ZoEVg6FEaciNjVBbkXDoQ0FC/svDZ5vcU7nuAWOgbE7mUII+A+XL1ciy7m
-T9sovuxiqaiGeDuHymsjL3KsHXr4JAQRnGtOKbDA9Q42GwNKbrHT5lFYfYxIowuu
-fmkWNUQimAE9FQ5/xi8w3le+T6YUkF4d5CqfrezOv1s7gbC9Slwy
------END CERTIFICATE-----
-</div>
-          <button id="copyToClipboardBottom" data-telemetry-id="clipboard_button_bot">Copy text to clipboard</button>
-        </div>
-      </div>
-    </div>
   </body>
