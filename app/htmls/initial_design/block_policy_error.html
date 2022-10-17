@@ -1,0 +1,42 @@
+<html xmlns="http://www.w3.org/1999/xhtml" dir="ltr" lang="en-US">
+  <head>
+    <meta http-equiv="Content-Security-Policy" content="default-src chrome:; object-src 'none'" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="stylesheet" href="./css/blockedSite.css" type="text/css" media="all" />
+    <link rel="icon" id="favicon" href="../../images/F-D_dark.png" />
+    <link rel="localization" href="branding/brand.ftl" />
+    <link rel="localization" href="browser/safebrowsing/blockedSite.ftl" />
+  <title data-l10n-id="safeb-blocked-malware-page-title">Visiting this website may harm your computer</title></head>
+  <body>
+    <div id="errorPageContainer" class="container">
+
+      <!-- Error Title -->
+      <div id="errorTitle" class="title">
+        <h1 class="title-text" id="errorTitleText" data-l10n-id="safeb-blocked-malware-page-title">Visiting this website may harm your computer</h1>
+      </div>
+
+      <div id="errorLongContent">
+
+        <!-- Short Description -->
+        <div id="errorShortDesc">
+          <p id="errorShortDescText" data-l10n-id="safeb-blocked-malware-page-short-desc">The flexible web security plugin blocked this page because it detected a violation of this domains trust policy. This could be a sign of an active attack, please do not proceed.</p>
+        </div>
+
+        <!-- Action buttons -->
+        <div id="buttons" class="button-container">
+          <!-- Commands handled in browser.js -->
+          <button id="goBackButton" class="primary" data-l10n-id="safeb-palm-accept-label">Go back</button>
+          <button id="seeDetailsButton" data-l10n-id="safeb-palm-see-details-label">See details</button>
+        </div>
+      </div>
+      <div id="errorDescriptionContainer">
+        <!-- Error Descriptions Handled in blockedSite.js -->
+        <div class="error-description" id="errorLongDesc">
+          <p id="errorInnerDescription" data-l10n-id="safeb-blocked-malware-page-error-desc-override-sumo" data-l10n-args="{&quot;sitename&quot;:&quot;malware.wicar.org&quot;}"><span id="error_desc_sitename" data-l10n-name="sitename" class="sitename">The policy for example.ethz.ch was violated. This indicates an active attack, you must not proceed to this site! </span><a id="error_desc_link" data-l10n-name="error_desc_link" href="TODO:insert Wiki Link">Error 104.</a> The returned certificate was signed by an untrusted CA. </p>
+          <p id="learn_more" data-l10n-id="safeb-blocked-malware-page-learn-more-sumo">Learn more about how the flexible web security plugin protects you here: <a id="firefox_support" data-l10n-name="firefox_support" href="https://support.mozilla.org/1/firefox/105.0.3/WINNT/en-US/phishing-malware">https://wiki.f-pki.ethz.ch</a>.</p>
+        </div>
+      </div>
+    </div>
+  </body>
+  <script src="chrome://browser/content/blockedSite.js"></script>
+</html>
