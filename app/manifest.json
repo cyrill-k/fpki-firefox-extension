@@ -18,7 +18,8 @@
     "webRequest",
     "webRequestBlocking",
     "<all_urls>",
-    "tabs"
+    "tabs",
+    "storage"
   ],
   "web_accessible_resources": [
     "/pages/block.html"

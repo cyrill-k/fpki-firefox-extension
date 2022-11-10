@@ -120,6 +120,16 @@ async function queryMapServer(domainName) {
     return domainEntries
 }
 
+// query map server
+async function queryMapServerHttp(mapServerUrl, domainName) {
+    let resp = await fetch(mapServerUrl+"/?domain="+domainName)
+    let domainEntries = await resp.json()
+
+    let base64decodedEntries = base64DecodeDomainEntry(domainEntries)
+
+    return domainEntries
+}
+
 function base64DecodeDomainEntry(response) {
     for (var i = 0; i < response.length; i++) {
         let replaced = response[i].DomainEntryBytes.replace("+", "-")
@@ -130,5 +140,8 @@ function base64DecodeDomainEntry(response) {
 }
 
 export {
-    getMapServerResponseAndCheck
+    queryMapServer,
+    queryMapServerHttp,
+    extractPolicy,
+    checkConnection
 }

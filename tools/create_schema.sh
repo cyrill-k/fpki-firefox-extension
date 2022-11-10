@@ -19,7 +19,7 @@ DROP DATABASE IF EXISTS fpki;
 CREATE DATABASE fpki /*!40100 DEFAULT CHARACTER SET ascii COLLATE ascii_bin */ /*!80016 DEFAULT ENCRYPTION='N' */;
 EOF
 )
-echo "$CMD" | mysql -u root
+echo "$CMD" | mysql -u test -p zaphod
 
 
 CMD=$(cat <<EOF
@@ -35,7 +35,7 @@ CREATE TABLE nodes (
 ) ENGINE=InnoDB CHARSET=\`binary\` COLLATE=\`binary\`;
 EOF
 )
-echo "$CMD" | mysql -u root
+echo "$CMD" | mysql -u test -p zaphod
 
 
 CMD=$(cat <<EOF
@@ -65,7 +65,7 @@ END$$
 DELIMITER ;
 EOF
 )
-echo "$CMD" | mysql -u root
+echo "$CMD" | mysql -u test -p zaphod
 
 
 CMD=$(cat <<EOF
@@ -95,7 +95,7 @@ END$$
 DELIMITER ;
 EOF
 )
-echo "$CMD" | mysql -u root
+echo "$CMD" | mysql -u test -p zaphod
 
 
 
@@ -106,7 +106,7 @@ CREATE TABLE \`fpki\`.\`domainEntries\` (
    UNIQUE INDEX \`key_UNIQUE\` (\`key\` ASC));
 EOF
 )
-echo "$CMD" | mysql -u root
+echo "$CMD" | mysql -u test -p zaphod
 
 
 
@@ -119,7 +119,7 @@ CREATE TABLE \`fpki\`.\`tree\` (
    UNIQUE INDEX \`key_UNIQUE\` (\`key\` ASC));
 EOF
 )
-echo "$CMD" | mysql -u root
+echo "$CMD" | mysql -u test -p zaphod
 
 
 
@@ -132,7 +132,7 @@ CREATE TABLE \`fpki\`.\`deleteTest\` (
    UNIQUE INDEX \`key_UNIQUE\` (\`key\` ASC));
 EOF
 )
-echo "$CMD" | mysql -u root
+echo "$CMD" | mysql -u test -p zaphod
 
 
 CMD=$(cat <<EOF
@@ -141,7 +141,7 @@ CMD=$(cat <<EOF
    PRIMARY KEY (\`key\`));
 EOF
 )
-echo "$CMD" | mysql -u root
+echo "$CMD" | mysql -u test -p zaphod
 
 
 

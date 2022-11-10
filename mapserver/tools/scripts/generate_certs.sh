@@ -29,7 +29,7 @@ pkill -f logsigner_exec
 rm logserver_exec
 rm logsigner_exec
 
-clear
+# clear
 
 if [ $POLICY_GENERATION_STATUS != "succeed" ] 
 then

@@ -14,14 +14,27 @@ The map server will run as a local server, and communicate with the extension vi
 First, you need to set up the map server. 
 
 To setup the database:
-``cd tools
-.//create_schema.sh``
+- ``cd tools``
+- ``mysql -u root``
+- ``USE mysql;``
+- ``CREATE USER 'test'@'localhost' IDENTIFIED BY 'zaphod';``
+- ``GRANT ALL PRIVILEGES ON *.* TO 'test'@'localhost';``
+- ``UPDATE user SET plugin='auth_socket' WHERE User='test';``
+- ``FLUSH PRIVILEGES;``
+- ``CREATE DATABASE test;``
+- ``.//create_schema.sh``
+
+### If mysql root access is lost
+- ``create user root@localhost identified by '';``
+
+Then reset the database using the trillian reset script
+/home/<user>/go/pkg/mod/github.com/google/trillian@v1.4.1/scripts/resetdb.sh
 
 Then go to mapserver folder
-``make generate_test_certs_and_RPC_SP``
+- ``make generate_test_certs_and_RPC_SP``
 
 And run map server
-``go run mapserver.go``
+- ``go run mapserver.go``
 
 After the map server is set up, load the browser extension. And you can visit the following url:
 
@@ -29,3 +42,6 @@ After the map server is set up, load the browser extension. And you can visit th
 "https://pay.amazon.com "
 "https://baidu.com "
 "https://sellercentral.amazon.com "
+
+## Try to see what happens if an embedded picture is blocked
+https://images-na.ssl-images-amazon.com/images/G/01/AmazonExports/Fuji/2021/June/Fuji_Quad_Headset_1x._SY116_CB667159060_.jpg
