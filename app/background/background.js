@@ -28,10 +28,12 @@ class FpkiRequest {
 
     initiateFetchingPoliciesIfNecessary() {
         this.policiesPromise = this.initiateFetchPolicies(config.get("max-connection-setup-time"));
+        return this.policiesPromise;
     }
 
     fetchPolicies() {
         this.policiesPromise = this.initiateFetchPolicies();
+        return this.policiesPromise;
     }
 
     async initiateFetchPolicies(maxTimeToExpiration=0) {
@@ -163,9 +165,9 @@ async function requestInfo(details) {
         const domain = await domainFunc.getDomainNameFromURL(details.url);
         const fpkiRequest = new FpkiRequest(mapserver, domain);
 
-        fpkiRequest.initiateFetchingPoliciesIfNecessary();
+        const policiesPromise = fpkiRequest.initiateFetchingPoliciesIfNecessary();
         // the following is necessary to prevent a browser warning: Uncaught (in promise) Error: ...
-        fpkiRequest.policiesPromise.catch((error) => {
+        policiesPromise.catch((error) => {
             // do not redirect here for now since we want to have a single point of redirection to simplify logging
             // console.log("initiateFetchingPoliciesIfNecessary redirect");
             // redirect(details, error);
@@ -197,31 +199,26 @@ async function checkInfo(details) {
     })
 
     try {
-        const policyPromises = [];
+        const policiesMap = new Map();
         for (const [index, mapserver] of config.get("mapservers").entries()) {
             if (index === config.get("mapserver-instances-queried")) {
                 break;
             }
             const fpkiRequest = new FpkiRequest(mapserver, domain);
-            fpkiRequest.fetchPolicies()
-            policyPromises.push(fpkiRequest.policiesPromise);
-        }
-
-        // wait for all policies to be resolved (or failed)
-        const policies = [];
-        for (const p of policyPromises) {
-            policies.push(await p);
+            policiesMap.set(mapserver, await fpkiRequest.fetchPolicies());
         }
 
         // check each policy and throw an error if one of the verifications fails
-        policies.forEach(p => LFPKI_accessor.checkConnection(p, remoteInfo, domain));
+        policiesMap.forEach((p, m) => {
+            console.log("starting verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
+            LFPKI_accessor.checkConnection(p, remoteInfo, domain);
+        });
 
         // TODO: check connection for all policies and continue if at least config.get("mapserver-quorum") responses exist
 
         // TODO: what happens if a response is invalid? we should definitely log it, but we could ignore it if enough other valid responses exist
 
-        console.log("starting verification for "+domain+" with policies: "+printMap(policies));
-        LFPKI_accessor.checkConnection(policies, remoteInfo, domain);
+        // LFPKI_accessor.checkConnection(policies, remoteInfo, domain);
         console.log("verification succeeded! ["+details.url+"]");
     }
     catch (error) {
