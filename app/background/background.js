@@ -5,11 +5,19 @@ import * as error from "../js_lib/errors.js"
 import * as LFPKI_accessor from "../js_lib/LF-PKI-accessor.js"
 
 var config = new Map();
-config.set("mapservers", [{"identity": "local-mapserver", "domain": "http://localhost:8080", "querytype": "lfpki-http-get"}]);
+// TODO: remove duplicate local mapserver (only used for testing)
+config.set("mapservers", [
+    {"identity": "local-mapserver", "domain": "http://localhost:8080", "querytype": "lfpki-http-get"},
+    {"identity": "local-mapserver-2", "domain": "http://localhost:8080", "querytype": "lfpki-http-get"}
+]);
 // cache timeout in ms
 config.set("cache-timeout", 10000);
-// max amount of time that a connection setup takes. Used to ensure that a cached policy that is valid at the onBeforeRequest event is still valid when the onHeadersReceived event fires.
+// max amount of time in ms that a connection setup takes. Used to ensure that a cached policy that is valid at the onBeforeRequest event is still valid when the onHeadersReceived event fires.
 config.set("max-connection-setup-time", 1000);
+// quorum of trusted map servers necessary to accept their result
+config.set("mapserver-quorum", 2);
+// number of mapservers queried per validated domain (currently always choosing the first n entries in the mapserver list)
+config.set("mapserver-instances-queried", 2);
 
 class FpkiRequest {
     constructor(mapserver, domain) {
@@ -26,8 +34,8 @@ class FpkiRequest {
         this.policiesPromise = this.initiateFetchPolicies();
     }
 
-    async initiateFetchPolicies(margin=0) {
-        const cachedValidEntries = !shouldFetchPcaPolicies(this.domain, margin);
+    async initiateFetchPolicies(maxTimeToExpiration=0) {
+        const cachedValidEntries = !shouldFetchPcaPoliciesForMapserver(this.domain, this.mapserver, maxTimeToExpiration);
         const mapserver = this.mapserver;
         let activeRequest = null;
         if (fpkiRequests.has(this.domain)) {
@@ -40,13 +48,13 @@ class FpkiRequest {
         }
 
         if (cachedValidEntries) {
-            console.log("using cached entry ["+this.domain+"]");
+            console.log("using cached entry ["+this.domain+", "+this.mapserver.identity+"]");
             return getLatestPcaPolicies(this.domain).get(this.mapserver).pcaPolicies;
         } else if (activeRequest !== null) {
-            console.log("reusing existing active request ["+this.domain+"]");
+            console.log("reusing existing active request ["+this.domain+", "+this.mapserver.identity+"]");
             return activeRequest.policiesPromise;
         } else {
-            console.log("create new fetching request ["+this.domain+"]");
+            console.log("create new fetching request ["+this.domain+", "+this.mapserver.identity+"]");
 
             // add this request to ensure that no other request is scheduled for the same domain
             fpkiRequests.set(this.domain, map_get_list(fpkiRequests, this.domain).concat(this));
@@ -94,11 +102,11 @@ function addPcaPolicies(timestamp, domain, mapserver, pcaPolicies) {
 }
 
 function getLatestPcaPolicies(domain) {
-    let latestPolicies = new Map();
+    const latestPolicies = new Map();
     if (pcaPoliciesCache.has(domain)) {
         for (const [timestamp, mapserver, pcaPolicies] of pcaPoliciesCache.get(domain)) {
             // see if this really works of if we need some kind of mapserver identity
-            let replacePolicies = !latestPolicies.has(mapserver) || timestamp > latestPolicies.get(mapserver).timestamp;
+            const replacePolicies = !latestPolicies.has(mapserver) || timestamp > latestPolicies.get(mapserver).timestamp;
             if (replacePolicies) {
                 latestPolicies.set(mapserver, {timestamp: timestamp, pcaPolicies: pcaPolicies});
             }
@@ -107,17 +115,23 @@ function getLatestPcaPolicies(domain) {
     return latestPolicies;
 }
 
-function shouldFetchPcaPolicies(domain, margin=0) {
-    const currentTime = new Date();
-    return getValidPcaPolicies(domain, margin).length === 0;
+function shouldFetchPcaPoliciesForMapserver(domain, mapserver, maxTimeToExpiration=0) {
+    return getValidPcaPoliciesForMapserver(domain, mapserver, maxTimeToExpiration).length === 0;
 }
 
-function getValidPcaPolicies(domain, margin=0) {
+function getValidPcaPoliciesForMapserver(domain, mapserver, maxTimeToExpiration=0) {
+    return getAllValidPcaPolicies(domain, maxTimeToExpiration).
+        filter(
+            ([, entryMapserver, ]) => entryMapserver === mapserver
+        );
+}
+
+function getAllValidPcaPolicies(domain, maxTimeToExpiration=0) {
     const currentTime = new Date();
     const validPcaPolicies = [];
     getLatestPcaPolicies(domain).forEach(function(value, mapserver) {
         const {timestamp:timestamp, pcaPolicies:pcaPolicies} = value;
-        if (currentTime-timestamp < config.get("cache-timeout")-margin) {
+        if (currentTime-timestamp < config.get("cache-timeout")-maxTimeToExpiration) {
             validPcaPolicies.push([timestamp, mapserver, pcaPolicies]);
         }
     });
@@ -139,18 +153,24 @@ function redirect(details, error) {
 
 async function requestInfo(details) {
     console.log("requestInfo ["+details.url+"]");
-    // TODO: initiate fetching policies from multiple map servers
-    let mapserver = config.get("mapservers")[0];
-    let domain = await domainFunc.getDomainNameFromURL(details.url)
-    let fpkiRequest = new FpkiRequest(mapserver, domain);
 
-    fpkiRequest.initiateFetchingPoliciesIfNecessary();
-    // the following is necessary to prevent a browser warning: Uncaught (in promise) Error: ...
-    fpkiRequest.policiesPromise.catch((error) => {
-        // do not redirect here for now since we want to have a single point of redirection to simplify logging
-        // console.log("initiateFetchingPoliciesIfNecessary redirect");
-        // redirect(details, error);
-    });
+    for (const [index, mapserver] of config.get("mapservers").entries()) {
+        if (index === config.get("mapserver-instances-queried")) {
+            break;
+        }
+        // could randomize the queried mapservers and remember which were queried by keeping a global map of the form [details.requestId: Array[index]]
+        // const mapserver = config.get("mapservers")[0];
+        const domain = await domainFunc.getDomainNameFromURL(details.url);
+        const fpkiRequest = new FpkiRequest(mapserver, domain);
+
+        fpkiRequest.initiateFetchingPoliciesIfNecessary();
+        // the following is necessary to prevent a browser warning: Uncaught (in promise) Error: ...
+        fpkiRequest.policiesPromise.catch((error) => {
+            // do not redirect here for now since we want to have a single point of redirection to simplify logging
+            // console.log("initiateFetchingPoliciesIfNecessary redirect");
+            // redirect(details, error);
+        });
+    }
 }
 
 function printMap(m) {
@@ -177,12 +197,28 @@ async function checkInfo(details) {
     })
 
     try {
-        // TODO: fetch policies from multiple map servers
-        // TODO: combine policies into strictest policy
-        const mapserver = config.get("mapservers")[0];
-        const fpkiRequest = new FpkiRequest(mapserver, domain);
-        fpkiRequest.fetchPolicies();
-        const policies = await fpkiRequest.policiesPromise;
+        const policyPromises = [];
+        for (const [index, mapserver] of config.get("mapservers").entries()) {
+            if (index === config.get("mapserver-instances-queried")) {
+                break;
+            }
+            const fpkiRequest = new FpkiRequest(mapserver, domain);
+            fpkiRequest.fetchPolicies()
+            policyPromises.push(fpkiRequest.policiesPromise);
+        }
+
+        // wait for all policies to be resolved (or failed)
+        const policies = [];
+        for (const p of policyPromises) {
+            policies.push(await p);
+        }
+
+        // check each policy and throw an error if one of the verifications fails
+        policies.forEach(p => LFPKI_accessor.checkConnection(p, remoteInfo, domain));
+
+        // TODO: check connection for all policies and continue if at least config.get("mapserver-quorum") responses exist
+
+        // TODO: what happens if a response is invalid? we should definitely log it, but we could ignore it if enough other valid responses exist
 
         console.log("starting verification for "+domain+" with policies: "+printMap(policies));
         LFPKI_accessor.checkConnection(policies, remoteInfo, domain);
