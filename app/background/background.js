@@ -99,18 +99,18 @@ class PcaPoliciesCacheEntry {
 }
 
 function addPcaPolicies(timestamp, domain, mapserver, pcaPolicies) {
-    const cacheEntry = [timestamp, mapserver, pcaPolicies];
-    pcaPoliciesCache.set(domain, map_get_list(pcaPoliciesCache, domain).concat([cacheEntry]));
+    const cacheEntry = new PcaPoliciesCacheEntry(timestamp, mapserver, pcaPolicies);
+    pcaPoliciesCache.set(domain, map_get_list(pcaPoliciesCache, domain).concat(cacheEntry));
 }
 
 function getLatestPcaPolicies(domain) {
     const latestPolicies = new Map();
     if (pcaPoliciesCache.has(domain)) {
-        for (const [timestamp, mapserver, pcaPolicies] of pcaPoliciesCache.get(domain)) {
-            // see if this really works of if we need some kind of mapserver identity
-            const replacePolicies = !latestPolicies.has(mapserver) || timestamp > latestPolicies.get(mapserver).timestamp;
-            if (replacePolicies) {
-                latestPolicies.set(mapserver, {timestamp: timestamp, pcaPolicies: pcaPolicies});
+        for (const cacheEntry of pcaPoliciesCache.get(domain)) {
+            const {timestamp: timestamp, mapserver: mapserver} = cacheEntry;
+            // TODO: see if this really works of if we need some kind of mapserver identity
+            if (!latestPolicies.has(mapserver) || timestamp > latestPolicies.get(mapserver).timestamp) {
+                latestPolicies.set(mapserver, cacheEntry);
             }
         }
     }
