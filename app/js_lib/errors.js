@@ -1,8 +1,8 @@
-const errorTypes = {
+export const errorTypes = {
     INVALID_CONFIG: "Invalid configuration"
 }
 
-class FpkiError extends Error {
+export class FpkiError extends Error {
     constructor(errorType, message) {
         console.log(errorType);
         console.log(message);
@@ -10,9 +10,4 @@ class FpkiError extends Error {
         super(errorType+": "+message);
         this.errorType = errorType;
     }
-}
-
-export {
-    errorTypes,
-    FpkiError
 }
