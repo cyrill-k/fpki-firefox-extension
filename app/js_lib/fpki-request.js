@@ -91,7 +91,7 @@ function getLatestPcaPolicies(domain) {
     const latestPolicies = new Map();
     if (pcaPoliciesCache.has(domain)) {
         for (const cacheEntry of pcaPoliciesCache.get(domain)) {
-            const {timestamp: timestamp, mapserver: mapserver} = cacheEntry;
+            const {timestamp, mapserver} = cacheEntry;
             // TODO: see if this really works of if we need some kind of mapserver identity
             if (!latestPolicies.has(mapserver) || timestamp > latestPolicies.get(mapserver).timestamp) {
                 latestPolicies.set(mapserver, cacheEntry);
@@ -116,7 +116,7 @@ function getAllValidPcaPolicies(domain, maxTimeToExpiration=0) {
     const currentTime = new Date();
     const validPcaPolicies = [];
     getLatestPcaPolicies(domain).forEach(function(cacheEntry, mapserver) {
-        const {timestamp: timestamp, pcaPolicies: pcaPolicies} = cacheEntry;
+        const {timestamp, pcaPolicies} = cacheEntry;
         if (currentTime-timestamp < config.get("cache-timeout")-maxTimeToExpiration) {
             validPcaPolicies.push(cacheEntry);
         }
