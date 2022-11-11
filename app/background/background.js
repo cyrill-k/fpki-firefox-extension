@@ -124,17 +124,17 @@ function shouldFetchPcaPoliciesForMapserver(domain, mapserver, maxTimeToExpirati
 function getValidPcaPoliciesForMapserver(domain, mapserver, maxTimeToExpiration=0) {
     return getAllValidPcaPolicies(domain, maxTimeToExpiration).
         filter(
-            ([, entryMapserver, ]) => entryMapserver === mapserver
+            ({mapserver: entryMapserver}) => entryMapserver === mapserver
         );
 }
 
 function getAllValidPcaPolicies(domain, maxTimeToExpiration=0) {
     const currentTime = new Date();
     const validPcaPolicies = [];
-    getLatestPcaPolicies(domain).forEach(function(value, mapserver) {
-        const {timestamp:timestamp, pcaPolicies:pcaPolicies} = value;
+    getLatestPcaPolicies(domain).forEach(function(cacheEntry, mapserver) {
+        const {timestamp: timestamp, pcaPolicies: pcaPolicies} = cacheEntry;
         if (currentTime-timestamp < config.get("cache-timeout")-maxTimeToExpiration) {
-            validPcaPolicies.push([timestamp, mapserver, pcaPolicies]);
+            validPcaPolicies.push(cacheEntry);
         }
     });
     return validPcaPolicies;
