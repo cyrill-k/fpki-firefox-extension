@@ -5,12 +5,19 @@ import {checkConnection} from "../js_lib/LF-PKI-accessor.js"
 import {FpkiRequest} from "../js_lib/fpki-request.js"
 import {printMap} from "../js_lib/helper.js"
 import {config} from "../js_lib/config.js"
-import {LogEntry, getLogEntryForRequest, printLogEntriesToConsole} from "../js_lib/log.js"
+import {LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole} from "../js_lib/log.js"
 
 // communication between browser plugin popup and this background script
 browser.runtime.onConnect.addListener(function(port) {
     port.onMessage.addListener(function(msg) {
-        printLogEntriesToConsole();
+        switch (msg) {
+        case 'printLog':
+            printLogEntriesToConsole();
+            break;
+        case 'downloadLog':
+            downloadLog();
+            break;
+        }
     });
 })
 
