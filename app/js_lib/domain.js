@@ -14,7 +14,7 @@ function normalise(url) {
 }
 
 // get domain name from URL
-async function getDomainNameFromURL(url) {
+function getDomainNameFromURL(url) {
     let domainName = normalise(url).hostname
     return domainName
 }

@@ -122,12 +122,13 @@ async function queryMapServer(domainName) {
 
 // query map server
 async function queryMapServerHttp(mapServerUrl, domainName) {
-    let resp = await fetch(mapServerUrl+"/?domain="+domainName)
+    const fetchUrl = mapServerUrl+"/?domain="+domainName;
+    let resp = await fetch(fetchUrl)
     let domainEntries = await resp.json()
 
     let base64decodedEntries = base64DecodeDomainEntry(domainEntries)
 
-    return domainEntries
+    return {response: domainEntries, fetchUrl: fetchUrl}
 }
 
 function base64DecodeDomainEntry(response) {

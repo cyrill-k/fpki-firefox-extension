@@ -8,10 +8,11 @@ var fpkiRequests = new Map();
 var pcaPoliciesCache = new Map();
 
 export class FpkiRequest {
-    constructor(mapserver, domain) {
+    constructor(mapserver, domain, requestId) {
         this.mapserver = mapserver;
         this.domain = domain;
         this.requestInitiated = new Date();
+        this.requestId = requestId;
     }
 
     initiateFetchingPoliciesIfNecessary() {
@@ -22,6 +23,27 @@ export class FpkiRequest {
     fetchPolicies() {
         this.policiesPromise = this.#initiateFetchPolicies();
         return this.policiesPromise;
+    }
+
+    // removes the request for this domain and mapserver from the list of active requests
+    // returns true if a request was removed and false otherwise
+    removeFromActiveRequestsIfPossible() {
+        const currentRequests = fpkiRequests.get(this.domain);
+        const mapserver = this.mapserver
+        const index = currentRequests.findIndex(request=>request.mapserver===mapserver);
+        if (index !== -1) {
+            currentRequests.splice(index, 1);
+            fpkiRequests.set(this.domain, currentRequests);
+            return true;
+        }
+        return false;
+    }
+
+    #getLatestPerformanceResourceEntry(fetchUrl) {
+        return performance.getEntriesByName(fetchUrl, "resource").reduce(
+            (prev, current) =>
+            prev === null || prev.startTime < current.startTime ? current : prev,
+            null);
     }
 
     async #initiateFetchPolicies(maxTimeToExpiration=0) {
@@ -39,37 +61,57 @@ export class FpkiRequest {
 
         if (cachedValidEntries) {
             console.log("using cached entry ["+this.domain+", "+this.mapserver.identity+"]");
-            return getLatestPcaPolicies(this.domain).get(this.mapserver).pcaPolicies;
+            const {pcaPolicies, timestamp} = getLatestPcaPolicies(this.domain).get(this.mapserver);
+            const metrics = {type: "cached", lifetime: timestamp-new Date()+config.get("cache-timeout")};
+            return {policies: pcaPolicies, metrics};
         } else if (activeRequest !== null) {
             console.log("reusing existing active request ["+this.domain+", "+this.mapserver.identity+"]");
-            return activeRequest.policiesPromise;
+            const startTime = performance.now();
+            let {policies, metrics} = await activeRequest.policiesPromise;
+            if (this.requestId !== activeRequest.requestId) {
+                const endTime = performance.now();
+                metrics = {...metrics, type: "ongoing-request", waitingTime: new Date()-activeRequest.requestInitiated}
+            }
+            return {policies, metrics};
         } else {
             console.log("create new fetching request ["+this.domain+", "+this.mapserver.identity+"]");
 
             // add this request to ensure that no other request is scheduled for the same domain
             fpkiRequests.set(this.domain, mapGetList(fpkiRequests, this.domain).concat(this));
 
-            let mapResponse;
-            // fetch policy for the mapserver over the configured channel (e.g., http get)
-            switch (this.mapserver.querytype) {
-            case "lfpki-http-get":
-                mapResponse = await queryMapServerHttp(this.mapserver.domain, this.domain);
-                break;
-            default:
-                throw new FpkiError(errorTypes.INVALID_CONFIG, "Invalid mapserver config: "+this.mapserver.querytype)
-                break;
+            // execute the fetching and response parsing in a try block to ensure that the active request is dropped whether the operations succeed or fail
+            try {
+                let mapResponse, performanceResourceEntry;
+                // fetch policy for the mapserver over the configured channel (e.g., http get)
+                switch (this.mapserver.querytype) {
+                case "lfpki-http-get":
+                    const {response, fetchUrl} = await queryMapServerHttp(this.mapserver.domain, this.domain);
+                    mapResponse = response;
+                    performanceResourceEntry = this.#getLatestPerformanceResourceEntry(fetchUrl);
+                    break;
+                default:
+                    throw new FpkiError(errorTypes.INVALID_CONFIG, "Invalid mapserver config: "+this.mapserver.querytype)
+                    break;
+                }
+
+                // extract metrics from performance resource entry
+                const {duration, transferSize, connectStart, connectEnd, secureConnectionStart} = performanceResourceEntry;
+                // measure RTT by calculating the SYN-ACK handshake duration
+                const mapserverRtt = secureConnectionStart === 0 ? connectEnd-connectStart : secureConnectionStart-connectStart;
+                const metrics = {duration, size: transferSize, rtt: mapserverRtt, initiated: this.requestInitiated, type: "fetch"};
+
+                // extract policies from payload
+                const policies = extractPolicy(mapResponse);
+
+                // add policies to policy cache
+                addPcaPolicies(this.requestInitiated, this.domain, this.mapserver, policies);
+
+                return {policies, metrics};
+            } catch (error) {
+                throw error;
+            } finally {
+                this.removeFromActiveRequestsIfPossible();
             }
-
-            // extract policies from payload
-            const policies = extractPolicy(mapResponse);
-
-            // add policies to policy cache
-            addPcaPolicies(this.requestInitiated, this.domain, this.mapserver, policies);
-
-            // now that the request is finished and the result is cached, the request can be removed from the list of active requests
-            fpkiRequests.delete(this.domain);
-
-            return policies;
         }
     }
 };
