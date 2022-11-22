@@ -41,7 +41,7 @@ export class LogEntry {
     finalizeLogEntry(requestId) {
         finishedConnectionLogs.push(this);
         ongoingConnectionLogs.delete(requestId);
-        console.log("finalize log entry");
+        console.log("finalize log entry rid="+requestId);
         console.log(this);
     }
 }
@@ -65,7 +65,7 @@ function download(filename, text) {
 
 export function printLogEntriesToConsole() {
     console.log("printing log:" + printMap(ongoingConnectionLogs));
-    console.log("finalized logs:" + JSON.stringify(finishedConnectionLogs, null, 2));
+    //console.log("finalized logs:" + JSON.stringify(finishedConnectionLogs, null, 2));
 }
 
 export function downloadLog() {

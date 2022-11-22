@@ -146,7 +146,7 @@ var SHA256Hash = func(data ...[]byte) []byte {
 }*/
 
 func truncateTable() {
-	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/fpki?maxAllowedPacket=1073741824")
+	db, err := sql.Open("mysql", "test:zaphod@tcp(127.0.0.1:3307)/fpki?maxAllowedPacket=1073741824")
 	if err != nil {
 		panic(err)
 	}

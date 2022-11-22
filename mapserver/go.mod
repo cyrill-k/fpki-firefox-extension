@@ -122,3 +122,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
+
+replace github.com/netsec-ethz/fpki => /home/cyrill/go/src/github.com/netsec-ethz/fpki

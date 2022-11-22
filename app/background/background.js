@@ -54,7 +54,7 @@ function shouldValidateDomain(domain) {
 async function requestInfo(details) {
     const perfStart = performance.now();
     const startTimestamp = new Date();
-    console.log("requestInfo ["+details.url+"]");
+    console.log("requestInfo ["+details.url+"]: "+JSON.stringify(details));
 
     const domain = getDomainNameFromURL(details.url);
     if (!shouldValidateDomain(domain)) {
@@ -78,17 +78,22 @@ async function requestInfo(details) {
             // redirect(details, error);
         });
     }
+    console.log("tracking request: "+JSON.stringify(details));
     logEntry.trackRequest(details.requestId);
 }
 
 async function checkInfo(details) {
     const onHeadersReceived = performance.now();
     const logEntry = getLogEntryForRequest(details.requestId);
-    console.log("checkInfo ["+details.url+"]");
+    console.log("checkInfo ["+details.url+"]: "+JSON.stringify(details));
     const domain = getDomainNameFromURL(details.url);
     if (!shouldValidateDomain(domain)) {
         // console.log("ignoring (no checkInfo): " + domain);
         return;
+    }
+    if (typeof logEntry === "undefined") {
+        // ensure that if checkInfo is called multiple times for a single request, logEntry is ignored
+        console.log("UNDEFINED log entry: "+details);
     }
 
     const remoteInfo = await browser.webRequest.getSecurityInfo(details.requestId, {
@@ -104,9 +109,11 @@ async function checkInfo(details) {
                 break;
             }
             const fpkiRequest = new FpkiRequest(mapserver, domain, details.requestId);
+            console.log("await fpki request for +["+domain+", "+mapserver.identity+"]: rid="+details.requestId);
             const {policies, metrics} = await fpkiRequest.fetchPolicies();
             policiesMap.set(mapserver, policies);
             logEntry.fpkiResponse(mapserver, policies, metrics);
+            console.log("await finished for fpki request for +["+domain+", "+mapserver.identity+"]: rid="+details.requestId);
         }
 
         // check each policy and throw an error if one of the verifications fails
@@ -139,13 +146,19 @@ async function checkInfo(details) {
 //     };
 // }
 
-function onCompleted(details) {
+async function onCompleted(details) {
     const domain = getDomainNameFromURL(details.url);
     if (!shouldValidateDomain(domain)) {
         // console.log("ignoring (no requestInfo): " + domain);
         return;
     }
-    console.log("onCompleted:"+details.url);
+    console.log("onCompleted: "+JSON.stringify(details));
+    console.log(printLogEntriesToConsole());
+    const remoteInfo = await browser.webRequest.getSecurityInfo(details.requestId, {
+        certificateChain: true,
+        rawDER: true
+    });
+    console.log(remoteInfo);
 }
 
 // add listener to header-received.
@@ -160,7 +173,7 @@ browser.webRequest.onHeadersReceived.addListener(
     checkInfo, {
         urls: ["*://*/*"]
     },
-    ['blocking'])
+    ['blocking', 'responseHeaders'])
 
 browser.webRequest.onCompleted.addListener(
     onCompleted, {

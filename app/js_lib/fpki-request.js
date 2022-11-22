@@ -7,6 +7,19 @@ var fpkiRequests = new Map();
 
 var pcaPoliciesCache = new Map();
 
+async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 60000 } = options;
+    
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeout);
+    const response = await fetch(resource, {
+        ...options,
+        signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+}
+
 export class FpkiRequest {
     constructor(mapserver, domain, requestId) {
         this.mapserver = mapserver;
@@ -17,12 +30,22 @@ export class FpkiRequest {
 
     initiateFetchingPoliciesIfNecessary() {
         this.policiesPromise = this.#initiateFetchPolicies(config.get("max-connection-setup-time"));
-        return this.policiesPromise;
+        const promise = this.policiesPromise;
+        this.wrappedPoliciesPromise = (async () => {
+            return await promise;
+        })();
+        return this.wrappedPoliciesPromise;
+        // return this.policiesPromise;
     }
 
     fetchPolicies() {
         this.policiesPromise = this.#initiateFetchPolicies();
-        return this.policiesPromise;
+        const promise = this.policiesPromise;
+        this.wrappedPoliciesPromise = (async () => {
+            return await promise;
+        })();
+        return this.wrappedPoliciesPromise;
+        // return this.policiesPromise;
     }
 
     // removes the request for this domain and mapserver from the list of active requests
@@ -70,7 +93,7 @@ export class FpkiRequest {
             let {policies, metrics} = await activeRequest.policiesPromise;
             if (this.requestId !== activeRequest.requestId) {
                 const endTime = performance.now();
-                metrics = {...metrics, type: "ongoing-request", waitingTime: new Date()-activeRequest.requestInitiated}
+                metrics = {...metrics, type: "ongoing-request", initiatedOffset: new Date()-activeRequest.requestInitiated}
             }
             return {policies, metrics};
         } else {
