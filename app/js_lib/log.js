@@ -34,20 +34,27 @@ export class LogEntry {
         this.connectionSetupOverhead = onHeadersReceivedEnd - onHeadersReceivedStart;
     }
 
+    validationSkipped(onCompleted) {
+        this.decision = "validation skipped";
+        this.connectionCompletion = onCompleted - this.perfStartTimestamp;
+    }
+
     trackRequest(requestId) {
         ongoingConnectionLogs.set(requestId, this);
     }
 
     finalizeLogEntry(requestId) {
-        finishedConnectionLogs.push(this);
-        ongoingConnectionLogs.delete(requestId);
-        console.log("finalize log entry rid="+requestId);
-        console.log(this);
+        if (ongoingConnectionLogs.has(requestId)) {
+            finishedConnectionLogs.push(this);
+            ongoingConnectionLogs.delete(requestId);
+            console.log("finalize log entry rid="+requestId);
+            console.log(this);
+        }
     }
 }
 
 export function getLogEntryForRequest(requestId) {
-    return ongoingConnectionLogs.get(requestId);
+    return ongoingConnectionLogs.has(requestId) ? ongoingConnectionLogs.get(requestId) : null;
 }
 
 function download(filename, text) {

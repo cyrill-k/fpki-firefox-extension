@@ -14,12 +14,20 @@ esac
 
 set -e # after call to read
 
+MYSQL_CMD="mysql -u ${MYSQL_USER:-root}"
+if [ -n "${MYSQL_PASSWORD}" ]; then
+    MYSQL_CMD="${MYSQL_CMD} -p${MYSQL_PASSWORD}"
+fi
+if [ -n "${MYSQL_HOST}" ] || [ -n "${MYSQL_PORT}" ]; then
+    MYSQL_CMD="${MYSQL_CMD} -h ${MYSQL_HOST:-localhost} -P ${MYSQL_PORT:-3306} --protocol TCP"
+fi
+
 CMD=$(cat <<EOF
 DROP DATABASE IF EXISTS fpki;
 CREATE DATABASE fpki /*!40100 DEFAULT CHARACTER SET ascii COLLATE ascii_bin */ /*!80016 DEFAULT ENCRYPTION='N' */;
 EOF
 )
-echo "$CMD" | mysql -h localhost -P 3307 --protocol TCP -u test -pzaphod
+echo "$CMD" | ${MYSQL_CMD}
 
 
 CMD=$(cat <<EOF
@@ -35,8 +43,8 @@ CREATE TABLE nodes (
 ) ENGINE=InnoDB CHARSET=\`binary\` COLLATE=\`binary\`;
 EOF
 )
-echo "$CMD" | mysql -h localhost -P 3307 --protocol TCP -u test -pzaphod
-
+echo "$CMD" | ${MYSQL_CMD}
+# old mysql -u root
 
 CMD=$(cat <<EOF
 USE fpki;
@@ -65,7 +73,7 @@ END$$
 DELIMITER ;
 EOF
 )
-echo "$CMD" | mysql -h localhost -P 3307 --protocol TCP -u test -pzaphod
+echo "$CMD" | ${MYSQL_CMD}
 
 
 CMD=$(cat <<EOF
@@ -95,7 +103,7 @@ END$$
 DELIMITER ;
 EOF
 )
-echo "$CMD" | mysql -h localhost -P 3307 --protocol TCP -u test -pzaphod
+echo "$CMD" | ${MYSQL_CMD}
 
 
 
@@ -106,7 +114,7 @@ CREATE TABLE \`fpki\`.\`domainEntries\` (
    UNIQUE INDEX \`key_UNIQUE\` (\`key\` ASC));
 EOF
 )
-echo "$CMD" | mysql -h localhost -P 3307 --protocol TCP -u test -pzaphod
+echo "$CMD" | ${MYSQL_CMD}
 
 
 
@@ -119,7 +127,7 @@ CREATE TABLE \`fpki\`.\`tree\` (
    UNIQUE INDEX \`key_UNIQUE\` (\`key\` ASC));
 EOF
 )
-echo "$CMD" | mysql -h localhost -P 3307 --protocol TCP -u test -pzaphod
+echo "$CMD" | ${MYSQL_CMD}
 
 
 
@@ -132,7 +140,7 @@ CREATE TABLE \`fpki\`.\`deleteTest\` (
    UNIQUE INDEX \`key_UNIQUE\` (\`key\` ASC));
 EOF
 )
-echo "$CMD" | mysql -h localhost -P 3307 --protocol TCP -u test -pzaphod
+echo "$CMD" | ${MYSQL_CMD}
 
 
 CMD=$(cat <<EOF
@@ -141,7 +149,7 @@ CMD=$(cat <<EOF
    PRIMARY KEY (\`key\`));
 EOF
 )
-echo "$CMD" | mysql -h localhost -P 3307 --protocol TCP -u test -pzaphod
+echo "$CMD" | ${MYSQL_CMD}
 
 
 

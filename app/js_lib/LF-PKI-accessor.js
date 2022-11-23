@@ -1,5 +1,6 @@
 import * as domainFunc from "./domain.js"
 import * as verifier from "./verifier.js"
+import {cLog} from "./helper.js"
 
 // get map server response and check the connection
 async function getMapServerResponseAndCheck(url, needVerification, remoteInfo) {
@@ -120,10 +121,33 @@ async function queryMapServer(domainName) {
     return domainEntries
 }
 
+var fetchCounter = 0;
+async function fetchWithTimeout(resource, options = {}) {
+    const { timeout = 60000, requestId } = options;
+
+    const currentFetchId = fetchCounter;
+    fetchCounter += 1;
+
+    const controller = new AbortController();
+    const id = setTimeout(() => {
+        cLog(requestId, "aborting... "+currentFetchId);
+        cLog(requestId, resource);
+        controller.abort();
+    }, timeout);
+    cLog(requestId, "starting... "+currentFetchId);
+    const response = await fetch(resource, {
+        ...options,
+        signal: controller.signal
+    });
+    cLog(requestId, "cancelling... "+currentFetchId);
+    clearTimeout(id);
+    return response;
+}
+
 // query map server
-async function queryMapServerHttp(mapServerUrl, domainName) {
+async function queryMapServerHttp(mapServerUrl, domainName, options) {
     const fetchUrl = mapServerUrl+"/?domain="+domainName;
-    let resp = await fetch(fetchUrl)
+    let resp = await fetchWithTimeout(fetchUrl, options);
     let domainEntries = await resp.json()
 
     let base64decodedEntries = base64DecodeDomainEntry(domainEntries)

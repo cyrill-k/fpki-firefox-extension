@@ -1,5 +1,6 @@
 export const errorTypes = {
-    INVALID_CONFIG: "Invalid configuration"
+    INVALID_CONFIG: "Invalid configuration",
+    INTERNAL_ERROR: "Internal plugin error"
 }
 
 export class FpkiError extends Error {

@@ -15,3 +15,9 @@ export function printMap(m) {
     }
     return JSON.stringify(m, replacer);
 }
+
+
+
+export function cLog(requestId, ...args) {
+    console.log("rid=["+requestId+"]: "+args.reduce((a, b) => a+", "+b));
+}

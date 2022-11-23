@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -56,7 +57,8 @@ func mapServerQueryHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(response)
 
-		//inspectResponse(response)
+		fmt.Println("replying with response: ", response)
+		// inspectResponse(response)
 
 	default:
 		w.WriteHeader(http.StatusNotImplemented)
@@ -146,7 +148,24 @@ var SHA256Hash = func(data ...[]byte) []byte {
 }*/
 
 func truncateTable() {
-	db, err := sql.Open("mysql", "test:zaphod@tcp(127.0.0.1:3307)/fpki?maxAllowedPacket=1073741824")
+	env := map[string]string{"MYSQL_USER": "root", "MYSQL_PASSWORD": "", "MYSQL_HOST": "localhost", "MYSQL_PORT": ""}
+	for k := range env {
+		v, exists := os.LookupEnv(k)
+		if exists {
+			env[k] = v
+		}
+	}
+	dsnString := env["MYSQL_USER"]
+	if env["MYSQL_PASSWORD"] != "" {
+		dsnString += ":" + env["MYSQL_PASSWORD"]
+	}
+	dsnString += "@tcp(" + env["MYSQL_HOST"]
+	if env["MYSQL_PORT"] != "" {
+		dsnString += ":" + env["MYSQL_PORT"]
+	}
+	dsnString += ")/fpki?maxAllowedPacket=1073741824"
+	fmt.Printf("mapserver | truncateTable | using dsn: %s\n", dsnString)
+	db, err := sql.Open("mysql", dsnString)
 	if err != nil {
 		panic(err)
 	}
