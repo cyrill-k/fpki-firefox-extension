@@ -121,7 +121,50 @@ async function queryMapServer(domainName) {
     return domainEntries
 }
 
-var fetchCounter = 0;
+var fetchCounter = 1;
+
+function wait(delay){
+    return new Promise((resolve) => setTimeout(resolve, delay));
+}
+
+async function fetchRetry(url, delay, tries, timeout, requestId, fetchIndex=0, fetchOptions = {}) {
+    if (fetchIndex === 0) {
+        fetchIndex = fetchCounter
+        fetchCounter += 1;
+        cLog(requestId, "starting... "+fetchIndex+", triesLeft="+tries+", url="+url);
+    }
+    // function onError(err){
+    //     const triesLeft = tries - 1;
+    //     if(!triesLeft){
+    //         cLog(requestId, "failed... "+fetchIndex+", triesLeft="+triesLeft);
+    //         throw err;
+    //     }
+    //     return wait(delay).then(() => fetchRetry(url, delay, triesLeft, requestId, fetchIndex, fetchOptions));
+    // }
+    const controller = new AbortController();
+    const id = setTimeout(() => {
+        cLog(requestId, "aborting after timeout... "+fetchIndex+", triesLeft="+tries);
+        cLog(requestId, url);
+        controller.abort();
+    }, timeout);
+    cLog(requestId, "fetching... "+fetchIndex+", triesLeft="+tries);
+    try {
+        const response = await fetch(url,{ ...fetchOptions, signal: controller.signal });
+        cLog(requestId, "finished... "+fetchIndex+", triesLeft="+tries);
+        return {response, triesLeft: tries};
+    } catch(err) {
+        const triesLeft = tries - 1;
+        if(!triesLeft){
+            cLog(requestId, "failed... "+fetchIndex+", triesLeft="+triesLeft);
+            throw err;
+        }
+        return wait(delay).then(() => fetchRetry(url, delay, triesLeft, timeout, requestId, fetchIndex, fetchOptions));
+    } finally {
+        // TODO: check if the timeout is cleared at the correct time (i.e., before waiting for the recursive call in the catch block
+        clearTimeout(id);
+    }
+}
+
 async function fetchWithTimeout(resource, options = {}) {
     const { timeout = 60000, requestId } = options;
 
@@ -147,12 +190,14 @@ async function fetchWithTimeout(resource, options = {}) {
 // query map server
 async function queryMapServerHttp(mapServerUrl, domainName, options) {
     const fetchUrl = mapServerUrl+"/?domain="+domainName;
-    let resp = await fetchWithTimeout(fetchUrl, options);
-    let domainEntries = await resp.json()
+    // let resp = await fetchWithTimeout(fetchUrl, options);
+    const { delay=0, timeout=60000, maxTries=3, requestId } = options;
+    let {response, triesLeft} = await fetchRetry(fetchUrl, delay, maxTries, timeout, requestId, 0, { keepalive: true });
+    let domainEntries = await response.json();
 
-    let base64decodedEntries = base64DecodeDomainEntry(domainEntries)
+    let base64decodedEntries = base64DecodeDomainEntry(domainEntries);
 
-    return {response: domainEntries, fetchUrl: fetchUrl}
+    return {response: domainEntries, fetchUrl: fetchUrl, nRetries: maxTries-triesLeft};
 }
 
 function base64DecodeDomainEntry(response) {

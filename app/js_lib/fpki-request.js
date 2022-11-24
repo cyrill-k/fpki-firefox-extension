@@ -94,13 +94,14 @@ export class FpkiRequest {
 
             // execute the fetching and response parsing in a try block to ensure that the active request is dropped whether the operations succeed or fail
             try {
-                let mapResponse, performanceResourceEntry;
+                let mapResponse, performanceResourceEntry, nRetries;
                 // fetch policy for the mapserver over the configured channel (e.g., http get)
                 switch (this.mapserver.querytype) {
                 case "lfpki-http-get":
-                    const {response, fetchUrl} = await queryMapServerHttp(this.mapserver.domain, this.domain, {timeout: 5000, requestId: this.requestId});
-                    mapResponse = response;
-                    performanceResourceEntry = this.#getLatestPerformanceResourceEntry(fetchUrl);
+                    const result = await queryMapServerHttp(this.mapserver.domain, this.domain, {timeout: 5000, requestId: this.requestId, maxTries: config.get("max-retries")});
+                    mapResponse = result.response;
+                    nRetries = result.nRetries;
+                    performanceResourceEntry = this.#getLatestPerformanceResourceEntry(result.fetchUrl);
                     break;
                 default:
                     throw new FpkiError(errorTypes.INVALID_CONFIG, "Invalid mapserver config: "+this.mapserver.querytype)

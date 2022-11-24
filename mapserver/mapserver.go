@@ -24,13 +24,27 @@ import (
 // global var for now
 var mapResponder *responder.MapResponder
 
+var queryCounterChannel = make(chan int)
+
 // ugly version.... I will refactor it later.
 func main() {
 	truncateTable()
 	mapResponder = prepareMapServer()
 
-	http.HandleFunc("/", mapServerQueryHandler)
-	http.ListenAndServe(":8080", nil)
+	go func(counterChannel chan int) {
+		counter := 0
+		for {
+			counterChannel <- counter
+			counter += 1
+		}
+	}(queryCounterChannel)
+
+	var s = http.Server{
+		Addr:        ":8080",
+		Handler:     http.HandlerFunc(mapServerQueryHandler),
+		IdleTimeout: 5 * time.Second,
+	}
+	s.ListenAndServe()
 }
 
 func mapServerQueryHandler(w http.ResponseWriter, r *http.Request) {
@@ -41,11 +55,14 @@ func mapServerQueryHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case "GET":
+		queryIndex := <-queryCounterChannel
 		ctx, cancelF := context.WithTimeout(context.Background(), time.Minute)
 		defer cancelF()
 
 		queriedDomain := r.URL.Query()["domain"][0]
-		fmt.Println("get domain request: ", queriedDomain)
+		fmt.Println("[", queryIndex, "] get domain request:", queriedDomain)
+
+		fmt.Println("[", queryIndex, "] receive a request from:", r.RemoteAddr, r.Header)
 
 		response, err := mapResponder.GetProof(ctx, queriedDomain)
 		if err != nil {
@@ -57,7 +74,7 @@ func mapServerQueryHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(response)
 
-		fmt.Println("replying with response: ", response)
+		fmt.Println("[", queryIndex, "] replying for domain request: ", queriedDomain)
 		// inspectResponse(response)
 
 	default:

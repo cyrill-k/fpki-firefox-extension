@@ -22,6 +22,12 @@ browser.runtime.onConnect.addListener(function(port) {
     });
 })
 
+window.addEventListener('unhandledrejection', function(event) {
+  // the event object has two special properties:
+  alert(event.promise); // [object Promise] - the promise that generated the error
+  alert(event.reason); // Error: Whoops! - the unhandled error object
+});
+
 // TODO: remove duplicate local mapserver (only used for testing)
 // use 127.0.0.11 instead of localhost to distinguish the second test server from the first one (although it is the same instance)
 // also, using 127.0.0.11 ensures that the mapserver IPs do not clash with the local test webpage at 127.0.0.1
@@ -75,7 +81,7 @@ async function requestInfo(details) {
         policiesPromise.catch((error) => {
             logEntry.fpkiRequestInitiateError(mapserver.identity, error.message);
             // do not redirect here for now since we want to have a single point of redirection to simplify logging
-            // cLog(details.requestId, "initiateFetchingPoliciesIfNecessary redirect");
+            cLog(details.requestId, "initiateFetchingPoliciesIfNecessary catch");
             // redirect(details, error);
         });
     }
