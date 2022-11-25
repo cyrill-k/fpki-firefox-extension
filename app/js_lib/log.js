@@ -19,6 +19,10 @@ export class LogEntry {
         this.perfStartTimestamp = perfStartTimestamp;
     }
 
+    certificateChainReceived(certificateChain) {
+        this.certificateChain = certificateChain;
+    }
+
     fpkiRequestInitiateError(mapserver, error) {
         this.fpkiRequestInitiateErrors.push([mapserver, error]);
     }

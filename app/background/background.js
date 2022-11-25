@@ -111,7 +111,12 @@ async function checkInfo(details) {
     const remoteInfo = await browser.webRequest.getSecurityInfo(details.requestId, {
         certificateChain: true,
         rawDER: true
-    })
+    });
+
+    if (logEntry !== null) {
+        const certificateChain = remoteInfo.certificates.map(c => ({fingerprintSha256: c.fingerprint.sha256, serial: c.serialNumber, subject: c.subject, issuer: c.issuer}));
+        logEntry.certificateChainReceived(certificateChain);
+    }
 
     let decision = "accept";
     try {
