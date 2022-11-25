@@ -3,10 +3,14 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/x509"
 	"database/sql"
 	"encoding/base64"
+	"encoding/csv"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -150,8 +154,8 @@ func bitIsSet(bits []byte, i int) bool {
 }
 
 /*
-// Hash exports default hash function for trie
-var SHA256Hash = func(data ...[]byte) []byte {
+   // Hash exports default hash function for trie
+   var SHA256Hash = func(data ...[]byte) []byte {
 	hash := sha256.New()
 
 	for i := 0; i < len(data); i++ {
@@ -162,7 +166,7 @@ var SHA256Hash = func(data ...[]byte) []byte {
 
 	//fmt.Println(hash.Size())
 	return hash.Sum(nil)
-}*/
+    }*/
 
 func truncateTable() {
 	env := map[string]string{"MYSQL_USER": "root", "MYSQL_PASSWORD": "", "MYSQL_HOST": "localhost", "MYSQL_PORT": ""}
@@ -215,6 +219,21 @@ func prepareMapServer() *responder.MapResponder {
 	}
 
 	rpcs, sps, err := getRPCAndSP()
+	if err != nil {
+		panic(err)
+	}
+
+	certs, err := getCerts()
+	if err != nil {
+		panic(err)
+	}
+	for _, v := range certs {
+		fmt.Println(v.Subject)
+	}
+
+	ctx, cancelFCerts := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancelFCerts()
+	err = mapUpdater.UpdateCertsLocally(ctx, certs)
 	if err != nil {
 		panic(err)
 	}
@@ -277,4 +296,51 @@ func getRPCAndSP() ([]*common.RPC, []*common.SP, error) {
 		}
 	}
 	return rpcs, sps, nil
+}
+
+func getCerts() ([]*x509.Certificate, error) {
+	certs := []*x509.Certificate{}
+
+	f, err := os.Open("./certs/ct_log_certs/certs-head.csv")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// remember to close the file at the end of the program
+	defer f.Close()
+
+	csvReader := csv.NewReader(f)
+	isFirstLine := true
+	for {
+		rec, err := csvReader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
+		if !isFirstLine {
+			// do something with read line
+			// fmt.Printf("%+v\n", rec)
+
+			var block *pem.Block
+			block, _ = pem.Decode([]byte(rec[1]))
+
+			switch {
+			case block == nil:
+				return nil, fmt.Errorf("Certificate input | no pem block")
+			case block.Type != "CERTIFICATE":
+				return nil, fmt.Errorf("Certificate input | contains data other than certificate")
+			}
+
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return nil, fmt.Errorf("Certificate input | ParseCertificate | %w", err)
+			}
+
+			certs = append(certs, cert)
+		}
+		isFirstLine = false
+	}
+	return certs, nil
 }

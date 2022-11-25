@@ -108,11 +108,19 @@ export class FpkiRequest {
                     break;
                 }
 
-                // extract metrics from performance resource entry
-                const {duration, transferSize, connectStart, connectEnd, secureConnectionStart} = performanceResourceEntry;
-                // measure RTT by calculating the SYN-ACK handshake duration
-                const mapserverRtt = secureConnectionStart === 0 ? connectEnd-connectStart : secureConnectionStart-connectStart;
-                const metrics = {duration, size: transferSize, rtt: mapserverRtt, initiated: this.requestInitiated, type: "fetch", nRetries};
+                let metrics = {};
+                if (performanceResourceEntry !== null) {
+                    // extract metrics from performance resource entry
+                    const {duration, transferSize, connectStart, connectEnd, secureConnectionStart} = performanceResourceEntry;
+                    // measure RTT by calculating the SYN-ACK handshake duration
+                    const mapserverRtt = secureConnectionStart === 0 ? connectEnd-connectStart : secureConnectionStart-connectStart;
+                    metrics = {duration, size: transferSize, rtt: mapserverRtt, initiated: this.requestInitiated, type: "fetch", nRetries};
+                } else {
+                    console.log(performance.getEntriesByType("resource"));
+                    console.log("Too many resource entries. Clearing entries...");
+                    performance.clearResourceTimings();
+                    // TODO: add "no metric" statement to log entry
+                }
 
                 // extract policies from payload
                 const policies = extractPolicy(mapResponse);
