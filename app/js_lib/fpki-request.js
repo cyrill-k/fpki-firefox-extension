@@ -112,7 +112,7 @@ export class FpkiRequest {
                 const {duration, transferSize, connectStart, connectEnd, secureConnectionStart} = performanceResourceEntry;
                 // measure RTT by calculating the SYN-ACK handshake duration
                 const mapserverRtt = secureConnectionStart === 0 ? connectEnd-connectStart : secureConnectionStart-connectStart;
-                const metrics = {duration, size: transferSize, rtt: mapserverRtt, initiated: this.requestInitiated, type: "fetch"};
+                const metrics = {duration, size: transferSize, rtt: mapserverRtt, initiated: this.requestInitiated, type: "fetch", nRetries};
 
                 // extract policies from payload
                 const policies = extractPolicy(mapResponse);
