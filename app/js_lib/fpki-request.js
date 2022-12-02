@@ -1,11 +1,11 @@
 import {errorTypes, FpkiError} from "./errors.js"
-import {queryMapServerHttp, extractPolicy} from "./LF-PKI-accessor.js"
+import {queryMapServerHttp, extractPolicy, extractCertificates} from "./LF-PKI-accessor.js"
 import {mapGetList, cLog, printMap} from "./helper.js"
 import {config} from "./config.js"
 
 var fpkiRequests = new Map();
 
-var pcaPoliciesCache = new Map();
+var mapserverResponseCache = new Map();
 
 export class FpkiRequest {
     constructor(mapserver, domain, requestId) {
@@ -44,7 +44,7 @@ export class FpkiRequest {
         if (index !== -1) {
             currentRequests.splice(index, 1);
             fpkiRequests.set(this.domain, currentRequests);
-            cLog(this.requestId, "removed request: "+JSON.stringify(this));
+            // cLog(this.requestId, "removed request: "+JSON.stringify(this));
             return true;
         }
         cLog(this.requestId, "couldn't find request");
@@ -59,7 +59,7 @@ export class FpkiRequest {
     }
 
     async #initiateFetchPolicies(maxTimeToExpiration=0) {
-        const cachedValidEntries = !shouldFetchPcaPoliciesForMapserver(this.domain, this.mapserver, maxTimeToExpiration);
+        const cachedValidEntries = !shouldFetchMapserverResponseForMapserver(this.domain, this.mapserver, maxTimeToExpiration);
         const mapserver = this.mapserver;
         let activeRequest = null;
         if (fpkiRequests.has(this.domain)) {
@@ -73,12 +73,11 @@ export class FpkiRequest {
 
         if (cachedValidEntries) {
             cLog(this.requestId, "using cached entry ["+this.domain+", "+this.mapserver.identity+"]");
-            const {pcaPolicies, timestamp} = getLatestPcaPolicies(this.domain).get(this.mapserver);
+            const {pcaPolicies, timestamp} = getLatestMapserverResponse(this.domain).get(this.mapserver);
             const metrics = {type: "cached", lifetime: timestamp-new Date()+config.get("cache-timeout")};
             return {policies: pcaPolicies, metrics};
         } else if (activeRequest !== null) {
             cLog(this.requestId, "reusing existing active request ["+this.domain+", "+this.mapserver.identity+"]: "+activeRequest.requestId);
-            cLog(this.requestId, printMap(fpkiRequests));
             const startTime = performance.now();
             let {policies, metrics} = await activeRequest.policiesPromise;
             if (this.requestId !== activeRequest.requestId) {
@@ -124,12 +123,13 @@ export class FpkiRequest {
 
                 // extract policies from payload
                 const policies = extractPolicy(mapResponse);
+                const certificates = extractCertificates(mapResponse);
                 cLog(this.requestId, "fetch finished for: "+this);
 
                 // add policies to policy cache
-                addPcaPolicies(this.requestInitiated, this.domain, this.mapserver, policies);
+                addMapserverResponse(this.requestInitiated, this.domain, this.mapserver, policies, certificates);
 
-                return {policies, metrics};
+                return {policies, certificates, metrics};
             } catch (error) {
                 throw error;
             } finally {
@@ -139,23 +139,25 @@ export class FpkiRequest {
     }
 };
 
-class PcaPoliciesCacheEntry {
-    constructor(timestamp, mapserver, pcaPolicies) {
+
+class MapserverResponseCacheEntry {
+    constructor(timestamp, mapserver, pcaPolicies, certificates) {
         this.timestamp = timestamp;
         this.mapserver = mapserver;
         this.pcaPolicies = pcaPolicies;
+        this.certificates = certificates;
     }
 }
 
-function addPcaPolicies(timestamp, domain, mapserver, pcaPolicies) {
-    const cacheEntry = new PcaPoliciesCacheEntry(timestamp, mapserver, pcaPolicies);
-    pcaPoliciesCache.set(domain, mapGetList(pcaPoliciesCache, domain).concat(cacheEntry));
+function addMapserverResponse(timestamp, domain, mapserver, pcaPolicies, certificates) {
+    const cacheEntry = new MapserverResponseCacheEntry(timestamp, mapserver, pcaPolicies, certificates);
+    mapserverResponseCache.set(domain, mapGetList(mapserverResponseCache, domain).concat(cacheEntry));
 }
 
-function getLatestPcaPolicies(domain) {
+function getLatestMapserverResponse(domain) {
     const latestPolicies = new Map();
-    if (pcaPoliciesCache.has(domain)) {
-        for (const cacheEntry of pcaPoliciesCache.get(domain)) {
+    if (mapserverResponseCache.has(domain)) {
+        for (const cacheEntry of mapserverResponseCache.get(domain)) {
             const {timestamp, mapserver} = cacheEntry;
             // TODO: see if this really works of if we need some kind of mapserver identity
             if (!latestPolicies.has(mapserver) || timestamp > latestPolicies.get(mapserver).timestamp) {
@@ -166,25 +168,25 @@ function getLatestPcaPolicies(domain) {
     return latestPolicies;
 }
 
-function shouldFetchPcaPoliciesForMapserver(domain, mapserver, maxTimeToExpiration=0) {
-    return getValidPcaPoliciesForMapserver(domain, mapserver, maxTimeToExpiration).length === 0;
+function shouldFetchMapserverResponseForMapserver(domain, mapserver, maxTimeToExpiration=0) {
+    return getValidMapserverResponseForMapserver(domain, mapserver, maxTimeToExpiration).length === 0;
 }
 
-function getValidPcaPoliciesForMapserver(domain, mapserver, maxTimeToExpiration=0) {
-    return getAllValidPcaPolicies(domain, maxTimeToExpiration).
+function getValidMapserverResponseForMapserver(domain, mapserver, maxTimeToExpiration=0) {
+    return getAllValidMapserverResponse(domain, maxTimeToExpiration).
         filter(
             ({mapserver: entryMapserver}) => entryMapserver === mapserver
         );
 }
 
-function getAllValidPcaPolicies(domain, maxTimeToExpiration=0) {
+function getAllValidMapserverResponse(domain, maxTimeToExpiration=0) {
     const currentTime = new Date();
-    const validPcaPolicies = [];
-    getLatestPcaPolicies(domain).forEach(function(cacheEntry, mapserver) {
+    const validMapserverResponse = [];
+    getLatestMapserverResponse(domain).forEach(function(cacheEntry, mapserver) {
         const {timestamp, pcaPolicies} = cacheEntry;
         if (currentTime-timestamp < config.get("cache-timeout")-maxTimeToExpiration) {
-            validPcaPolicies.push(cacheEntry);
+            validMapserverResponse.push(cacheEntry);
         }
     });
-    return validPcaPolicies;
+    return validMapserverResponse;
 }

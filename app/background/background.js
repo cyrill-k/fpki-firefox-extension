@@ -7,6 +7,7 @@ import {printMap, cLog} from "../js_lib/helper.js"
 import {config} from "../js_lib/config.js"
 import {LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole} from "../js_lib/log.js"
 import {FpkiError, errorTypes} from "../js_lib/errors.js"
+import {policyValidateConnection} from "../js_lib/validation.js"
 
 // communication between browser plugin popup and this background script
 browser.runtime.onConnect.addListener(function(port) {
@@ -22,11 +23,11 @@ browser.runtime.onConnect.addListener(function(port) {
     });
 })
 
-window.addEventListener('unhandledrejection', function(event) {
-  // the event object has two special properties:
-  alert(event.promise); // [object Promise] - the promise that generated the error
-  alert(event.reason); // Error: Whoops! - the unhandled error object
-});
+// window.addEventListener('unhandledrejection', function(event) {
+//   // the event object has two special properties:
+//   alert(event.promise); // [object Promise] - the promise that generated the error
+//   alert(event.reason); // Error: Whoops! - the unhandled error object
+// });
 
 // TODO: remove duplicate local mapserver (only used for testing)
 // use 127.0.0.11 instead of localhost to distinguish the second test server from the first one (although it is the same instance)
@@ -61,7 +62,7 @@ function shouldValidateDomain(domain) {
 async function requestInfo(details) {
     const perfStart = performance.now();
     const startTimestamp = new Date();
-    cLog(details.requestId, "requestInfo ["+details.url+"]: "+JSON.stringify(details));
+    cLog(details.requestId, "requestInfo ["+details.url+"]");
 
     const domain = getDomainNameFromURL(details.url);
     if (!shouldValidateDomain(domain)) {
@@ -82,17 +83,18 @@ async function requestInfo(details) {
             logEntry.fpkiRequestInitiateError(mapserver.identity, error.message);
             // do not redirect here for now since we want to have a single point of redirection to simplify logging
             cLog(details.requestId, "initiateFetchingPoliciesIfNecessary catch");
-            // redirect(details, error);
+            redirect(details, error);
+            throw error;
         });
     }
-    cLog(details.requestId, "tracking request: "+JSON.stringify(details));
+    // cLog(details.requestId, "tracking request: "+JSON.stringify(details));
     logEntry.trackRequest(details.requestId);
 }
 
 async function checkInfo(details) {
     const onHeadersReceived = performance.now();
     const logEntry = getLogEntryForRequest(details.requestId);
-    cLog(details.requestId, "checkInfo ["+details.url+"]: "+JSON.stringify(details));
+    cLog(details.requestId, "checkInfo ["+details.url+"]");
     const domain = getDomainNameFromURL(details.url);
     if (!shouldValidateDomain(domain)) {
         // cLog(details.requestId, "ignoring (no checkInfo): " + domain);
@@ -121,16 +123,18 @@ async function checkInfo(details) {
     let decision = "accept";
     try {
         const policiesMap = new Map();
+        const certificatesMap = new Map();
         for (const [index, mapserver] of config.get("mapservers").entries()) {
             if (index === config.get("mapserver-instances-queried")) {
                 break;
             }
             const fpkiRequest = new FpkiRequest(mapserver, domain, details.requestId);
             cLog(details.requestId, "await fpki request for ["+domain+", "+mapserver.identity+"]");
-            const {policies, metrics} = await fpkiRequest.fetchPolicies();
+            const {policies, certificates, metrics} = await fpkiRequest.fetchPolicies();
             policiesMap.set(mapserver, policies);
+            certificatesMap.set(mapserver, certificates);
             if (logEntry !== null) {
-                logEntry.fpkiResponse(mapserver, policies, metrics);
+                logEntry.fpkiResponse(mapserver, policies, certificates, metrics);
             }
             cLog(details.requestId, "await finished for fpki request for ["+domain+", "+mapserver.identity+"]");
         }
@@ -138,8 +142,13 @@ async function checkInfo(details) {
         // check each policy and throw an error if one of the verifications fails
         policiesMap.forEach((p, m) => {
             cLog(details.requestId, "starting verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
-            checkConnection(p, remoteInfo, domain);
+            const {success, violations} = policyValidateConnection(remoteInfo, {}, domain, p);
+            if (!success) {
+                throw violations[0].reason+" ["+violations[0].pca+"]";
+            }
         });
+
+        // TODO: legacy (i.e., certificate-based) validation
 
         // TODO: check connection for all policies and continue if at least config.get("mapserver-quorum") responses exist
 
@@ -150,6 +159,7 @@ async function checkInfo(details) {
         // TODO: in case that an exception was already thrown in requestInfo, then the redirection occurs twice (but this is not an issue since they both redirect to the same error url)
         decision = "reject: "+error
         redirect(details, error);
+        throw error;
     } finally {
         if (logEntry !== null) {
             const onHeadersReceivedFinished = performance.now();
@@ -174,7 +184,7 @@ async function onCompleted(details) {
         // cLog(details.requestId, "ignoring (no requestInfo): " + domain);
         return;
     }
-    cLog(details.requestId, "onCompleted: "+JSON.stringify(details));
+    cLog(details.requestId, "onCompleted ["+details.url+"]");
     // cLog(details.requestId, printLogEntriesToConsole());
     const logEntry = getLogEntryForRequest(details.requestId);
     if (logEntry !== null) {
@@ -186,7 +196,6 @@ async function onCompleted(details) {
         certificateChain: true,
         rawDER: true
     });
-    cLog(details.requestId, remoteInfo);
 }
 
 // add listener to header-received.

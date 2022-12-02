@@ -54,7 +54,7 @@ func issuePCandRPC(domainName string) {
 		panicAndQuit(err)
 	}
 
-	// sign and log the second rcsr
+	// sign and log the third rcsr
 	err = pca.SignAndLogRCSR(rcsr)
 	if err != nil {
 		panicAndQuit(err)
@@ -62,6 +62,17 @@ func issuePCandRPC(domainName string) {
 
 	// third rcsr
 	rcsr, err = do.GenerateRCSR("pay.amazon.com", 1)
+	if err != nil {
+		panicAndQuit(err)
+	}
+
+	// sign and log the fourth rcsr
+	err = pca.SignAndLogRCSR(rcsr)
+	if err != nil {
+		panicAndQuit(err)
+	}
+	// fourth rcsr
+	rcsr, err = do.GenerateRCSR("media-amazon.com", 1)
 	if err != nil {
 		panicAndQuit(err)
 	}
@@ -138,7 +149,7 @@ func issuePCandRPC(domainName string) {
 		}
 	}
 
-	if len(rpcs) != 3 {
+	if len(rpcs) != 4 {
 		panicAndQuit(fmt.Errorf("rpcs num error"))
 	}
 
@@ -158,6 +169,11 @@ func issuePCandRPC(domainName string) {
 		AllowedSubdomains: []string{""},
 	}
 
+	policy4 := common.Policy{
+		TrustedCA:         []string{"US CA"},
+		AllowedSubdomains: nil,
+	}
+
 	psr1, err := do.GeneratePSR("amazon.com", policy1)
 	if err != nil {
 		panicAndQuit(err)
@@ -173,6 +189,11 @@ func issuePCandRPC(domainName string) {
 		panicAndQuit(err)
 	}
 
+	psr4, err := do.GeneratePSR("media-amazon.com", policy4)
+	if err != nil {
+		panicAndQuit(err)
+	}
+
 	err = pca.SignAndLogSP(psr1)
 	if err != nil {
 		panicAndQuit(err)
@@ -184,6 +205,11 @@ func issuePCandRPC(domainName string) {
 	}
 
 	err = pca.SignAndLogSP(psr3)
+	if err != nil {
+		panicAndQuit(err)
+	}
+
+	err = pca.SignAndLogSP(psr4)
 	if err != nil {
 		panicAndQuit(err)
 	}

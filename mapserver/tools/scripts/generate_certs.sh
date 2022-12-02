@@ -5,8 +5,8 @@ echo "map server and pca certs generated"
 go build -o logserver_exec ./tools/logserver/logserver_exec.go
 go build -o logsigner_exec ./tools/logsigner/logsigner_exec.go
 
-./logserver_exec --mysql_uri "test:zaphod@tcp(127.0.0.1:3307)/test" >/dev/null& 
-./logsigner_exec --mysql_uri "test:zaphod@tcp(127.0.0.1:3307)/test" >/dev/null& 
+./logserver_exec --mysql_uri "test:zaphod@tcp(127.0.0.1:${MYSQL_PORT:-3306})/test" >/dev/null& 
+./logsigner_exec --mysql_uri "test:zaphod@tcp(127.0.0.1:${MYSQL_PORT:-3306})/test" >/dev/null& 
 
 sleep 2
 

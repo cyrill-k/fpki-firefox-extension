@@ -2,6 +2,9 @@ import * as domainFunc from "./domain.js"
 import * as verifier from "./verifier.js"
 import {cLog} from "./helper.js"
 
+// imports the function ParsePemCertificate as an object of the global variable certificateparser
+import * as mymodule from "../js_lib/bundledparser.js"
+
 // get map server response and check the connection
 async function getMapServerResponseAndCheck(url, needVerification, remoteInfo) {
     // get domain name
@@ -81,7 +84,7 @@ function checkConnection(policies, remoteInfo, domainName) {
 
 //extract policies into map
 function extractPolicy(mapResponse) {
-    // trusted pca map
+    // trusted PCA map
     let trustedPCAMap = new Map()
     trustedPCAMap.set("pca", "description: ...")
 
@@ -109,6 +112,47 @@ function extractPolicy(mapResponse) {
         }
     }
     return allPolicies
+}
+
+function extractRawCertificates(mapResponse) {
+    // trusted CA map
+    const trustedCAMap = new Map();
+    // TODO: pass the domain under validation to this function (not sure if that is actually necessary) and then infer the trusted CA map from the user's trust preference
+    trustedCAMap.set("GTS CA 1C3", "description: ...");
+
+    const certificateMap = new Map();
+    for (var i = 0; i < mapResponse.length; i++) {
+        // if domain policies exist
+        if (mapResponse[i].PoI.ProofType == 1) {
+            // parse it
+            const entry = JSON.parse(mapResponse[i].DomainEntryBytes);
+
+            // policies of one specific domain
+            const certificatesOfCurrentDomain = new Map();
+            for (var j = 0; j < entry.CAEntry.length; j++) {
+                if (trustedCAMap.has(entry.CAEntry[j].CAName)) {
+                    // group certificates by CAs
+                    certificatesOfCurrentDomain.set(entry.CAEntry[j].CAName,
+                                                entry.CAEntry[j].DomainCerts);
+                }
+            }
+            certificateMap.set(mapResponse[i].Domain, certificatesOfCurrentDomain);
+        }
+    }
+    return certificateMap;
+}
+
+function extractCertificates(mapResponse) {
+    const rawDomainMap = extractRawCertificates(mapResponse);
+    const domainMap = new Map();
+    for (const [domain, rawCaMap] of rawDomainMap) {
+        const caMap = new Map();
+        for (const [ca, certs] of rawCaMap) {
+            caMap.set(ca, certs.map(c => certificateparser.parsePemCertificate("-----BEGIN CERTIFICATE-----\n"+c+"\n-----END CERTIFICATE-----")));
+        }
+        domainMap.set(domain, caMap);
+    }
+    return domainMap;
 }
 
 // query map server
@@ -213,5 +257,6 @@ export {
     queryMapServer,
     queryMapServerHttp,
     extractPolicy,
+    extractCertificates,
     checkConnection
 }

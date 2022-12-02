@@ -1,4 +1,4 @@
-.PHONY: generate_test_certs clean
+.PHONY: generate_test_certs_and_RPC_SP clean
 
 generate_test_certs_and_RPC_SP: 
 	@./tools/scripts/generate_certs.sh

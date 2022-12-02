@@ -60,7 +60,7 @@ func mapServerQueryHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		queryIndex := <-queryCounterChannel
-		ctx, cancelF := context.WithTimeout(context.Background(), time.Minute)
+		ctx, cancelF := context.WithTimeout(context.Background(), time.Minute*10)
 		defer cancelF()
 
 		queriedDomain := r.URL.Query()["domain"][0]
@@ -77,8 +77,10 @@ func mapServerQueryHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(response)
+		buf := new(bytes.Buffer)
+		json.NewEncoder(buf).Encode(response)
 
-		fmt.Println("[", queryIndex, "] replying for domain request: ", queriedDomain)
+		fmt.Println("[", queryIndex, "] replying for domain request: ", queriedDomain, ", size=", len(buf.String()))
 		// inspectResponse(response)
 
 	default:
@@ -298,10 +300,10 @@ func getRPCAndSP() ([]*common.RPC, []*common.SP, error) {
 	return rpcs, sps, nil
 }
 
-func getCerts() ([]*x509.Certificate, error) {
-	certs := []*x509.Certificate{}
+func getCerts() ([][]byte, error) {
+	certsRaw := [][]byte{}
 
-	f, err := os.Open("./certs/ct_log_certs/certs-head.csv")
+	f, err := os.Open("./certs/ct_log_certs/certs.csv")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -334,13 +336,13 @@ func getCerts() ([]*x509.Certificate, error) {
 			}
 
 			cert, err := x509.ParseCertificate(block.Bytes)
-			if err != nil {
-				return nil, fmt.Errorf("Certificate input | ParseCertificate | %w", err)
+			if err == nil {
+				fmt.Println(cert.Subject)
 			}
 
-			certs = append(certs, cert)
+			certsRaw = append(certsRaw, block.Bytes)
 		}
 		isFirstLine = false
 	}
-	return certs, nil
+	return certsRaw, nil
 }
