@@ -7,7 +7,7 @@ import {printMap, cLog} from "../js_lib/helper.js"
 import {config} from "../js_lib/config.js"
 import {LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole} from "../js_lib/log.js"
 import {FpkiError, errorTypes} from "../js_lib/errors.js"
-import {policyValidateConnection} from "../js_lib/validation.js"
+import {policyValidateConnection, legacyValidateConnection} from "../js_lib/validation.js"
 
 // communication between browser plugin popup and this background script
 browser.runtime.onConnect.addListener(function(port) {
@@ -141,10 +141,19 @@ async function checkInfo(details) {
 
         // check each policy and throw an error if one of the verifications fails
         policiesMap.forEach((p, m) => {
-            cLog(details.requestId, "starting verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
+            cLog(details.requestId, "starting policy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
             const {success, violations} = policyValidateConnection(remoteInfo, {}, domain, p);
             if (!success) {
                 throw violations[0].reason+" ["+violations[0].pca+"]";
+            }
+        });
+
+        // check each policy and throw an error if one of the verifications fails
+        certificatesMap.forEach((c, m) => {
+            cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c));
+            const {success, violations} = legacyValidateConnection(remoteInfo, {}, domain, c);
+            if (!success) {
+                throw violations[0].reason+" ["+violations[0].ca+"]";
             }
         });
 

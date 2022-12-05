@@ -119,6 +119,12 @@ function extractRawCertificates(mapResponse) {
     const trustedCAMap = new Map();
     // TODO: pass the domain under validation to this function (not sure if that is actually necessary) and then infer the trusted CA map from the user's trust preference
     trustedCAMap.set("GTS CA 1C3", "description: ...");
+    trustedCAMap.set("DigiCert Global Root CA", "description: ...");
+    trustedCAMap.set("TrustAsia TLS RSA CA", "description: ...");
+    trustedCAMap.set("DigiCert SHA2 Secure Server CA", "description: ...");
+    trustedCAMap.set("DigiCert Secure Site CN CA G3", "description: ...");
+    trustedCAMap.set("GlobalSign Organization Validation CA - SHA256 - G2", "description: ...");
+    trustedCAMap.set("DigiCert TLS Hybrid ECC SHA384 2020 CA1", "description: ...");
 
     const certificateMap = new Map();
     for (var i = 0; i < mapResponse.length; i++) {
@@ -133,7 +139,7 @@ function extractRawCertificates(mapResponse) {
                 if (trustedCAMap.has(entry.CAEntry[j].CAName)) {
                     // group certificates by CAs
                     certificatesOfCurrentDomain.set(entry.CAEntry[j].CAName,
-                                                entry.CAEntry[j].DomainCerts);
+                                                    entry.CAEntry[j].DomainCerts);
                 }
             }
             certificateMap.set(mapResponse[i].Domain, certificatesOfCurrentDomain);

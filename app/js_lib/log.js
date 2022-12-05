@@ -27,8 +27,8 @@ export class LogEntry {
         this.fpkiRequestInitiateErrors.push([mapserver, error]);
     }
 
-    fpkiResponse(mapserver, response, metrics) {
-        this.fpkiResponses.push([mapserver, Object.fromEntries(response)]);
+    fpkiResponse(mapserver, policies, certificates, metrics) {
+        this.fpkiResponses.push([mapserver, {policies: Object.fromEntries(policies), certificates: Object.fromEntries(certificates)}]);
         this.fpkiResponseMetrics.push([mapserver, metrics]);
     }
 

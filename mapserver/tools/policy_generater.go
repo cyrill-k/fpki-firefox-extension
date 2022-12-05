@@ -32,55 +32,19 @@ func issuePCandRPC(domainName string) {
 		panicAndQuit(err)
 	}
 
-	// first rcsr
-	rcsr, err := do.GenerateRCSR("amazon.com", 1)
-	if err != nil {
-		panicAndQuit(err)
-	}
-
-	if len(rcsr.PRCSignature) != 0 {
-		panic("first rcsr error: should not have RPCSignature")
-	}
-
-	// sign and log the first rcsr
-	err = pca.SignAndLogRCSR(rcsr)
-	if err != nil {
-		panicAndQuit(err)
-	}
-
-	// second rcsr
-	rcsr, err = do.GenerateRCSR("baidu.com", 1)
-	if err != nil {
-		panicAndQuit(err)
-	}
-
-	// sign and log the third rcsr
-	err = pca.SignAndLogRCSR(rcsr)
-	if err != nil {
-		panicAndQuit(err)
-	}
-
-	// third rcsr
-	rcsr, err = do.GenerateRCSR("pay.amazon.com", 1)
-	if err != nil {
-		panicAndQuit(err)
-	}
-
-	// sign and log the fourth rcsr
-	err = pca.SignAndLogRCSR(rcsr)
-	if err != nil {
-		panicAndQuit(err)
-	}
-	// fourth rcsr
-	rcsr, err = do.GenerateRCSR("media-amazon.com", 1)
-	if err != nil {
-		panicAndQuit(err)
-	}
-
-	// sign and log the second rcsr
-	err = pca.SignAndLogRCSR(rcsr)
-	if err != nil {
-		panicAndQuit(err)
+	domains := []string{"amazon.com", "baidu.com", "pay.amazon.com", "media-amazon.com", "ethz.ch"}
+	for i, domain := range domains {
+		rcsr, err := do.GenerateRCSR(domain, 1)
+		if err != nil {
+			panicAndQuit(err)
+		}
+		if i == 0 && len(rcsr.PRCSignature) != 0 {
+			panic("first rcsr error: should not have RPCSignature")
+		}
+		err = pca.SignAndLogRCSR(rcsr)
+		if err != nil {
+			panicAndQuit(err)
+		}
 	}
 
 	adminClient, err := client.GetAdminClient("./tools/config/adminclient_config.json")
@@ -149,69 +113,47 @@ func issuePCandRPC(domainName string) {
 		}
 	}
 
-	if len(rpcs) != 4 {
+	if len(rpcs) != len(domains) {
 		panicAndQuit(fmt.Errorf("rpcs num error"))
 	}
 
+	var policies []common.Policy
 	// generate SP
-	policy1 := common.Policy{
+	policies = append(policies, common.Policy{
 		TrustedCA:         []string{"US CA"},
 		AllowedSubdomains: []string{"pay.amazon.com"},
-	}
+	})
 
-	policy2 := common.Policy{
+	policies = append(policies, common.Policy{
 		TrustedCA:         []string{"US CA"},
 		AllowedSubdomains: []string{""},
-	}
+	})
 
-	policy3 := common.Policy{
+	policies = append(policies, common.Policy{
 		TrustedCA:         []string{"US CA"},
 		AllowedSubdomains: []string{""},
-	}
+	})
 
-	policy4 := common.Policy{
+	policies = append(policies, common.Policy{
 		TrustedCA:         []string{"US CA"},
 		AllowedSubdomains: nil,
-	}
+	})
 
-	psr1, err := do.GeneratePSR("amazon.com", policy1)
-	if err != nil {
-		panicAndQuit(err)
-	}
+	policies = append(policies, common.Policy{
+		TrustedCA:         nil,
+		AllowedSubdomains: []string{"netsec.ethz.ch"},
+	})
 
-	psr2, err := do.GeneratePSR("baidu.com", policy2)
-	if err != nil {
-		panicAndQuit(err)
-	}
+	for i, p := range policies {
+		psr, err := do.GeneratePSR(domains[i], p)
+		if err != nil {
+			panicAndQuit(err)
+		}
 
-	psr3, err := do.GeneratePSR("pay.amazon.com", policy3)
-	if err != nil {
-		panicAndQuit(err)
-	}
-
-	psr4, err := do.GeneratePSR("media-amazon.com", policy4)
-	if err != nil {
-		panicAndQuit(err)
-	}
-
-	err = pca.SignAndLogSP(psr1)
-	if err != nil {
-		panicAndQuit(err)
-	}
-
-	err = pca.SignAndLogSP(psr2)
-	if err != nil {
-		panicAndQuit(err)
-	}
-
-	err = pca.SignAndLogSP(psr3)
-	if err != nil {
-		panicAndQuit(err)
-	}
-
-	err = pca.SignAndLogSP(psr4)
-	if err != nil {
-		panicAndQuit(err)
+		err = pca.SignAndLogSP(psr)
+		if err != nil {
+			panicAndQuit(err)
+		}
 	}
 
 	logClient.QueueSPs(ctx)

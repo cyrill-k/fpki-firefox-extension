@@ -73,18 +73,18 @@ export class FpkiRequest {
 
         if (cachedValidEntries) {
             cLog(this.requestId, "using cached entry ["+this.domain+", "+this.mapserver.identity+"]");
-            const {pcaPolicies, timestamp} = getLatestMapserverResponse(this.domain).get(this.mapserver);
+            const {pcaPolicies, certificates, timestamp} = getLatestMapserverResponse(this.domain).get(this.mapserver);
             const metrics = {type: "cached", lifetime: timestamp-new Date()+config.get("cache-timeout")};
-            return {policies: pcaPolicies, metrics};
+            return {policies: pcaPolicies, certificates, metrics};
         } else if (activeRequest !== null) {
             cLog(this.requestId, "reusing existing active request ["+this.domain+", "+this.mapserver.identity+"]: "+activeRequest.requestId);
             const startTime = performance.now();
-            let {policies, metrics} = await activeRequest.policiesPromise;
+            let {policies, certificates, metrics} = await activeRequest.policiesPromise;
             if (this.requestId !== activeRequest.requestId) {
                 const endTime = performance.now();
                 metrics = {...metrics, type: "ongoing-request", initiatedOffset: new Date()-activeRequest.requestInitiated}
             }
-            return {policies, metrics};
+            return {policies, certificates, metrics};
         } else {
             cLog(this.requestId, "create new fetching request ["+this.domain+", "+this.mapserver.identity+"]");
 

@@ -229,11 +229,8 @@ func prepareMapServer() *responder.MapResponder {
 	if err != nil {
 		panic(err)
 	}
-	for _, v := range certs {
-		fmt.Println(v.Subject)
-	}
 
-	ctx, cancelFCerts := context.WithTimeout(context.Background(), time.Second*10)
+	ctx, cancelFCerts := context.WithTimeout(context.Background(), time.Minute)
 	defer cancelFCerts()
 	err = mapUpdater.UpdateCertsLocally(ctx, certs)
 	if err != nil {
