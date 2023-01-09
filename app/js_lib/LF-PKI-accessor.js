@@ -30,11 +30,11 @@ function checkConnection(policies, remoteInfo, domainName) {
     // map countries => CAs in that country
     let countryToCAMap = new Map()
     countryToCAMap.set("US CA", ["CN=GTS CA 1C3,O=Google Trust Services LLC,C=US",
-        "CN=GTS Root R1,O=Google Trust Services LLC,C=US",
-        "CN=Amazon,OU=Server CA 1B,O=Amazon,C=US",
-        "CN=Amazon Root CA 1,O=Amazon,C=US",
-        "CN=DigiCert Global CA G2,O=DigiCert Inc,C=US",
-        "CN=DigiCert Global Root G2,OU=www.digicert.com,O=DigiCert Inc,C=US"])
+                                 "CN=GTS Root R1,O=Google Trust Services LLC,C=US",
+                                 "CN=Amazon,OU=Server CA 1B,O=Amazon,C=US",
+                                 "CN=Amazon Root CA 1,O=Amazon,C=US",
+                                 "CN=DigiCert Global CA G2,O=DigiCert Inc,C=US",
+                                 "CN=DigiCert Global Root G2,OU=www.digicert.com,O=DigiCert Inc,C=US"])
 
     var CertificateException = "invalid CA"
     var DomainNotAllowed = "domain not allowed"
@@ -102,10 +102,10 @@ function extractPolicy(mapResponse) {
                 if (trustedPCAMap.has(entry.CAEntry[j].CAName)) {
                     // group policies by CAs
                     policiesOfCurrentDomain.set(entry.CAEntry[j].CAName,
-                        {
-                            TrustedCA: entry.CAEntry[j].CurrentPC.Policies.TrustedCA,
-                            AllowedSubdomains: entry.CAEntry[j].CurrentPC.Policies.AllowedSubdomains
-                        })
+                                                {
+                                                    TrustedCA: entry.CAEntry[j].CurrentPC.Policies.TrustedCA,
+                                                    AllowedSubdomains: entry.CAEntry[j].CurrentPC.Policies.AllowedSubdomains
+                                                })
                 }
             }
             allPolicies.set(mapResponse[i].Domain, policiesOfCurrentDomain)
@@ -136,11 +136,12 @@ function extractRawCertificates(mapResponse) {
             // policies of one specific domain
             const certificatesOfCurrentDomain = new Map();
             for (var j = 0; j < entry.CAEntry.length; j++) {
-                if (trustedCAMap.has(entry.CAEntry[j].CAName)) {
-                    // group certificates by CAs
-                    certificatesOfCurrentDomain.set(entry.CAEntry[j].CAName,
-                                                    entry.CAEntry[j].DomainCerts);
-                }
+                // TODO: check validity of CAs specified in the CA entry
+                // if (trustedCAMap.has(entry.CAEntry[j].CAName)) {
+                // group certificates by CAs
+                certificatesOfCurrentDomain.set(entry.CAEntry[j].CAName,
+                                                {certs: entry.CAEntry[j].DomainCerts, certChains: entry.CAEntry[j].DomainCertChains});
+                // }
             }
             certificateMap.set(mapResponse[i].Domain, certificatesOfCurrentDomain);
         }
@@ -153,8 +154,22 @@ function extractCertificates(mapResponse) {
     const domainMap = new Map();
     for (const [domain, rawCaMap] of rawDomainMap) {
         const caMap = new Map();
-        for (const [ca, certs] of rawCaMap) {
-            caMap.set(ca, certs.map(c => certificateparser.parsePemCertificate("-----BEGIN CERTIFICATE-----\n"+c+"\n-----END CERTIFICATE-----")));
+        for (const [ca, {certs, certChains}] of rawCaMap) {
+            var parsedCerts = [];
+            if (certs !== null) {
+                parsedCerts = certs.map(c => certificateparser.parsePemCertificate("-----BEGIN CERTIFICATE-----\n"+c+"\n-----END CERTIFICATE-----"));
+            }
+            var parsedCertChains = [];
+            if (certChains !== null) {
+                parsedCertChains = certChains.map(cc => {
+                    if (cc === null) {
+                        return [];
+                    } else {
+                        return cc.map(c => certificateparser.parsePemCertificate("-----BEGIN CERTIFICATE-----\n"+c+"\n-----END CERTIFICATE-----"))
+                    }
+                });
+            }
+            caMap.set(ca, {certs: parsedCerts, certChains: parsedCertChains});
         }
         domainMap.set(domain, caMap);
     }

@@ -2,11 +2,17 @@
 <html lang="en">
   <head>
     <script src="popup.js"></script>
-    <title> SCION LF-PKI </title>
+    <title> SCION (L)F-PKI </title>
   </head>
   <body>
-    Domain and config information will be displayed here (To be done)
-    <button id="printLog">Print Log</button>
-    <button id="downloadLog">Download Log</button>
+    <button id="printLog">Print Log to browser console</button>
+    <button id="downloadLog">Download Log as json file</button>
+    <div>
+      <pre>
+        <code id="config">
+          { "hello": "world" }
+        </code>
+      </pre>
+    </div>
   </body>
 </html>

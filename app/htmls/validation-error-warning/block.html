@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<head xmlns="http://www.w3.org/1999/xhtml">
+  <meta http-equiv="Content-Security-Policy" content="default-src chrome:; object-src 'none'" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Warning: Potential Security Risk Ahead</title>
+  <link rel="stylesheet" href="./css/aboutNetError.css" type="text/css" media="all" />
+  <link rel="icon" id="favicon" href="../../images/F-D_dark.png" />
+  <link rel="localization" href="browser/aboutCertError.ftl" />
+  <link rel="localization" href="browser/nsserrors.ftl" />
+  <link rel="localization" href="branding/brand.ftl" />
+  <link rel="localization" href="browser/netError.ftl" />
+</head>
+
+<body xmlns="http://www.w3.org/1999/xhtml" dir="ltr" class="certerror" code="MOZILLA_PKIX_ERROR_SELF_SIGNED_CERT">
+  <!-- ERROR ITEM CONTAINER (removed during loading to avoid bug 39098) -->
+  <!-- PAGE CONTAINER (for styling purposes only) -->
+  <div id="errorPageContainer" class="container">
+    <div id="text-container">
+      <!-- Error Title -->
+      <div class="title">
+        <h1 class="title-text">Warning: Potential Security Risk Ahead</h1>
+      </div>
+
+      <!-- LONG CONTENT (the section most likely to require scrolling) -->
+      <div id="errorLongContent">
+
+        <!-- Short Description -->
+        <div id="errorShortDesc">
+          <p id="errorShortDescText">The flexible web security plugin detected a potential security threat and did not continue to <span id="errorShortDescDomain" xmlns="http://www.w3.org/1999/xhtml" class="hostname">FILL IN</span>. If you visit this site, attackers could try to steal information like your passwords, emails, or credit card details.</p>
+          <p id="errorShortDescErrorMessage">FILL IN</p>
+        </div>
+      </div>
+      <!--       <div id="advancedPanelContainer"> -->
+        <!--         <div id="badCertAdvancedPanel" class="advanced-panel"> -->
+          <!--           <p id="badCertTechnicalInfo"><label ><br>https://example.com</label> -->
+            
+            <!-- <label >The server returned a certificate signed by <i>CA1</i>, but there exists a more highly trusted certificate from <i>CA2</i> that should be preferred.<br><br>This rule is defined in your imported preference: <b>Centre for Cyber Trust</b></label> -->
+            
+            <!-- <label >Error code: <a id="errorCode" data-l10n-name="error-code-link" data-telemetry-id="error_code_link" href="#certificateErrorDebugInformation">E201</a></label> -->
+            <!-- <label ><br>Learn more about how the flexible web security plugin protects you here:</label>  -->
+            <!-- </p> -->
+
+          <!--           <a id="viewCertificate" href="javascript:void(0)">https://wiki.f-pki.ethz.ch</a> -->
+          <!--           <div id="advancedPanelButtonContainer" class="button-container"> -->
+            <!--             <button id="advancedPanelReturnButton" class="primary" data-telemetry-id="return_button_adv">Go Back (Recommended)</button> -->
+            <!--             <div class="exceptionDialogButtonContainer"> -->
+              <!--               <button id="exceptionDialogButton" data-telemetry-id="exception_button">Accept the Risk and Continue</button> -->
+              <!--             </div> -->
+          </div>
+        </div>
+</body>
+<script src="block.js"></script>
+</html>

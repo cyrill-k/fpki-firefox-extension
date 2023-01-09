@@ -1,49 +1,88 @@
 import * as domainFunc from "./domain.js"
+import {FpkiError} from "./errors.js"
+import {printMap} from "./helper.js"
+
+// policy mode
+// start from highest ancestor -> go to actual domain
+// for each domain in all ancestor domains (+ the actual domain), find policies issued by PCAs with highest trust level and validate the connection certificate using them
+// -> behavior may change if we allow attributes to be inherited
+
+// legacy mode
+// only consider the actual domain without including ancestor domains
+// including ancestor domains is difficult, because of what would happen if an ancestor cert is issued by more highly trusted CA? -> we probably cannot block the certificate as it would lead to many false positives
+
+function policyFilterHighestTrustLevelPolicies(trustPreferenceEntries, domainPolicies) {
+    let highestTrustLevelPolicies = new Map();
+    let highestTrustLevel = 0;
+    domainPolicies.forEach((pcaPolicy, pcaIdentifier) => {
+        trustPreferenceEntries.forEach(tps => {
+            tps.forEach(tp => {
+                if (tp.pca === pcaIdentifier) {
+                    if (tp.level > highestTrustLevel) {
+                        highestTrustLevelPolicies = new Map();
+                        highestTrustLevel = tp.level;
+                    }
+                    if (tp.level >= highestTrustLevel && !highestTrustLevelPolicies.has(pcaIdentifier)) {
+                        highestTrustLevelPolicies.set(pcaIdentifier, pcaPolicy);
+                    }
+                }
+            });
+        });
+    });
+    return {highestTrustLevel, highestTrustLevelPolicies};
+}
 
 function policyValidateActualDomain(remoteInfo, config, actualDomain, domainPolicies) {
-    var CertificateException = "invalid CA";
+    const CertificateException = "invalid CA";
 
-    // countries to CA map
-    // map countries => CAs in that country
-    let countryToCAMap = new Map();
-    countryToCAMap.set("US CA", ["CN=GTS CA 1C3,O=Google Trust Services LLC,C=US",
-                                 "CN=GTS Root R1,O=Google Trust Services LLC,C=US",
-                                 "CN=Amazon,OU=Server CA 1B,O=Amazon,C=US",
-                                 "CN=Amazon Root CA 1,O=Amazon,C=US",
-                                 "CN=DigiCert Global CA G2,O=DigiCert Inc,C=US",
-                                 "CN=DigiCert Global Root G2,OU=www.digicert.com,O=DigiCert Inc,C=US"]);
+    const caSets = config.get("ca-sets");
+
+    const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("policy-trust-preference"), actualDomain);
     
+    // get policies whose PCAs have the highest trust level (II)
+    const {highestTrustLevelPolicies} = policyFilterHighestTrustLevelPolicies(filteredTrustPreferenceEntries, domainPolicies);
+
+    var checksPerformed = 0;
     const violations = [];
-    domainPolicies.forEach((pcaPolicy, pcaIdentifier) => {
+    highestTrustLevelPolicies.forEach((pcaPolicy, pcaIdentifier) => {
         if (pcaPolicy.TrustedCA !== null) {
             remoteInfo.certificates.forEach((certificate, i) => {
                 // if certificate is in browsers trust store
                 if (certificate.isBuiltInRoot) {
                     // check if CA is in the trusted list
-                    if (pcaPolicy.TrustedCA.every(ca => !countryToCAMap.get(ca).includes(certificate.subject))) {
+                    if (pcaPolicy.TrustedCA.every(ca => !caSets.get(ca).includes(certificate.subject))) {
                         violations.push({pca: pcaIdentifier, reason: CertificateException + ": " + certificate.issuer});
                     }
+                    checksPerformed += 1;
                 }
             });
         }
     });
-    return {success: violations.length === 0, violations};
+    return {success: violations.length === 0, violations, checksPerformed};
 }
 
 function policyValidateParentDomain(remoteInfo, config, actualDomain, parentDomain, domainPolicies) {
-    var DomainNotAllowed = "domain not allowed";
+    const DomainNotAllowed = "domain not allowed";
 
+    // only consider trust preference entries for the parent domain
+    const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("policy-trust-preference"), parentDomain);
+
+    // get policies whose PCAs have the highest trust level (II)
+    const {highestTrustLevelPolicies} = policyFilterHighestTrustLevelPolicies(filteredTrustPreferenceEntries, domainPolicies);
+
+    var checksPerformed = 0;
     const violations = [];
     let domainIsDisallowed = false;
-    domainPolicies.forEach((pcaPolicy, pcaIdentifier) => {
+    highestTrustLevelPolicies.forEach((pcaPolicy, pcaIdentifier) => {
         if (pcaPolicy.AllowedSubdomains !== null) {
             if (pcaPolicy.AllowedSubdomains.every(d => d !== actualDomain)) {
                 violations.push({pca: pcaIdentifier, reason: DomainNotAllowed + ": " + actualDomain});
             }
+            checksPerformed += 1
         }
     });
 
-    return {success: violations.length === 0, violations};
+    return {success: violations.length === 0, violations, checksPerformed};
 }
 
 // check connection using the policies retrieved from a single mapserver
@@ -51,39 +90,51 @@ function policyValidateParentDomain(remoteInfo, config, actualDomain, parentDoma
 export function policyValidateConnection(remoteInfo, config, domainName, allPolicies) {
     // iterate over all policies from all (trusted) mapservers
     // for example: the request for video.google.com, will contain the policies for "video.google.com" and "google.com"
+    var checksPerformed = 0;
     const violations = [];
     allPolicies.forEach((value, key) => {
         if (key == domainName) {
             // validate policies defined on the actual domain (e.g., allowed CA issuers)
-            const {success, violations: actualDomainViolations} = policyValidateActualDomain(remoteInfo, config, key, value);
+            const {success, violations: actualDomainViolations, checksPerformed: actualDomainChecksPerformed} = policyValidateActualDomain(remoteInfo, config, key, value);
+            checksPerformed += actualDomainChecksPerformed;
             violations.push(...actualDomainViolations);
         } else if (domainFunc.getParentDomain(domainName) == key) {
             // validate policies defined on the parent domain (e.g., allowed subdomains)
-            const {success, violations: parentDomainViolations} = policyValidateParentDomain(remoteInfo, config, domainName, key, value);
+            const {success, violations: parentDomainViolations, checksPerformed: parentDomainChecksPerformed} = policyValidateParentDomain(remoteInfo, config, domainName, key, value);
+            checksPerformed += parentDomainChecksPerformed;
             violations.push(...parentDomainViolations);
         } else {
             // TODO: how to deal with violations of other ancestors (e.g., parent of parent)?
         }
     });
-    return {success: violations.length === 0, violations};
+    return {success: violations.length === 0, violations, checksPerformed};
+}
+
+function filterTrustPreferenceEntries(trustPreferenceEntries, domain) {
+    const filteredTrustPreferenceEntries = [];
+    trustPreferenceEntries.forEach((tpEntry, d) => {
+        if (!d.includes("*")) {
+            if (d === domain) {
+                filteredTrustPreferenceEntries.push(tpEntry);
+            }
+        } else {
+            if (d[0] === "*" && (d.length === 1 || d[1] === ".") && !d.substr(1).includes("*")) {
+                if (d.length === 1 || domain.endsWith(d.substr(2))) {
+                    filteredTrustPreferenceEntries.push(tpEntry);
+                }
+            } else {
+                throw new FpkiError(INVALID_CONFIG, "invalid wildcard domain descriptor (must start with *, cannot use wildcards on partial domains (e.g., *example.com))");
+            }
+        }
+    });
+    return filteredTrustPreferenceEntries;
 }
 
 function legacyValidateActualDomain(remoteInfo, config, actualDomain, domainCertificates) {
-    var CertificateException = "[legacy mode] more highly trusted CA detected";
+    const CertificateException = "[legacy mode] more highly trusted CA detected";
 
-    // countries to CA map
-    // map countries => CAs in that country
-    let countryToCAMap = new Map();
-    countryToCAMap.set("US CA", ["CN=GTS CA 1C3,O=Google Trust Services LLC,C=US",
-                                 "CN=GTS Root R1,O=Google Trust Services LLC,C=US",
-                                 "CN=Amazon,OU=Server CA 1B,O=Amazon,C=US",
-                                 "CN=Amazon Root CA 1,O=Amazon,C=US",
-                                 "CN=DigiCert Global CA G2,O=DigiCert Inc,C=US",
-                                 "CN=DigiCert Global Root G2,OU=www.digicert.com,O=DigiCert Inc,C=US"]);
-
-    let legacyTrustPreference = new Map();
-    legacyTrustPreference.set("google.com", [{caSet: "US CA", level: 1}]);
-    legacyTrustPreference.set("qq.com", [{caSet: "US CA", level: 1}]);
+    const caSets = config.get("ca-sets");
+    const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("legacy-trust-preference"), actualDomain);
     // TODO: implement wildcard trust preferences
 
     const violations = [];
@@ -101,37 +152,41 @@ function legacyValidateActualDomain(remoteInfo, config, actualDomain, domainCert
     });
 
     // get connection root cert trust level (I)
-    if (!legacyTrustPreference.has(actualDomain)) {
+    if (filteredTrustPreferenceEntries.length === 0) {
         return {success: true, violations};
     }
     let connectionRootCertTrustLevel = 0;
-    legacyTrustPreference.get(actualDomain).forEach(tp => {
-        if (countryToCAMap.get(tp.caSet).includes(connectionRootCertSubject)) {
-            if (tp.level > connectionRootCertTrustLevel) {
-                connectionRootCertTrustLevel = tp.level;
+    filteredTrustPreferenceEntries.forEach(tps => {
+        tps.forEach(tp => {
+            if (caSets.get(tp.caSet).includes(connectionRootCertSubject)) {
+                if (tp.level > connectionRootCertTrustLevel) {
+                    connectionRootCertTrustLevel = tp.level;
+                }
             }
-        }
+        });
     });
 
     // get cert whose root cert has the highest trust level (II)
     let highestTrustLevelCerts = [];
     let highestTrustLevelRootCertSubjectCN = [];
     let highestTrustLevelRootCertTrustLevel = 0;
-    domainCertificates.forEach((caCertificates, caIdentifier) => {
-        caCertificates.forEach(caCertificate => {
-            legacyTrustPreference.get(actualDomain).forEach(tp => {
-                // TODO: correctly do the check from CN value to full subject (maybe add "CN="+caIdentifer+",") or parse all subject attributes
-                if (countryToCAMap.get(tp.caSet).some(s => s.includes(caIdentifier))) {
-                    if (tp.level > highestTrustLevelRootCertTrustLevel) {
-                        highestTrustLevelCerts = [caCertificate];
-                        highestTrustLevelRootCertSubjectCN = [caIdentifier];
-                        highestTrustLevelRootCertTrustLevel = tp.level;
+    domainCertificates.forEach(({certs: caCertificates}, caIdentifier) => {
+        caCertificates.forEach((caCertificate, index) => {
+            filteredTrustPreferenceEntries.forEach(tps => {
+                tps.forEach(tp => {
+                    // TODO: correctly do the check from CN value to full subject (maybe add "CN="+caIdentifer+",") or parse all subject attributes
+                    if (caSets.get(tp.caSet).some(s => s.includes(caIdentifier))) {
+                        if (tp.level > highestTrustLevelRootCertTrustLevel) {
+                            highestTrustLevelCerts = [caCertificate];
+                            highestTrustLevelRootCertSubjectCN = [caIdentifier];
+                            highestTrustLevelRootCertTrustLevel = tp.level;
+                        }
+                        else if (tp.level === highestTrustLevelRootCertTrustLevel) {
+                            highestTrustLevelCerts.push(caCertificate);
+                            highestTrustLevelRootCertSubjectCN.push(caIdentifier);
+                        }
                     }
-                    else if (tp.level === highestTrustLevelRootCertTrustLevel) {
-                        highestTrustLevelCerts.push(caCertificate);
-                        highestTrustLevelRootCertSubjectCN.push(caIdentifier);
-                    }
-                }
+                });
             });
         });
     });

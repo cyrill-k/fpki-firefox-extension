@@ -131,7 +131,7 @@ export class FpkiRequest {
 
                 return {policies, certificates, metrics};
             } catch (error) {
-                throw error;
+                throw new FpkiError(errorTypes.MAPSERVER_NETWORK_ERROR, error);
             } finally {
                 this.removeFromActiveRequestsIfPossible();
             }

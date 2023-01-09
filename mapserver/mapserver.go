@@ -15,6 +15,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -82,10 +83,37 @@ func mapServerQueryHandler(w http.ResponseWriter, r *http.Request) {
 
 		fmt.Println("[", queryIndex, "] replying for domain request: ", queriedDomain, ", size=", len(buf.String()))
 		// inspectResponse(response)
+		inspectDomainEntries(queryIndex, response)
 
 	default:
 		w.WriteHeader(http.StatusNotImplemented)
 		w.Write([]byte(http.StatusText(http.StatusNotImplemented)))
+	}
+}
+
+func inspectDomainEntries(queryIndex int, response []mapCommon.MapServerResponse) {
+	for i, v := range response {
+		if len(v.DomainEntryBytes) == 0 {
+			fmt.Printf("[ %d ] Response %d (%s): Entry bytes is empty\n", queryIndex, i, v.Domain)
+		} else {
+			de, err := mapCommon.DeserializeDomainEntry(v.DomainEntryBytes)
+			if err != nil {
+				log.Panicln("Failed to deserialize domain entry: %s", err)
+			}
+			fmt.Printf("[ %d ] Response %d (%s): %d CA entries\n", queryIndex, i, v.Domain, len(de.CAEntry))
+			for j, cae := range de.CAEntry {
+				if cae.CurrentPC.CAName != "" {
+					fmt.Printf("[ %d ] %d: %s (contains signed policy, %d domain certs)\n", queryIndex, j, cae.CAName, len(cae.DomainCerts))
+				} else {
+					fmt.Printf("[ %d ] %d: %s (%d domain certs)\n", queryIndex, j, cae.CAName, len(cae.DomainCerts))
+				}
+				var nCertChains []int
+				for _, certChain := range cae.DomainCertChains {
+					nCertChains = append(nCertChains, len(certChain))
+				}
+				fmt.Printf("[ %d ] %d: cert chain lengths: %v\n", queryIndex, i, nCertChains)
+			}
+		}
 	}
 }
 
@@ -214,6 +242,30 @@ func truncateTable() {
 	}
 }
 
+func startMapServer() *responder.MapResponder {
+	mapUpdater, err := updater.NewMapUpdater(nil, 233)
+	if err != nil {
+		panic(err)
+	}
+
+	root := mapUpdater.GetRoot()
+	err = mapUpdater.Close()
+	if err != nil {
+		panic(err)
+	}
+
+	ctx, cancelF := context.WithTimeout(context.Background(), time.Minute)
+	defer cancelF()
+
+	// get a new responder, and load an existing tree
+	mapResponder, err := responder.NewMapResponder(ctx, root, 233, "./config/mapserver_config.json")
+	if err != nil {
+		panic(err)
+	}
+
+	return mapResponder
+}
+
 func prepareMapServer() *responder.MapResponder {
 	mapUpdater, err := updater.NewMapUpdater(nil, 233)
 	if err != nil {
@@ -225,14 +277,14 @@ func prepareMapServer() *responder.MapResponder {
 		panic(err)
 	}
 
-	certs, err := getCerts()
+	certs, certChains, err := getCerts()
 	if err != nil {
 		panic(err)
 	}
 
 	ctx, cancelFCerts := context.WithTimeout(context.Background(), time.Minute)
 	defer cancelFCerts()
-	err = mapUpdater.UpdateCertsLocally(ctx, certs)
+	err = mapUpdater.UpdateCertsLocally(ctx, certs, certChains)
 	if err != nil {
 		panic(err)
 	}
@@ -297,10 +349,33 @@ func getRPCAndSP() ([]*common.RPC, []*common.SP, error) {
 	return rpcs, sps, nil
 }
 
-func getCerts() ([][]byte, error) {
-	certsRaw := [][]byte{}
+func decodeCerts(encodedCerts string, separator string) ([]*x509.Certificate, [][]byte, error) {
+	var certs []*x509.Certificate
+	var certBytes [][]byte
+	for _, encodedCert := range strings.Split(encodedCerts, separator) {
+		var block *pem.Block
+		block, _ = pem.Decode([]byte(encodedCert))
 
-	f, err := os.Open("./certs/ct_log_certs/certs.csv")
+		switch {
+		case block == nil:
+			return nil, nil, fmt.Errorf("Certificate input | no pem block")
+		case block.Type != "CERTIFICATE":
+			return nil, nil, fmt.Errorf("Certificate input | contains data other than certificate")
+		}
+
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, nil, fmt.Errorf("Certificate input | parsing error")
+		}
+
+		certs = append(certs, cert)
+		certBytes = append(certBytes, block.Bytes)
+	}
+	return certs, certBytes, nil
+}
+
+func appendCertsFromCsv(path string, certColumn int, certChainColumn int, domainFilter map[string]struct{}, certs [][]byte, certChains [][][]byte) ([][]byte, [][][]byte, error) {
+	f, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -315,31 +390,76 @@ func getCerts() ([][]byte, error) {
 		if err == io.EOF {
 			break
 		}
-		if err != nil {
-			log.Fatal(err)
-		}
+
 		if !isFirstLine {
 			// do something with read line
 			// fmt.Printf("%+v\n", rec)
 
-			var block *pem.Block
-			block, _ = pem.Decode([]byte(rec[1]))
-
-			switch {
-			case block == nil:
-				return nil, fmt.Errorf("Certificate input | no pem block")
-			case block.Type != "CERTIFICATE":
-				return nil, fmt.Errorf("Certificate input | contains data other than certificate")
+			leafCerts, leafCertBytes, err := decodeCerts(rec[certColumn], ";")
+			if err != nil {
+				return nil, nil, fmt.Errorf("Failed to decode certs: %s", err)
+			}
+			if len(leafCerts) != 1 {
+				return nil, nil, fmt.Errorf("Wrong number of leaf certificates")
+			}
+			var domains []string
+			domains = append(domains, leafCerts[0].Subject.CommonName)
+			domains = append(domains, leafCerts[0].DNSNames...)
+			addCertificate := false
+			for _, v := range domains {
+				if _, ok := domainFilter[v]; ok {
+					addCertificate = true
+					break
+				}
 			}
 
-			cert, err := x509.ParseCertificate(block.Bytes)
-			if err == nil {
-				fmt.Println(cert.Subject)
+			if addCertificate {
+				fmt.Println(domains)
+				certs = append(certs, leafCertBytes[0])
+				if certChainColumn != -1 {
+					_, certChainBytes, err := decodeCerts(rec[certChainColumn], ";")
+					if err != nil {
+						return nil, nil, fmt.Errorf("Failed to decode certchain: %s", err)
+					}
+					certChains = append(certChains, certChainBytes)
+				} else {
+					certChains = append(certChains, [][]byte{})
+				}
 			}
-
-			certsRaw = append(certsRaw, block.Bytes)
 		}
 		isFirstLine = false
 	}
-	return certsRaw, nil
+	return certs, certChains, nil
+}
+
+func getCerts() ([][]byte, [][][]byte, error) {
+	certsRaw := [][]byte{}
+	certChainsRaw := [][][]byte{}
+
+	type void struct{}
+	var member void
+	includedDomains := make(map[string]struct{})
+	includedDomains["microsoft.com"] = member
+	includedDomains["azure.microsoft.com"] = member
+	includedDomains["bing.com"] = member
+	includedDomains["google.com"] = member
+	includedDomains["baidu.com"] = member
+	includedDomains["amazon.com"] = member
+	includedDomains["pay.amazon.com"] = member
+	includedDomains["ethz.ch"] = member
+	includedDomains["netsec.ethz.ch"] = member
+	includedDomains["facebook.com"] = member
+	includedDomains["www.facebook.com"] = member
+	includedDomains["qq.com"] = member
+	includedDomains["wikipedia.org"] = member
+
+	var err error
+	if certsRaw, certChainsRaw, err = appendCertsFromCsv("./certs/ct_log_certs/certs.csv", 1, -1, includedDomains, certsRaw, certChainsRaw); err != nil {
+		return nil, nil, err
+	}
+	if certsRaw, certChainsRaw, err = appendCertsFromCsv("./certs/additional_certs/certs.csv", 0, 1, includedDomains, certsRaw, certChainsRaw); err != nil {
+		return nil, nil, err
+	}
+
+	return certsRaw, certChainsRaw, nil
 }

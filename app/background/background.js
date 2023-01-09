@@ -44,14 +44,71 @@ config.set("max-connection-setup-time", 1000);
 config.set("mapserver-quorum", 2);
 // number of mapservers queried per validated domain (currently always choosing the first n entries in the mapserver list)
 config.set("mapserver-instances-queried", 2);
+config.set("ca-sets", (()=>{
+    const caSet = new Map();
+    caSet.set("US CA", ["CN=GTS CA 1C3,O=Google Trust Services LLC,C=US",
+                        "CN=GTS Root R1,O=Google Trust Services LLC,C=US",
+                        "CN=Amazon,OU=Server CA 1B,O=Amazon,C=US",
+                        "CN=Amazon Root CA 1,O=Amazon,C=US",
+                        "CN=DigiCert Global CA G2,O=DigiCert Inc,C=US",
+                        "CN=DigiCert Global Root G2,OU=www.digicert.com,O=DigiCert Inc,C=US"]);
+    // don't include "C=US,O=Microsoft Corporation,CN=Microsoft RSA TLS CA 02"
+    caSet.set("Microsoft CA", ["CN=Microsoft RSA Root Certificate Authority 2017,O=Microsoft Corporation,C=US",
+                               "CN=Microsoft ECC Root Certificate Authority 2017,O=Microsoft Corporation,C=US",
+                               "CN=Microsoft RSA TLS CA 01,O=Microsoft Corporation,C=US"]);
+    return caSet;
+})());
+// the default level of a root certificate is 0
+// CAs with higher levels take precedence over CAs with lower levels
+config.set("legacy-trust-preference", (()=>{
+    const tp = new Map();
+    tp.set("google.com", [{caSet: "US CA", level: 1}]);
+    tp.set("qq.com", [{caSet: "US CA", level: 1}]);
+    tp.set("azure.microsoft.com", [{caSet: "Microsoft CA", level: 1}]);
+    tp.set("bing.com", [{caSet: "Microsoft CA", level: 1}]);
+    return tp;
+})());
+// the default level of a root certificate is 0
+// CAs with higher levels take precedence over CAs with lower levels
+config.set("policy-trust-preference", (()=>{
+    const tp = new Map();
+    tp.set("*", [{pca: "pca", level: 1}]);
+    return tp;
+})());
+config.set("root-pcas", (()=>{
+    const rootPcas = new Map();
+    rootPcas.set("pca", "local PCA for testing purposes");
+    return rootPcas;
+})());
+config.set("root-cas", (()=>{
+    const rootCas = new Map();
+    rootCas.set("GTS CA 1C3", "description: ...");
+    rootCas.set("DigiCert Global Root CA", "description: ...");
+    rootCas.set("TrustAsia TLS RSA CA", "description: ...");
+    rootCas.set("DigiCert SHA2 Secure Server CA", "description: ...");
+    rootCas.set("DigiCert Secure Site CN CA G3", "description: ...");
+    rootCas.set("GlobalSign Organization Validation CA - SHA256 - G2", "description: ...");
+    rootCas.set("DigiCert TLS Hybrid ECC SHA384 2020 CA1", "description: ...");
+    return rootCas;
+})());
 
 function redirect(details, error) {
-    cLog(details.requestId, "verification failed! -> redirecting. Reason: " + error+ " ["+details.url+"]")
+    cLog(details.requestId, "verification failed! -> redirecting. Reason: " + error+ " ["+details.url+"]");
     // if any error is caught, redirect to the blocking page, and show the error page
     let { tabId } = details;
+    let htmlErrorFile;
+    if (error.errorType === errorTypes.MAPSERVER_NETWORK_ERROR) {
+        htmlErrorFile = "../htmls/map-server-error/block.html";
+    } else if (error.errorType === errorTypes.LEGACY_MODE_VALIDATION_ERROR) {
+        htmlErrorFile = "../htmls/validation-error-warning/block.html";
+    } else if (error.errorType === errorTypes.POLICY_MODE_VALIDATION_ERROR) {
+        htmlErrorFile = "../htmls/validation-error-blocking/block.html";
+    } else {
+        htmlErrorFile = "../htmls/block.html";
+    }
     chrome.tabs.update(tabId, {
-        url: browser.runtime.getURL("../htmls/block.html") + "?reason=" + error
-    })
+        url: browser.runtime.getURL(htmlErrorFile) + "?reason=" + encodeURIComponent(error) + "&domain=" + encodeURIComponent(getDomainNameFromURL(details.url))
+    });
 }
 
 function shouldValidateDomain(domain) {
@@ -115,6 +172,13 @@ async function checkInfo(details) {
         rawDER: true
     });
 
+    cLog(details.requestId, remoteInfo);
+    if (remoteInfo.certificates === undefined) {
+        cLog(details.requestId, "establishing non-secure http connection");
+        // TODO: could also implement protection against http downgrade
+        return;
+    }
+
     if (logEntry !== null) {
         const certificateChain = remoteInfo.certificates.map(c => ({fingerprintSha256: c.fingerprint.sha256, serial: c.serialNumber, subject: c.subject, issuer: c.issuer}));
         logEntry.certificateChainReceived(certificateChain);
@@ -139,23 +203,30 @@ async function checkInfo(details) {
             cLog(details.requestId, "await finished for fpki request for ["+domain+", "+mapserver.identity+"]");
         }
 
+        // count how many policy validations were performed
+        var policyChecksPerformed = 0;
         // check each policy and throw an error if one of the verifications fails
         policiesMap.forEach((p, m) => {
             cLog(details.requestId, "starting policy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
-            const {success, violations} = policyValidateConnection(remoteInfo, {}, domain, p);
+            const {success, violations, checksPerformed} = policyValidateConnection(remoteInfo, config, domain, p);
+            console.log("checks performed = "+checksPerformed);
+            policyChecksPerformed += checksPerformed;
             if (!success) {
-                throw violations[0].reason+" ["+violations[0].pca+"]";
+                throw new FpkiError(errorTypes.POLICY_MODE_VALIDATION_ERROR, violations[0].reason+" ["+violations[0].pca+"]");
             }
         });
 
-        // check each policy and throw an error if one of the verifications fails
-        certificatesMap.forEach((c, m) => {
-            cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c));
-            const {success, violations} = legacyValidateConnection(remoteInfo, {}, domain, c);
-            if (!success) {
-                throw violations[0].reason+" ["+violations[0].ca+"]";
-            }
-        });
+        // don't perform legacy validation if policy validation has already taken place
+        if (policyChecksPerformed === 0) {
+            // check each policy and throw an error if one of the verifications fails
+            certificatesMap.forEach((c, m) => {
+                cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c));
+                const {success, violations} = legacyValidateConnection(remoteInfo, config, domain, c);
+                if (!success) {
+                    throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, violations[0].reason+" ["+violations[0].ca+"]");
+                }
+            });
+        }
 
         // TODO: legacy (i.e., certificate-based) validation
 

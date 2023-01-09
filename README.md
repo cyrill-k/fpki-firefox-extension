@@ -59,3 +59,17 @@ go version 1.19.2
 mysql 8.0.31
 mysql -h localhost -P 3307 --protocol TCP -u root -proot
 mysql -h localhost -P 3307 --protocol TCP -u test -pzaphod
+
+## new test websites
+
+### policy issuer
+https://m.media-amazon.com
+https://baidu.com
+
+### policy subdomain
+https://netsec.ethz.ch
+https://sellercentral.amazon.com
+
+### legacy
+https://azure.microsoft.com
+https://bing.com
