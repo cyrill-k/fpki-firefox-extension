@@ -966,7 +966,7 @@ Entity.prototype.encode = function encode(data, enc, /* internal */ reporter) {
   return this._getEncoder(enc).encode(data, reporter);
 };
 
-},{"./decoders":11,"./encoders":14,"inherits":17}],4:[function(require,module,exports){
+},{"./decoders":11,"./encoders":14,"inherits":21}],4:[function(require,module,exports){
 'use strict';
 
 const inherits = require('inherits');
@@ -1121,7 +1121,7 @@ EncoderBuffer.prototype.join = function join(out, offset) {
   return out;
 };
 
-},{"../base/reporter":7,"inherits":17,"safer-buffer":23}],5:[function(require,module,exports){
+},{"../base/reporter":7,"inherits":21,"safer-buffer":28}],5:[function(require,module,exports){
 'use strict';
 
 const base = exports;
@@ -1771,7 +1771,7 @@ Node.prototype._isPrintstr = function isPrintstr(str) {
   return /^[A-Za-z0-9 '()+,-./:=?]*$/.test(str);
 };
 
-},{"../base/buffer":4,"../base/reporter":7,"minimalistic-assert":22}],7:[function(require,module,exports){
+},{"../base/buffer":4,"../base/reporter":7,"minimalistic-assert":26}],7:[function(require,module,exports){
 'use strict';
 
 const inherits = require('inherits');
@@ -1896,7 +1896,7 @@ ReporterError.prototype.rethrow = function rethrow(msg) {
   return this;
 };
 
-},{"inherits":17}],8:[function(require,module,exports){
+},{"inherits":21}],8:[function(require,module,exports){
 'use strict';
 
 // Helper
@@ -2316,7 +2316,7 @@ function derDecodeLen(buf, primitive, fail) {
   return len;
 }
 
-},{"../base/buffer":4,"../base/node":6,"../constants/der":8,"bn.js":16,"inherits":17}],11:[function(require,module,exports){
+},{"../base/buffer":4,"../base/node":6,"../constants/der":8,"bn.js":16,"inherits":21}],11:[function(require,module,exports){
 'use strict';
 
 const decoders = exports;
@@ -2377,7 +2377,7 @@ PEMDecoder.prototype.decode = function decode(data, options) {
   return DERDecoder.prototype.decode.call(this, input, options);
 };
 
-},{"./der":10,"inherits":17,"safer-buffer":23}],13:[function(require,module,exports){
+},{"./der":10,"inherits":21,"safer-buffer":28}],13:[function(require,module,exports){
 'use strict';
 
 const inherits = require('inherits');
@@ -2674,7 +2674,7 @@ function encodeTag(tag, primitive, cls, reporter) {
   return res;
 }
 
-},{"../base/node":6,"../constants/der":8,"inherits":17,"safer-buffer":23}],14:[function(require,module,exports){
+},{"../base/node":6,"../constants/der":8,"inherits":21,"safer-buffer":28}],14:[function(require,module,exports){
 'use strict';
 
 const encoders = exports;
@@ -2707,7 +2707,7 @@ PEMEncoder.prototype.encode = function encode(data, options) {
   return out.join('\n');
 };
 
-},{"./der":13,"inherits":17}],16:[function(require,module,exports){
+},{"./der":13,"inherits":21}],16:[function(require,module,exports){
 (function (module, exports) {
   'use strict';
 
@@ -6155,480 +6155,7 @@ PEMEncoder.prototype.encode = function encode(data, options) {
   };
 })(typeof module === 'undefined' || module, this);
 
-},{"buffer":26}],17:[function(require,module,exports){
-if (typeof Object.create === 'function') {
-  // implementation from standard node.js 'util' module
-  module.exports = function inherits(ctor, superCtor) {
-    if (superCtor) {
-      ctor.super_ = superCtor
-      ctor.prototype = Object.create(superCtor.prototype, {
-        constructor: {
-          value: ctor,
-          enumerable: false,
-          writable: true,
-          configurable: true
-        }
-      })
-    }
-  };
-} else {
-  // old school shim for old browsers
-  module.exports = function inherits(ctor, superCtor) {
-    if (superCtor) {
-      ctor.super_ = superCtor
-      var TempCtor = function () {}
-      TempCtor.prototype = superCtor.prototype
-      ctor.prototype = new TempCtor()
-      ctor.prototype.constructor = ctor
-    }
-  }
-}
-
-},{}],18:[function(require,module,exports){
-"use strict";
-/**
- * encoder.js
- */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.stringToArrayBuffer = exports.arrayBufferToString = exports.hexStringToArrayBuffer = exports.arrayBufferToHexString = exports.decodeBase64Url = exports.encodeBase64Url = exports.decodeBase64 = exports.encodeBase64 = void 0;
-const env = __importStar(require("./env"));
-/**
- * Encode ArrayBuffer or TypedArray To Base64
- * @param data
- * @return {*}
- */
-const encodeBase64 = (data) => {
-    let str = '';
-    if (typeof data === 'string')
-        str = data;
-    else
-        str = (0, exports.arrayBufferToString)(data);
-    const btoa = env.getEnvBtoa();
-    return btoa(str);
-};
-exports.encodeBase64 = encodeBase64;
-/**
- * Decode Base64 to Uint8Array
- * @param str
- * @return {Uint8Array|string|*}
- */
-const decodeBase64 = (str) => {
-    const atob = env.getEnvAtob();
-    const binary = atob(str);
-    const data = (0, exports.stringToArrayBuffer)(binary);
-    return getAsciiIfAscii(data);
-};
-exports.decodeBase64 = decodeBase64;
-/**
- * if input data is an ArrayBuffer or TypedArray, it would be returned as Uint8Array
- * @param data
- * @return {Uint8Array}
- */
-const sanitizeTypedArrayAndArrayBuffer = (data) => {
-    if (data instanceof Uint8Array)
-        return data;
-    if (ArrayBuffer.isView(data) && typeof data.buffer !== 'undefined') { // TypedArray except Uint8Array
-        return new Uint8Array(data.buffer);
-    }
-    else
-        return new Uint8Array(data); // ArrayBuffer
-};
-/**
- * Check if the given Uint8Array can be expressed in Ascii Text
- * @param data
- * @return {Uint8Array|string|*}
- */
-const getAsciiIfAscii = (data) => {
-    let flag = true;
-    for (let i = 0; i < data.length; i++) {
-        if (data[i] > 0x7e || (data[i] < 0x20 && data[i] !== 0x0d && data[i] !== 0x0a)) {
-            flag = false;
-            break;
-        }
-    }
-    let returnData = null;
-    if (flag) {
-        returnData = '';
-        for (let i = 0; i < data.length; i++)
-            returnData += String.fromCharCode(data[i]);
-    }
-    else
-        returnData = data;
-    return returnData;
-};
-/**
- * Encode ArrayBuffer or TypedArray to base64url string
- * @param data
- * @return {string}
- */
-const encodeBase64Url = (data) => (0, exports.encodeBase64)(data).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-exports.encodeBase64Url = encodeBase64Url;
-/**
- * Decode Base64Url string to Uint8Array
- * @param str
- * @return {Uint8Array}
- */
-const decodeBase64Url = (str) => {
-    str = str.replace(/-/g, '+').replace(/_/g, '/');
-    // str = str + "=".repeat(str.length % 4); // this sometimes causes error...
-    return (0, exports.decodeBase64)(str);
-};
-exports.decodeBase64Url = decodeBase64Url;
-/**
- * Encode ArrayBuffer or TypedArray to hex string
- * @param data
- * @return {string}
- */
-const arrayBufferToHexString = (data) => {
-    const arr = sanitizeTypedArrayAndArrayBuffer(data);
-    let hexStr = '';
-    for (let i = 0; i < arr.length; i++) {
-        let hex = (arr[i] & 0xff).toString(16);
-        hex = (hex.length === 1) ? `0${hex}` : hex;
-        hexStr += hex;
-    }
-    return hexStr;
-};
-exports.arrayBufferToHexString = arrayBufferToHexString;
-/**
- * Decode hex string to Uint8Array
- * @param str
- * @return {Uint8Array}
- */
-const hexStringToArrayBuffer = (str) => {
-    const arr = [];
-    const len = str.length;
-    for (let i = 0; i < len; i += 2)
-        arr.push(parseInt(str.substr(i, 2), 16));
-    return new Uint8Array(arr);
-};
-exports.hexStringToArrayBuffer = hexStringToArrayBuffer;
-/**
- * Encode ArrayBuffer or TypedArray to string with code (like output of legacy atob)
- * @param data
- * @return {string}
- */
-const arrayBufferToString = (data) => {
-    const bytes = sanitizeTypedArrayAndArrayBuffer(data);
-    const arr = new Array(bytes.length);
-    bytes.forEach((x, i) => { arr[i] = x; });
-    return String.fromCharCode.apply(null, arr);
-};
-exports.arrayBufferToString = arrayBufferToString;
-/**
- * Decode string with code (like output of legacy atob) to Uint8Array
- * @param str
- * @return {Uint8Array}
- */
-const stringToArrayBuffer = (str) => {
-    const bytes = new Uint8Array(str.length);
-    return bytes.map((_x, i) => str.charCodeAt(i));
-};
-exports.stringToArrayBuffer = stringToArrayBuffer;
-
-},{"./env":19}],19:[function(require,module,exports){
-(function (Buffer){(function (){
-"use strict";
-/**
- * this module handles the difference between window (browser) and node js for specific functions and libraries.
- * env.js
- */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.getEnvAtob = exports.getEnvBtoa = void 0;
-const getEnvBtoa = () => {
-    if (typeof window !== 'undefined')
-        return window.btoa; // browser
-    else
-        return nodeBtoa; // node
-};
-exports.getEnvBtoa = getEnvBtoa;
-const getEnvAtob = () => {
-    if (typeof window !== 'undefined')
-        return window.atob; // browser
-    else
-        return nodeAtob; // node
-};
-exports.getEnvAtob = getEnvAtob;
-const nodeBtoa = (str) => {
-    if (typeof Buffer === 'undefined')
-        throw new Error('UnsupportedEnvironment');
-    const buffer = Buffer.from(str.toString(), 'binary');
-    return buffer.toString('base64');
-};
-const nodeAtob = (str) => {
-    if (typeof Buffer === 'undefined')
-        throw new Error('UnsupportedEnvironment');
-    return Buffer.from(str, 'base64').toString('binary');
-};
-
-}).call(this)}).call(this,require("buffer").Buffer)
-},{"buffer":27}],20:[function(require,module,exports){
-"use strict";
-/**
- * formatter.js
- */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.binToPem = exports.pemToBin = void 0;
-const encoder = __importStar(require("./encoder"));
-const PemArmorString = {
-    'public': 'PUBLIC KEY',
-    'private': 'PRIVATE KEY',
-    'encryptedPrivate': 'ENCRYPTED PRIVATE KEY',
-    'certificate': 'CERTIFICATE',
-    'certRequest': 'CERTIFICATE REQUEST'
-};
-/**
- * Convert PEM armored string to Uint8Array
- * @param keydataB64Pem
- * @return {Uint8Array}
- */
-const pemToBin = (keydataB64Pem) => {
-    const keydataB64 = dearmorPem(keydataB64Pem);
-    return encoder.decodeBase64(keydataB64);
-};
-exports.pemToBin = pemToBin;
-/**
- * Convert ArrayBuffer or TypedArray to PEM armored string with a specified type
- * @param keydata
- * @param type
- * @return {string}
- */
-const binToPem = (keydata, type) => {
-    const keydataB64 = encoder.encodeBase64(keydata);
-    return formatAsPem(keydataB64, type);
-};
-exports.binToPem = binToPem;
-/**
- * Armor the given Base64 string and return PEM formatted string
- * @param str
- * @param type
- * @return {string}
- */
-const formatAsPem = (str, type) => {
-    const typeString = PemArmorString[type];
-    let finalString = `-----BEGIN ${typeString}-----\n`;
-    while (str.length > 0) {
-        finalString += `${str.substring(0, 64)}\n`;
-        str = str.substring(64);
-    }
-    finalString = `${finalString}-----END ${typeString}-----`;
-    return finalString;
-};
-/**
- * Dearmor the given PEM string and return Base64 string
- * @param str
- * @return {string}
- */
-const dearmorPem = (str) => {
-    // const beginRegExp = RegExp('^-----[\s]*BEGIN[^-]*KEY-----$', 'gm');
-    // const endRegExp = RegExp('^-----[\s]*END[^-]*KEY-----$', 'gm');
-    const beginRegExp = RegExp('^-----[\s]*BEGIN[^-]*-----$', 'gm');
-    const endRegExp = RegExp('^-----[\s]*END[^-]*-----$', 'gm');
-    // check if the object starts from 'begin'
-    try {
-        let dearmored = str.split(beginRegExp)[1].split(endRegExp)[0];
-        dearmored = dearmored.replace(/\r?\n/g, '');
-        return dearmored;
-    }
-    catch (e) {
-        throw new Error('Invalid format as PEM');
-    }
-};
-
-},{"./encoder":18}],21:[function(require,module,exports){
-"use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.formatter = exports.encoder = void 0;
-/**
- * index.ts
- **/
-const Encoder = __importStar(require("./encoder"));
-const Formatter = __importStar(require("./formatter"));
-var encoder;
-(function (encoder) {
-    encoder.encodeBase64 = Encoder.encodeBase64;
-    encoder.decodeBase64 = Encoder.decodeBase64;
-    encoder.encodeBase64Url = Encoder.encodeBase64Url;
-    encoder.decodeBase64Url = Encoder.decodeBase64Url;
-    encoder.arrayBufferToHexString = Encoder.arrayBufferToHexString;
-    encoder.hexStringToArrayBuffer = Encoder.hexStringToArrayBuffer;
-    encoder.stringToArrayBuffer = Encoder.stringToArrayBuffer;
-    encoder.arrayBufferToString = Encoder.arrayBufferToString;
-})(encoder = exports.encoder || (exports.encoder = {}));
-var formatter;
-(function (formatter) {
-    formatter.binToPem = Formatter.binToPem;
-    formatter.pemToBin = Formatter.pemToBin;
-})(formatter = exports.formatter || (exports.formatter = {}));
-exports.default = { encoder, formatter };
-
-},{"./encoder":18,"./formatter":20}],22:[function(require,module,exports){
-module.exports = assert;
-
-function assert(val, msg) {
-  if (!val)
-    throw new Error(msg || 'Assertion failed');
-}
-
-assert.equal = function assertEqual(l, r, msg) {
-  if (l != r)
-    throw new Error(msg || ('Assertion failed: ' + l + ' != ' + r));
-};
-
-},{}],23:[function(require,module,exports){
-(function (process){(function (){
-/* eslint-disable node/no-deprecated-api */
-
-'use strict'
-
-var buffer = require('buffer')
-var Buffer = buffer.Buffer
-
-var safer = {}
-
-var key
-
-for (key in buffer) {
-  if (!buffer.hasOwnProperty(key)) continue
-  if (key === 'SlowBuffer' || key === 'Buffer') continue
-  safer[key] = buffer[key]
-}
-
-var Safer = safer.Buffer = {}
-for (key in Buffer) {
-  if (!Buffer.hasOwnProperty(key)) continue
-  if (key === 'allocUnsafe' || key === 'allocUnsafeSlow') continue
-  Safer[key] = Buffer[key]
-}
-
-safer.Buffer.prototype = Buffer.prototype
-
-if (!Safer.from || Safer.from === Uint8Array.from) {
-  Safer.from = function (value, encodingOrOffset, length) {
-    if (typeof value === 'number') {
-      throw new TypeError('The "value" argument must not be of type number. Received type ' + typeof value)
-    }
-    if (value && typeof value.length === 'undefined') {
-      throw new TypeError('The first argument must be one of type string, Buffer, ArrayBuffer, Array, or Array-like Object. Received type ' + typeof value)
-    }
-    return Buffer(value, encodingOrOffset, length)
-  }
-}
-
-if (!Safer.alloc) {
-  Safer.alloc = function (size, fill, encoding) {
-    if (typeof size !== 'number') {
-      throw new TypeError('The "size" argument must be of type number. Received type ' + typeof size)
-    }
-    if (size < 0 || size >= 2 * (1 << 30)) {
-      throw new RangeError('The value "' + size + '" is invalid for option "size"')
-    }
-    var buf = Buffer(size)
-    if (!fill || fill.length === 0) {
-      buf.fill(0)
-    } else if (typeof encoding === 'string') {
-      buf.fill(fill, encoding)
-    } else {
-      buf.fill(fill)
-    }
-    return buf
-  }
-}
-
-if (!safer.kStringMaxLength) {
-  try {
-    safer.kStringMaxLength = process.binding('buffer').kStringMaxLength
-  } catch (e) {
-    // we can't determine kStringMaxLength in environments where process.binding
-    // is unsupported, so let's not set it
-  }
-}
-
-if (!safer.constants) {
-  safer.constants = {
-    MAX_LENGTH: safer.kMaxLength
-  }
-  if (safer.kStringMaxLength) {
-    safer.constants.MAX_STRING_LENGTH = safer.kStringMaxLength
-  }
-}
-
-module.exports = safer
-
-}).call(this)}).call(this,require('_process'))
-},{"_process":29,"buffer":27}],24:[function(require,module,exports){
-const rfc5280 = require('asn1.js-rfc5280');
-const jseu = require('js-encoding-utils');
-const Buffer = require('buffer').Buffer;
-
-// pass the certificate in the PEM format and return a certificate object
-function parsePemCertificate(pemCertificate) {
-    const x509bin = jseu.formatter.pemToBin(pemCertificate);
-    const binKeyBuffer = Buffer.from(x509bin);
-    const decoded = rfc5280.Certificate.decode(binKeyBuffer, 'der');
-    return decoded;
-}
-
-module.exports = {parsePemCertificate};
-
-},{"asn1.js-rfc5280":1,"buffer":27,"js-encoding-utils":21}],25:[function(require,module,exports){
+},{"buffer":18}],17:[function(require,module,exports){
 'use strict'
 
 exports.byteLength = byteLength
@@ -6780,9 +6307,9 @@ function fromByteArray (uint8) {
   return parts.join('')
 }
 
-},{}],26:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 
-},{}],27:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 (function (Buffer){(function (){
 /*!
  * The buffer module from node.js, for the browser.
@@ -8563,7 +8090,7 @@ function numberIsNaN (obj) {
 }
 
 }).call(this)}).call(this,require("buffer").Buffer)
-},{"base64-js":25,"buffer":27,"ieee754":28}],28:[function(require,module,exports){
+},{"base64-js":17,"buffer":19,"ieee754":20}],20:[function(require,module,exports){
 /*! ieee754. BSD-3-Clause License. Feross Aboukhadijeh <https://feross.org/opensource> */
 exports.read = function (buffer, offset, isLE, mLen, nBytes) {
   var e, m
@@ -8650,7 +8177,384 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
   buffer[offset + i - d] |= s * 128
 }
 
-},{}],29:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
+if (typeof Object.create === 'function') {
+  // implementation from standard node.js 'util' module
+  module.exports = function inherits(ctor, superCtor) {
+    if (superCtor) {
+      ctor.super_ = superCtor
+      ctor.prototype = Object.create(superCtor.prototype, {
+        constructor: {
+          value: ctor,
+          enumerable: false,
+          writable: true,
+          configurable: true
+        }
+      })
+    }
+  };
+} else {
+  // old school shim for old browsers
+  module.exports = function inherits(ctor, superCtor) {
+    if (superCtor) {
+      ctor.super_ = superCtor
+      var TempCtor = function () {}
+      TempCtor.prototype = superCtor.prototype
+      ctor.prototype = new TempCtor()
+      ctor.prototype.constructor = ctor
+    }
+  }
+}
+
+},{}],22:[function(require,module,exports){
+"use strict";
+/**
+ * encoder.js
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.stringToArrayBuffer = exports.arrayBufferToString = exports.hexStringToArrayBuffer = exports.arrayBufferToHexString = exports.decodeBase64Url = exports.encodeBase64Url = exports.decodeBase64 = exports.encodeBase64 = void 0;
+const env = __importStar(require("./env"));
+/**
+ * Encode ArrayBuffer or TypedArray To Base64
+ * @param data
+ * @return {*}
+ */
+const encodeBase64 = (data) => {
+    let str = '';
+    if (typeof data === 'string')
+        str = data;
+    else
+        str = (0, exports.arrayBufferToString)(data);
+    const btoa = env.getEnvBtoa();
+    return btoa(str);
+};
+exports.encodeBase64 = encodeBase64;
+/**
+ * Decode Base64 to Uint8Array
+ * @param str
+ * @return {Uint8Array|string|*}
+ */
+const decodeBase64 = (str) => {
+    const atob = env.getEnvAtob();
+    const binary = atob(str);
+    const data = (0, exports.stringToArrayBuffer)(binary);
+    return getAsciiIfAscii(data);
+};
+exports.decodeBase64 = decodeBase64;
+/**
+ * if input data is an ArrayBuffer or TypedArray, it would be returned as Uint8Array
+ * @param data
+ * @return {Uint8Array}
+ */
+const sanitizeTypedArrayAndArrayBuffer = (data) => {
+    if (data instanceof Uint8Array)
+        return data;
+    if (ArrayBuffer.isView(data) && typeof data.buffer !== 'undefined') { // TypedArray except Uint8Array
+        return new Uint8Array(data.buffer);
+    }
+    else
+        return new Uint8Array(data); // ArrayBuffer
+};
+/**
+ * Check if the given Uint8Array can be expressed in Ascii Text
+ * @param data
+ * @return {Uint8Array|string|*}
+ */
+const getAsciiIfAscii = (data) => {
+    let flag = true;
+    for (let i = 0; i < data.length; i++) {
+        if (data[i] > 0x7e || (data[i] < 0x20 && data[i] !== 0x0d && data[i] !== 0x0a)) {
+            flag = false;
+            break;
+        }
+    }
+    let returnData = null;
+    if (flag) {
+        returnData = '';
+        for (let i = 0; i < data.length; i++)
+            returnData += String.fromCharCode(data[i]);
+    }
+    else
+        returnData = data;
+    return returnData;
+};
+/**
+ * Encode ArrayBuffer or TypedArray to base64url string
+ * @param data
+ * @return {string}
+ */
+const encodeBase64Url = (data) => (0, exports.encodeBase64)(data).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+exports.encodeBase64Url = encodeBase64Url;
+/**
+ * Decode Base64Url string to Uint8Array
+ * @param str
+ * @return {Uint8Array}
+ */
+const decodeBase64Url = (str) => {
+    str = str.replace(/-/g, '+').replace(/_/g, '/');
+    // str = str + "=".repeat(str.length % 4); // this sometimes causes error...
+    return (0, exports.decodeBase64)(str);
+};
+exports.decodeBase64Url = decodeBase64Url;
+/**
+ * Encode ArrayBuffer or TypedArray to hex string
+ * @param data
+ * @return {string}
+ */
+const arrayBufferToHexString = (data) => {
+    const arr = sanitizeTypedArrayAndArrayBuffer(data);
+    let hexStr = '';
+    for (let i = 0; i < arr.length; i++) {
+        let hex = (arr[i] & 0xff).toString(16);
+        hex = (hex.length === 1) ? `0${hex}` : hex;
+        hexStr += hex;
+    }
+    return hexStr;
+};
+exports.arrayBufferToHexString = arrayBufferToHexString;
+/**
+ * Decode hex string to Uint8Array
+ * @param str
+ * @return {Uint8Array}
+ */
+const hexStringToArrayBuffer = (str) => {
+    const arr = [];
+    const len = str.length;
+    for (let i = 0; i < len; i += 2)
+        arr.push(parseInt(str.substr(i, 2), 16));
+    return new Uint8Array(arr);
+};
+exports.hexStringToArrayBuffer = hexStringToArrayBuffer;
+/**
+ * Encode ArrayBuffer or TypedArray to string with code (like output of legacy atob)
+ * @param data
+ * @return {string}
+ */
+const arrayBufferToString = (data) => {
+    const bytes = sanitizeTypedArrayAndArrayBuffer(data);
+    const arr = new Array(bytes.length);
+    bytes.forEach((x, i) => { arr[i] = x; });
+    return String.fromCharCode.apply(null, arr);
+};
+exports.arrayBufferToString = arrayBufferToString;
+/**
+ * Decode string with code (like output of legacy atob) to Uint8Array
+ * @param str
+ * @return {Uint8Array}
+ */
+const stringToArrayBuffer = (str) => {
+    const bytes = new Uint8Array(str.length);
+    return bytes.map((_x, i) => str.charCodeAt(i));
+};
+exports.stringToArrayBuffer = stringToArrayBuffer;
+
+},{"./env":23}],23:[function(require,module,exports){
+(function (Buffer){(function (){
+"use strict";
+/**
+ * this module handles the difference between window (browser) and node js for specific functions and libraries.
+ * env.js
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getEnvAtob = exports.getEnvBtoa = void 0;
+const getEnvBtoa = () => {
+    if (typeof window !== 'undefined')
+        return window.btoa; // browser
+    else
+        return nodeBtoa; // node
+};
+exports.getEnvBtoa = getEnvBtoa;
+const getEnvAtob = () => {
+    if (typeof window !== 'undefined')
+        return window.atob; // browser
+    else
+        return nodeAtob; // node
+};
+exports.getEnvAtob = getEnvAtob;
+const nodeBtoa = (str) => {
+    if (typeof Buffer === 'undefined')
+        throw new Error('UnsupportedEnvironment');
+    const buffer = Buffer.from(str.toString(), 'binary');
+    return buffer.toString('base64');
+};
+const nodeAtob = (str) => {
+    if (typeof Buffer === 'undefined')
+        throw new Error('UnsupportedEnvironment');
+    return Buffer.from(str, 'base64').toString('binary');
+};
+
+}).call(this)}).call(this,require("buffer").Buffer)
+},{"buffer":19}],24:[function(require,module,exports){
+"use strict";
+/**
+ * formatter.js
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.binToPem = exports.pemToBin = void 0;
+const encoder = __importStar(require("./encoder"));
+const PemArmorString = {
+    'public': 'PUBLIC KEY',
+    'private': 'PRIVATE KEY',
+    'encryptedPrivate': 'ENCRYPTED PRIVATE KEY',
+    'certificate': 'CERTIFICATE',
+    'certRequest': 'CERTIFICATE REQUEST'
+};
+/**
+ * Convert PEM armored string to Uint8Array
+ * @param keydataB64Pem
+ * @return {Uint8Array}
+ */
+const pemToBin = (keydataB64Pem) => {
+    const keydataB64 = dearmorPem(keydataB64Pem);
+    return encoder.decodeBase64(keydataB64);
+};
+exports.pemToBin = pemToBin;
+/**
+ * Convert ArrayBuffer or TypedArray to PEM armored string with a specified type
+ * @param keydata
+ * @param type
+ * @return {string}
+ */
+const binToPem = (keydata, type) => {
+    const keydataB64 = encoder.encodeBase64(keydata);
+    return formatAsPem(keydataB64, type);
+};
+exports.binToPem = binToPem;
+/**
+ * Armor the given Base64 string and return PEM formatted string
+ * @param str
+ * @param type
+ * @return {string}
+ */
+const formatAsPem = (str, type) => {
+    const typeString = PemArmorString[type];
+    let finalString = `-----BEGIN ${typeString}-----\n`;
+    while (str.length > 0) {
+        finalString += `${str.substring(0, 64)}\n`;
+        str = str.substring(64);
+    }
+    finalString = `${finalString}-----END ${typeString}-----`;
+    return finalString;
+};
+/**
+ * Dearmor the given PEM string and return Base64 string
+ * @param str
+ * @return {string}
+ */
+const dearmorPem = (str) => {
+    // const beginRegExp = RegExp('^-----[\s]*BEGIN[^-]*KEY-----$', 'gm');
+    // const endRegExp = RegExp('^-----[\s]*END[^-]*KEY-----$', 'gm');
+    const beginRegExp = RegExp('^-----[\s]*BEGIN[^-]*-----$', 'gm');
+    const endRegExp = RegExp('^-----[\s]*END[^-]*-----$', 'gm');
+    // check if the object starts from 'begin'
+    try {
+        let dearmored = str.split(beginRegExp)[1].split(endRegExp)[0];
+        dearmored = dearmored.replace(/\r?\n/g, '');
+        return dearmored;
+    }
+    catch (e) {
+        throw new Error('Invalid format as PEM');
+    }
+};
+
+},{"./encoder":22}],25:[function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.formatter = exports.encoder = void 0;
+/**
+ * index.ts
+ **/
+const Encoder = __importStar(require("./encoder"));
+const Formatter = __importStar(require("./formatter"));
+var encoder;
+(function (encoder) {
+    encoder.encodeBase64 = Encoder.encodeBase64;
+    encoder.decodeBase64 = Encoder.decodeBase64;
+    encoder.encodeBase64Url = Encoder.encodeBase64Url;
+    encoder.decodeBase64Url = Encoder.decodeBase64Url;
+    encoder.arrayBufferToHexString = Encoder.arrayBufferToHexString;
+    encoder.hexStringToArrayBuffer = Encoder.hexStringToArrayBuffer;
+    encoder.stringToArrayBuffer = Encoder.stringToArrayBuffer;
+    encoder.arrayBufferToString = Encoder.arrayBufferToString;
+})(encoder = exports.encoder || (exports.encoder = {}));
+var formatter;
+(function (formatter) {
+    formatter.binToPem = Formatter.binToPem;
+    formatter.pemToBin = Formatter.pemToBin;
+})(formatter = exports.formatter || (exports.formatter = {}));
+exports.default = { encoder, formatter };
+
+},{"./encoder":22,"./formatter":24}],26:[function(require,module,exports){
+module.exports = assert;
+
+function assert(val, msg) {
+  if (!val)
+    throw new Error(msg || 'Assertion failed');
+}
+
+assert.equal = function assertEqual(l, r, msg) {
+  if (l != r)
+    throw new Error(msg || ('Assertion failed: ' + l + ' != ' + r));
+};
+
+},{}],27:[function(require,module,exports){
 // shim for using process in browser
 var process = module.exports = {};
 
@@ -8836,5 +8740,105 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}]},{},[24])(24)
+},{}],28:[function(require,module,exports){
+(function (process){(function (){
+/* eslint-disable node/no-deprecated-api */
+
+'use strict'
+
+var buffer = require('buffer')
+var Buffer = buffer.Buffer
+
+var safer = {}
+
+var key
+
+for (key in buffer) {
+  if (!buffer.hasOwnProperty(key)) continue
+  if (key === 'SlowBuffer' || key === 'Buffer') continue
+  safer[key] = buffer[key]
+}
+
+var Safer = safer.Buffer = {}
+for (key in Buffer) {
+  if (!Buffer.hasOwnProperty(key)) continue
+  if (key === 'allocUnsafe' || key === 'allocUnsafeSlow') continue
+  Safer[key] = Buffer[key]
+}
+
+safer.Buffer.prototype = Buffer.prototype
+
+if (!Safer.from || Safer.from === Uint8Array.from) {
+  Safer.from = function (value, encodingOrOffset, length) {
+    if (typeof value === 'number') {
+      throw new TypeError('The "value" argument must not be of type number. Received type ' + typeof value)
+    }
+    if (value && typeof value.length === 'undefined') {
+      throw new TypeError('The first argument must be one of type string, Buffer, ArrayBuffer, Array, or Array-like Object. Received type ' + typeof value)
+    }
+    return Buffer(value, encodingOrOffset, length)
+  }
+}
+
+if (!Safer.alloc) {
+  Safer.alloc = function (size, fill, encoding) {
+    if (typeof size !== 'number') {
+      throw new TypeError('The "size" argument must be of type number. Received type ' + typeof size)
+    }
+    if (size < 0 || size >= 2 * (1 << 30)) {
+      throw new RangeError('The value "' + size + '" is invalid for option "size"')
+    }
+    var buf = Buffer(size)
+    if (!fill || fill.length === 0) {
+      buf.fill(0)
+    } else if (typeof encoding === 'string') {
+      buf.fill(fill, encoding)
+    } else {
+      buf.fill(fill)
+    }
+    return buf
+  }
+}
+
+if (!safer.kStringMaxLength) {
+  try {
+    safer.kStringMaxLength = process.binding('buffer').kStringMaxLength
+  } catch (e) {
+    // we can't determine kStringMaxLength in environments where process.binding
+    // is unsupported, so let's not set it
+  }
+}
+
+if (!safer.constants) {
+  safer.constants = {
+    MAX_LENGTH: safer.kMaxLength
+  }
+  if (safer.kStringMaxLength) {
+    safer.constants.MAX_STRING_LENGTH = safer.kStringMaxLength
+  }
+}
+
+module.exports = safer
+
+}).call(this)}).call(this,require('_process'))
+},{"_process":27,"buffer":19}],29:[function(require,module,exports){
+const rfc5280 = require('asn1.js-rfc5280');
+const jseu = require('js-encoding-utils');
+const Buffer = require('buffer').Buffer;
+
+// pass the certificate in the PEM format and return a certificate object
+function parsePemCertificate(pemCertificate) {
+    const x509bin = jseu.formatter.pemToBin(pemCertificate);
+    const binKeyBuffer = Buffer.from(x509bin);
+    const decoded = rfc5280.Certificate.decode(binKeyBuffer, 'der');
+    return decoded;
+}
+
+function parseDerName(derName) {
+    return rfc5280.DirectoryString.decode(Buffer.from(derName));
+}
+
+module.exports = {parsePemCertificate,parseDerName};
+
+},{"asn1.js-rfc5280":1,"buffer":19,"js-encoding-utils":25}]},{},[29])(29)
 });

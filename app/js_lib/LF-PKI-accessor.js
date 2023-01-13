@@ -1,9 +1,7 @@
 import * as domainFunc from "./domain.js"
 import * as verifier from "./verifier.js"
 import {cLog} from "./helper.js"
-
-// imports the function ParsePemCertificate as an object of the global variable certificateparser
-import * as mymodule from "../js_lib/bundledparser.js"
+import {parsePemCertificate} from "./x509utils.js"
 
 // get map server response and check the connection
 async function getMapServerResponseAndCheck(url, needVerification, remoteInfo) {
@@ -157,7 +155,7 @@ function extractCertificates(mapResponse) {
         for (const [ca, {certs, certChains}] of rawCaMap) {
             var parsedCerts = [];
             if (certs !== null) {
-                parsedCerts = certs.map(c => certificateparser.parsePemCertificate("-----BEGIN CERTIFICATE-----\n"+c+"\n-----END CERTIFICATE-----"));
+                parsedCerts = certs.map(c => parsePemCertificate(c, true));
             }
             var parsedCertChains = [];
             if (certChains !== null) {
@@ -165,7 +163,7 @@ function extractCertificates(mapResponse) {
                     if (cc === null) {
                         return [];
                     } else {
-                        return cc.map(c => certificateparser.parsePemCertificate("-----BEGIN CERTIFICATE-----\n"+c+"\n-----END CERTIFICATE-----"))
+                        return cc.map(c => parsePemCertificate(c, true));
                     }
                 });
             }

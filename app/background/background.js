@@ -11,10 +11,17 @@ import {policyValidateConnection, legacyValidateConnection} from "../js_lib/vali
 
 // communication between browser plugin popup and this background script
 browser.runtime.onConnect.addListener(function(port) {
-    port.onMessage.addListener(function(msg) {
+    port.onMessage.addListener(async function(msg) {
         switch (msg) {
+        case 'initFinished':
+            port.postMessage({msgType: "config", value: config});
+            break;
         case 'printLog':
             printLogEntriesToConsole();
+            port.postMessage({msgType: "config", value: config});
+            break;
+        case 'showValidationResult':
+            port.postMessage({msgType: "validationResult", value: trustDecisions.get((await browser.tabs.query({currentWindow: true, active: true}))[0].id)});
             break;
         case 'downloadLog':
             downloadLog();
@@ -91,6 +98,8 @@ config.set("root-cas", (()=>{
     rootCas.set("DigiCert TLS Hybrid ECC SHA384 2020 CA1", "description: ...");
     return rootCas;
 })());
+
+const trustDecisions = new Map();
 
 function redirect(details, error) {
     cLog(details.requestId, "verification failed! -> redirecting. Reason: " + error+ " ["+details.url+"]");
@@ -221,7 +230,12 @@ async function checkInfo(details) {
             // check each policy and throw an error if one of the verifications fails
             certificatesMap.forEach((c, m) => {
                 cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c));
-                const {success, violations} = legacyValidateConnection(remoteInfo, config, domain, c);
+                const {success, violations, trustDecision} = legacyValidateConnection(remoteInfo, config, domain, c, m);
+                if (trustDecisions.has(details.tabId)) {
+                    trustDecisions.set(details.tabId, trustDecisions.get(details.tabId).concat(trustDecision));
+                } else {
+                    trustDecisions.set(details.tabId, [trustDecision]);
+                }
                 if (!success) {
                     throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, violations[0].reason+" ["+violations[0].ca+"]");
                 }

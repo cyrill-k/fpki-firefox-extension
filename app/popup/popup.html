@@ -1,15 +1,22 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <script src="popup.js"></script>
-    <title> SCION (L)F-PKI </title>
+    <link rel="stylesheet" href="style.css">
+    <script src="popup.js" type="module"></script>
+    <title>(L)F-PKI</title>
   </head>
   <body>
     <button id="printLog">Print Log to browser console</button>
     <button id="downloadLog">Download Log as json file</button>
-    <div>
+    <button id="showValidationResult">Show validation result for the current tab</button>
+    <div id="legacy-validation">
+      <p id="legacy-validation-title">Legacy Validation Results</p>
+    </div>
+    <div id="policy-validation-result">
+    </div>
+    <div id="config">
       <pre>
-        <code id="config">
+        <code id="config-code">
           { "hello": "world" }
         </code>
       </pre>

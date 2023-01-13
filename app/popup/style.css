@@ -1,0 +1,44 @@
+tbody td{
+  padding: 10px;
+}
+
+tbody tr:nth-child(even){
+  background-color: #9FBFDF;
+}
+
+tbody tr:nth-child(odd){
+    background-color: #C5D9EC;
+}
+
+.collapsible {
+  background-color: #eee;
+  color: #444;
+  cursor: pointer;
+  padding: 18px;
+  width: 100%;
+  border: none;
+  text-align: left;
+  outline: none;
+  font-size: 15px;
+}
+
+.active, .collapsible:hover {
+    background-color: #ccc;
+    color: #000;
+}
+
+.content {
+  padding: 10px 18px;
+  display: none;
+  overflow: hidden;
+  background-color: #ccc;
+}
+
+.validation-success {
+    background-color: #0a0;
+}
+
+.validation-failure {
+    background-color: #b00;
+    color: #fff;
+}

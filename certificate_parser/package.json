@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "browserify": "^17.0.0",
     "crypto": "^1.0.1",
     "js-x509-utils": "^1.0.4"
   }

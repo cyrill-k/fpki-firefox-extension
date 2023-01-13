@@ -1,6 +1,7 @@
 import * as domainFunc from "./domain.js"
 import {FpkiError} from "./errors.js"
 import {printMap} from "./helper.js"
+import {LegacyTrustInfo, LegacyTrustDecision} from "./validation-types.js"
 
 // policy mode
 // start from highest ancestor -> go to actual domain
@@ -130,60 +131,48 @@ function filterTrustPreferenceEntries(trustPreferenceEntries, domain) {
     return filteredTrustPreferenceEntries;
 }
 
-function legacyValidateActualDomain(remoteInfo, config, actualDomain, domainCertificates) {
+function legacyValidateActualDomain(connectionTrustInfo, config, actualDomain, domainCertificates) {
     const CertificateException = "[legacy mode] more highly trusted CA detected";
 
     const caSets = config.get("ca-sets");
+
+    const violations = []
+    const trustInfos = [];
+
     const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("legacy-trust-preference"), actualDomain);
-    // TODO: implement wildcard trust preferences
 
-    const violations = [];
-
-    // get connection cert
-    // TODO: ensure that the first certificate is always the actual certificate
-    let connectionCert = remoteInfo.certificates[0];
-
-    // get connection root cert
-    let connectionRootCertSubject = null;
-    remoteInfo.certificates.forEach((certificate, i) => {
-        if (certificate.isBuiltInRoot) {
-            connectionRootCertSubject = certificate.subject;
-        }
-    });
-
-    // get connection root cert trust level (I)
     if (filteredTrustPreferenceEntries.length === 0) {
-        return {success: true, violations};
+        return {success: true, violations, trustInfos};
     }
-    let connectionRootCertTrustLevel = 0;
-    filteredTrustPreferenceEntries.forEach(tps => {
-        tps.forEach(tp => {
-            if (caSets.get(tp.caSet).includes(connectionRootCertSubject)) {
-                if (tp.level > connectionRootCertTrustLevel) {
-                    connectionRootCertTrustLevel = tp.level;
-                }
-            }
-        });
-    });
+
+    const connectionCert = connectionTrustInfo.cert;
+    const connectionRootCertSubject = connectionTrustInfo.certChain[connectionTrustInfo.certChain.length-1].subject
+    const connectionRootCertTrustLevel = connectionTrustInfo.rootCaTrustLevel;
 
     // get cert whose root cert has the highest trust level (II)
     let highestTrustLevelCerts = [];
-    let highestTrustLevelRootCertSubjectCN = [];
+    let highestTrustLevelCertChains = [];
+    let highestTrustLevelRootCertSubject = [];
     let highestTrustLevelRootCertTrustLevel = 0;
-    domainCertificates.forEach(({certs: caCertificates}, caIdentifier) => {
-        caCertificates.forEach((caCertificate, index) => {
+    let highestTrustLevelTrustPreferences =[];
+    domainCertificates.forEach(({certs, certChains}, caIdentifier) => {
+        certs.forEach((cert, index) => {
             filteredTrustPreferenceEntries.forEach(tps => {
                 tps.forEach(tp => {
                     // TODO: correctly do the check from CN value to full subject (maybe add "CN="+caIdentifer+",") or parse all subject attributes
                     if (caSets.get(tp.caSet).some(s => s.includes(caIdentifier))) {
                         if (tp.level > highestTrustLevelRootCertTrustLevel) {
-                            highestTrustLevelCerts = [caCertificate];
-                            highestTrustLevelRootCertSubjectCN = [caIdentifier];
+                            highestTrustLevelCerts = [cert];
+                            highestTrustLevelCertChains = [certChains[index]];
+                            highestTrustLevelRootCertSubject = [caIdentifier];
+                            highestTrustLevelTrustPreferences = [tp];
                             highestTrustLevelRootCertTrustLevel = tp.level;
                         }
                         else if (tp.level === highestTrustLevelRootCertTrustLevel) {
-                            highestTrustLevelCerts.push(caCertificate);
-                            highestTrustLevelRootCertSubjectCN.push(caIdentifier);
+                            highestTrustLevelCerts.push(cert);
+                            highestTrustLevelCertChains.push(certChains[index]);
+                            highestTrustLevelRootCertSubject.push(caIdentifier);
+                            highestTrustLevelTrustPreferences.push(tp);
                         }
                     }
                 });
@@ -195,7 +184,8 @@ function legacyValidateActualDomain(remoteInfo, config, actualDomain, domainCert
     console.log(connectionRootCertSubject);
     console.log(connectionRootCertTrustLevel);
     console.log(highestTrustLevelCerts);
-    console.log(highestTrustLevelRootCertSubjectCN);
+    console.log(highestTrustLevelCertChains);
+    console.log(highestTrustLevelRootCertSubject);
     console.log(highestTrustLevelRootCertTrustLevel);
     console.log(connectionCert);
 
@@ -211,28 +201,63 @@ function legacyValidateActualDomain(remoteInfo, config, actualDomain, domainCert
             // await crypto.subtle.digest('SHA-256', c.tbsCertificate.subjectPublicKeyInfo);
             const publicKeyDiffers = true;
             if (publicKeyDiffers) {
-                violations.push({ca: connectionRootCertSubject, reason: CertificateException + ": " + highestTrustLevelRootCertSubjectCN[idx]});
+                trustInfos.push(new LegacyTrustInfo(c, highestTrustLevelCertChains[idx], highestTrustLevelRootCertTrustLevel, highestTrustLevelTrustPreferences[idx], CertificateException));
+                violations.push({ca: connectionRootCertSubject, reason: CertificateException + ": " + highestTrustLevelRootCertSubject[idx]});
             }
         });
     }
-    return {success: violations.length === 0, violations};
+    return {success: violations.length === 0, violations, trustInfos};
 }
 
 // check connection using the policies retrieved from a single mapserver
 // allPolicies has the following structure: {domain: {pca: SP}}, where SP has the structure: {attribute: value}, e.g., {AllowedSubdomains: ["allowed.mydomain.com"]}
-export function legacyValidateConnection(remoteInfo, config, domainName, allCertificates) {
+export function legacyValidateConnection(remoteInfo, config, domainName, allCertificates, mapserver) {
     // iterate over all certificates from all (trusted) mapservers
     // for example: the request for video.google.com, will only contain the certificates for "video.google.com"
     // TODO: currently all certificates are included in the response, could not return certificates for the parent domain in the future
     const violations = [];
+
+    // get connection cert
+    // TODO: ensure that the first certificate is always the actual certificate
+    let connectionCert = remoteInfo.certificates[0];
+
+    // get connection root cert
+    let connectionRootCertSubject = null;
+    remoteInfo.certificates.forEach((certificate, i) => {
+        if (certificate.isBuiltInRoot) {
+            connectionRootCertSubject = certificate.subject;
+        }
+    });
+
+    const caSets = config.get("ca-sets");
+    const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("legacy-trust-preference"), domainName);
+
+    // get connection root cert trust level (I)
+    let connectionRootCertTrustLevel = 0;
+    let connectionOriginTrustPreference = null;
+    filteredTrustPreferenceEntries.forEach(tps => {
+        tps.forEach(tp => {
+            if (caSets.get(tp.caSet).includes(connectionRootCertSubject)) {
+                if (tp.level > connectionRootCertTrustLevel) {
+                    connectionRootCertTrustLevel = tp.level;
+                    connectionOriginTrustPreference = tp;
+                }
+            }
+        });
+    });
+
+    const connectionTrustInfo = new LegacyTrustInfo(connectionCert, remoteInfo.certificates.slice(1), connectionRootCertTrustLevel, connectionOriginTrustPreference, null);
+    const certificateTrustInfos = [];
     allCertificates.forEach((value, key) => {
         if (key == domainName) {
             // validate based on certificates for the actual domain
-            const {success, violations: actualDomainViolations} = legacyValidateActualDomain(remoteInfo, config, key, value);
+            const {success, violations: actualDomainViolations, trustInfos} = legacyValidateActualDomain(connectionTrustInfo, config, key, value);
+            certificateTrustInfos.push(...trustInfos);
             violations.push(...actualDomainViolations);
         } else {
             // TODO: how to deal with certificate violations of other ancestors (e.g., parent of parent)?
         }
     });
-    return {success: violations.length === 0, violations};
+    const trustDecision = new LegacyTrustDecision(mapserver, domainName, connectionTrustInfo, certificateTrustInfos);
+    return {success: violations.length === 0, violations, trustDecision};
 }
