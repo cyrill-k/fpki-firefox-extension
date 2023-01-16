@@ -454,10 +454,10 @@ func getCerts() ([][]byte, [][][]byte, error) {
 	includedDomains["wikipedia.org"] = member
 
 	var err error
-	if certsRaw, certChainsRaw, err = appendCertsFromCsv("./certs/ct_log_certs/certs.csv", 1, -1, includedDomains, certsRaw, certChainsRaw); err != nil {
+	if certsRaw, certChainsRaw, err = appendCertsFromCsv("./testdata/ct_monitor_certs/certs.csv", 1, -1, includedDomains, certsRaw, certChainsRaw); err != nil {
 		return nil, nil, err
 	}
-	if certsRaw, certChainsRaw, err = appendCertsFromCsv("./certs/additional_certs/certs.csv", 0, 1, includedDomains, certsRaw, certChainsRaw); err != nil {
+	if certsRaw, certChainsRaw, err = appendCertsFromCsv("./testdata/additional_certs/certs.csv", 0, 1, includedDomains, certsRaw, certChainsRaw); err != nil {
 		return nil, nil, err
 	}
 
