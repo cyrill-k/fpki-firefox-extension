@@ -1,5 +1,6 @@
 tbody td{
-  padding: 10px;
+    padding: 10px;
+    text-align: center;
 }
 
 tbody tr:nth-child(even){

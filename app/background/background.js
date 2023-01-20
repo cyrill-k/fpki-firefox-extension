@@ -3,7 +3,7 @@
 import {getDomainNameFromURL} from "../js_lib/domain.js"
 import {checkConnection} from "../js_lib/LF-PKI-accessor.js"
 import {FpkiRequest} from "../js_lib/fpki-request.js"
-import {printMap, cLog} from "../js_lib/helper.js"
+import {printMap, cLog, mapGetList} from "../js_lib/helper.js"
 import {config} from "../js_lib/config.js"
 import {LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole} from "../js_lib/log.js"
 import {FpkiError, errorTypes} from "../js_lib/errors.js"
@@ -217,8 +217,9 @@ async function checkInfo(details) {
         // check each policy and throw an error if one of the verifications fails
         policiesMap.forEach((p, m) => {
             cLog(details.requestId, "starting policy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
-            const {success, violations, checksPerformed} = policyValidateConnection(remoteInfo, config, domain, p);
-            console.log("checks performed = "+checksPerformed);
+
+            const {success, violations, checksPerformed, trustDecision} = policyValidateConnection(remoteInfo, config, domain, p, m);
+            trustDecisions.set(details.tabId, mapGetList(trustDecisions, details.tabId).concat(trustDecision));
             policyChecksPerformed += checksPerformed;
             if (!success) {
                 throw new FpkiError(errorTypes.POLICY_MODE_VALIDATION_ERROR, violations[0].reason+" ["+violations[0].pca+"]");
@@ -231,11 +232,7 @@ async function checkInfo(details) {
             certificatesMap.forEach((c, m) => {
                 cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c));
                 const {success, violations, trustDecision} = legacyValidateConnection(remoteInfo, config, domain, c, m);
-                if (trustDecisions.has(details.tabId)) {
-                    trustDecisions.set(details.tabId, trustDecisions.get(details.tabId).concat(trustDecision));
-                } else {
-                    trustDecisions.set(details.tabId, [trustDecision]);
-                }
+                trustDecisions.set(details.tabId, mapGetList(trustDecisions, details.tabId).concat(trustDecision));
                 if (!success) {
                     throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, violations[0].reason+" ["+violations[0].ca+"]");
                 }
