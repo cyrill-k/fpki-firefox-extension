@@ -2,7 +2,7 @@ import {getSubject, getIssuer} from "../js_lib/x509utils.js"
 import {AllPolicyAttributes, EvaluationResult} from "../js_lib/validation-types.js"
 
 var synchronizedConfig = null;
-var validationResult = null;
+var validationResults = null;
 var port = browser.runtime.connect({
     name: "popup to background communication"
 });
@@ -98,12 +98,16 @@ function createElementIn(name, attributes, content, parentId) {
     return e;
 }
 
-function addCollapsibleButton(id, text, isFailure) {
-    let cAttr;
-    if (isFailure) {
-        cAttr = "collapsible validation-failure";
+function addCollapsibleButton(id, text, decision) {
+    let cAttr = "collapsible";
+    if (decision === "indefinitive") {
+        cAttr += " validation-indefinitive";
+    } else if (decision === "block") {
+        cAttr += " validation-failure";
+    } else if (decision === "warn") {
+        cAttr += " validation-warning";
     } else {
-        cAttr = "collapsible validation-success";
+        cAttr += " validation-success";
     }
     const button = createElementBefore("button", {"type": "button", "class":  cAttr}, text, id);
     button.addEventListener("click", function() {
@@ -117,13 +121,19 @@ function addCollapsibleButton(id, text, isFailure) {
     });
 }
 
-function updateValidationResult() {
-    if (validationResult === null) {
+async function updateValidationResult() {
+    if (validationResults === null) {
         getElement("legacy-connection-title").innerHTML = "No connection initiated yet";
         getElement("validation").style.visibility = "visible";
         getElement("config").style.visibility = "visible";
         return;
     }
+
+    // get current tab
+    const tabId = (await browser.tabs.query({currentWindow: true, active: true}))[0].id;
+    // get current DOM url
+    const {domUrl} = await browser.tabs.sendMessage(tabId, {request: 'get_dom_url'});
+    const validationResult = validationResults.get(tabId).get(domUrl);
 
     // get last result for each domain/mapserver
     const lastIndexMap = new Map();
@@ -148,7 +158,7 @@ function updateValidationResult() {
     getElement("config").style.visibility = "collapse";
 
     // TODO(cyrill) not sure if this is necessary
-    validationResult = null;
+    validationResults = null;
 }
 
 function addPolicyValidationResult(trustDecision, predecessor, index) {
@@ -173,40 +183,49 @@ function addPolicyValidationResult(trustDecision, predecessor, index) {
     connTable.innerHTML = table;
 
     // fill in information about conflicts if any conflicts exist
+    let finalDecision;
     let confTitle;
-    if (trustDecision.decision === "positive") {
-        confTitle = createElementAfter("p", {"id": "policy-conflicts-title-"+index, "class": "validation-success"}, "No Conflicting Policies for "+trustDecision.domain+" reported by mapserver "+trustDecision.mapserver.identity, connTable);
+    if (trustDecision.policyTrustInfos.every((pti) => pti.evaluations.length === 0)) {
+        finalDecision = "indefinitive";
+        confTitle = createElementAfter("p", {"id": "policy-conflicts-title-"+index, "class": "validation-indefinitive"}, "No Policies for "+trustDecision.domain+" reported by mapserver "+trustDecision.mapserver.identity, connTable);
     } else {
-        confTitle = createElementAfter("p", {"id": "policy-conflicts-title-"+index, "class": "validation-failure"}, "Conflicting Policies for "+trustDecision.domain+" reported by mapserver "+trustDecision.mapserver.identity, connTable);
-    }
-    table = "<tr><th colspan=\"3\">Policy</th><th colspan=\""+AllPolicyAttributes.length+"\">Evaluation Result</th></tr>";
-    table += "<tr><th>Issuer (PCA)</th><th>Domain</th><th>Policy</th>";
-    table += AllPolicyAttributes.map(a => "<th>"+a+"</th>");
-    table += "</tr>";
-    const confTable = createElementAfter("table", {"id": "policy-conflicts-certs-"+index}, "", confTitle);
-    trustDecision.policyTrustInfos.forEach(ti => {
-        table += "<tr>";
-        table += "<td>"+ti.pca+"</td>"
-        table += "<td>"+ti.policyDomain+"</td>"
-        table += "<td>"+JSON.stringify(ti.policyAttributes)+"</td>"
-        table += AllPolicyAttributes.map(attribute => {
-            const evaluation = ti.evaluations.find(e => e.attribute === attribute);
-            let content;
-            if (evaluation === undefined) {
-                content = "-";
-            } else if (evaluation.evaluationResult === EvaluationResult.SUCCESS) {
-                content = "<p class=\"validation-success\">Validation Passed</p>";
-            } else if (evaluation.evaluationResult === EvaluationResult.FAILURE) {
-                content = "<p class=\"validation-failure\">Validation Failed</p>";
-            }
-            return "<td>"+content+"</td>";
+        // show positive and negative policy evaluations
+        if (trustDecision.decision === "positive") {
+            finalDecision = "allow";
+            confTitle = createElementAfter("p", {"id": "policy-conflicts-title-"+index, "class": "validation-success"}, "No Conflicting Policies for "+trustDecision.domain+" reported by mapserver "+trustDecision.mapserver.identity, connTable);
+        } else {
+            finalDecision = "block";
+            confTitle = createElementAfter("p", {"id": "policy-conflicts-title-"+index, "class": "validation-failure"}, "Conflicting Policies for "+trustDecision.domain+" reported by mapserver "+trustDecision.mapserver.identity, connTable);
+        }
+        table = "<tr><th colspan=\"3\">Policy</th><th colspan=\""+AllPolicyAttributes.length+"\">Evaluation Result</th></tr>";
+        table += "<tr><th>Issuer (PCA)</th><th>Domain</th><th>Policy</th>";
+        table += AllPolicyAttributes.map(a => "<th>"+a+"</th>");
+        table += "</tr>";
+        const confTable = createElementAfter("table", {"id": "policy-conflicts-certs-"+index}, "", confTitle);
+        trustDecision.policyTrustInfos.forEach(ti => {
+            table += "<tr>";
+            table += "<td>"+ti.pca+"</td>"
+            table += "<td>"+ti.policyDomain+"</td>"
+            table += "<td>"+JSON.stringify(ti.policyAttributes)+"</td>"
+            table += AllPolicyAttributes.map(attribute => {
+                const evaluation = ti.evaluations.find(e => e.attribute === attribute);
+                let content;
+                if (evaluation === undefined) {
+                    content = "-";
+                } else if (evaluation.evaluationResult === EvaluationResult.SUCCESS) {
+                    content = "<p class=\"validation-success\">Validation Passed</p>";
+                } else if (evaluation.evaluationResult === EvaluationResult.FAILURE) {
+                    content = "<p class=\"validation-failure\">Validation Failed</p>";
+                }
+                return "<td>"+content+"</td>";
+            });
+            table += "</tr>"
         });
-        table += "</tr>"
-    });
-    confTable.innerHTML = table;
+        confTable.innerHTML = table;
+    }
 
     // add button to collapse a section (all sessions are initially collapsed)
-    addCollapsibleButton("policy-validation-result-"+index, "Policy Validation ("+trustDecision.domain+") reported by "+trustDecision.mapserver.identity, trustDecision.decision === "negative");
+    addCollapsibleButton("policy-validation-result-"+index, "Policy Validation ("+trustDecision.domain+") reported by "+trustDecision.mapserver.identity, finalDecision);
 
     return div;
 }
@@ -242,7 +261,7 @@ function addLegacyValidationResult(trustDecision, predecessor, index) {
     if (trustDecision.certificateTrustInfos.length === 0) {
         confTitle = createElementAfter("p", {"id": "legacy-conflicts-title-"+index, "class": "validation-success"}, "No Conflicting Certificates for "+trustDecision.domain+" reported by mapserver "+trustDecision.mapserver.identity, connTable);
     } else {
-        confTitle = createElementAfter("p", {"id": "legacy-conflicts-title-"+index, "class": "validation-failure"}, "Conflicting Certificates for "+trustDecision.domain+" reported by mapserver "+trustDecision.mapserver.identity, connTable);
+        confTitle = createElementAfter("p", {"id": "legacy-conflicts-title-"+index, "class": "validation-warning"}, "Conflicting Certificates for "+trustDecision.domain+" reported by mapserver "+trustDecision.mapserver.identity, connTable);
         table = "<tr><th>Root CA</th><th>#Intermediate Certs</th><th>Leaf Certificate</th></tr>";
         const confTable = createElementAfter("table", {"id": "legacy-conflicts-certs-"+index}, "", confTitle);
         trustDecision.certificateTrustInfos.forEach(ti => {
@@ -260,20 +279,20 @@ function addLegacyValidationResult(trustDecision, predecessor, index) {
     }
 
     // add button to collapse a section (all sessions are initially collapsed)
-    addCollapsibleButton("legacy-validation-result-"+index, "Legacy Validation ("+trustDecision.domain+") reported by "+trustDecision.mapserver.identity, trustDecision.decision === "negative");
+    addCollapsibleButton("legacy-validation-result-"+index, "Legacy Validation ("+trustDecision.domain+") reported by "+trustDecision.mapserver.identity, trustDecision.decision === "negative" ? "warn" : "allow");
 
     return div;
 }
 
 // communication from background script to popup
-port.onMessage.addListener(function(msg) {
+port.onMessage.addListener(async function(msg) {
     const {msgType, value} = msg;
     if (msgType === "config") {
         synchronizedConfig = value;
         updateConfig();
-    } else if (msgType === "validationResult") {
-        validationResult = value;
-        updateValidationResult();
+    } else if (msgType === "validationResults") {
+        validationResults = value;
+        await updateValidationResult();
     }
     console.log("message received: " + JSON.stringify(msg));
 });

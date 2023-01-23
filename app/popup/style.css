@@ -43,3 +43,11 @@ tbody tr:nth-child(odd){
     background-color: #b00;
     color: #fff;
 }
+
+.validation-warning {
+    background-color: #ffcc00;
+}
+
+.validation-indefinitive {
+    background-color: #ccc;
+}

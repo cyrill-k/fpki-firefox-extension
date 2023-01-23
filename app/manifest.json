@@ -1,27 +1,37 @@
 {
-  "name": "LF-PKI Browser Extension",
-  "version": "1.0",
-  "manifest_version": 2,
-  "description": "LF-PKI browser extension",
-  "background": {
-    "page": "./background/background.html",
-    "persistent": true
-  },
-  "browser_action": {
-    "default_icon": {                
-      "16": "images/icon.png"
+    "name": "LF-PKI Browser Extension",
+    "version": "1.0",
+    "manifest_version": 2,
+    "description": "LF-PKI browser extension",
+    "background": {
+        "page": "./background/background.html",
+        "persistent": true
     },
-    "default_popup": "./popup/popup.html" 
-  },
-  "permissions": [
-    "webNavigation",
-    "webRequest",
-    "webRequestBlocking",
-    "<all_urls>",
-    "tabs",
-    "storage"
-  ],
-  "web_accessible_resources": [
-    "/pages/block.html"
-]
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "./content/content.js"
+            ]
+        }
+    ],
+    "browser_action": {
+        "default_icon": {
+            "16": "images/icon.png"
+        },
+        "default_popup": "./popup/popup.html"
+    },
+    "permissions": [
+        "webNavigation",
+        "webRequest",
+        "webRequestBlocking",
+        "<all_urls>",
+        "tabs",
+        "storage"
+    ],
+    "web_accessible_resources": [
+        "/pages/block.html"
+    ]
 }
