@@ -1,5 +1,6 @@
 import {errorTypes, FpkiError} from "./errors.js"
 import {mapGetList} from "./helper.js"
+import {getSubject} from "./x509utils.js"
 
 // holds the assessed trust info (the trust level of the root certificate and the trust preference where this trust level was derived from) of a certain certificate (either received via TLS handshake or via a mapserver).
 //
@@ -11,18 +12,19 @@ export class LegacyTrustInfo {
         this.rootCaTrustLevel = rootCaTrustLevel;
         this.originTrustPreference = originTrustPreference;
         this.violation = violation;
+        this.evaluationResult = EvaluationResult.FAILURE;
     }
 }
 
 // combines trust information of multiple certificates issued for a given domain from a single mapserver
 export class LegacyTrustDecision {
-    constructor(mapserver, domain, connectionTrustInfo, certificateTrustInfos, decision="negative") {
+    constructor(mapserver, domain, connectionTrustInfo, certificateTrustInfos) {
         this.type = "legacy";
-        this.decision = decision;
         this.mapserver = mapserver;
         this.domain = domain;
         this.connectionTrustInfo = connectionTrustInfo;
         this.certificateTrustInfos = certificateTrustInfos;
+        this.decision = hasFailedValidations(this) ? "negative" : "positive";
     }
 
     // maybe we don't need to merge because we always stop as soon as the first negative decision is made
@@ -74,16 +76,76 @@ export class PolicyTrustInfo {
     }
 }
 
+export function hasApplicablePolicy(policyTrustDecision) {
+    return policyTrustDecision.policyTrustInfos.some(pti => pti.evaluations.length > 0);
+}
+
+export function hasFailedValidations(trustDecision) {
+    if (trustDecision.type === "policy") {
+        return trustDecision.policyTrustInfos.some(pti => pti.evaluations.some(e => e.evaluationResult === EvaluationResult.FAILURE));
+    } else {
+        return trustDecision.certificateTrustInfos.some(cti => cti.evaluationResult === EvaluationResult.FAILURE);
+    }
+}
+
+export function getShortErrorMessages(trustDecision) {
+    const errorMessages = [];
+    let trustInfos;
+    if (trustDecision.type === "policy") {
+        trustInfos = trustDecision.policyTrustInfos;
+    } else {
+        trustInfos = trustDecision.certificateTrustInfos;
+    }
+    trustInfos.forEach(ti => {
+        if (trustDecision.type === "policy") {
+            ti.evaluations.forEach(e => {
+                errorMessages.push(getPolicyErrorMessage(trustDecision, ti, e));
+            });
+        } else {
+            errorMessages.push(getLegacyErrorMessage(trustDecision, ti));
+        }
+    });
+    return errorMessages;
+}
+
+function getPolicyErrorMessage(trustDecision, trustInfo, evaluation) {
+    let errorMessage = "";
+    errorMessage += "[policy mode] ";
+    if (evaluation.attribute === PolicyAttributes.TRUSTED_CA) {
+        errorMessage += "Detected certificate issued by an invalid CA: "+getSubject(trustDecision.connectionCertChain[trustDecision.connectionCertChain.length-1]);
+    } else if (evaluation.attribute === PolicyAttributes.SUBDOMAINS) {
+        errorMessage += "Detected certificate issued for a domain that is not allowed: "+trustDecision.domain;
+    }
+    errorMessage += " [policy issued by PCA: ";
+    errorMessage += trustInfo.pca;
+    errorMessage += "]";
+    return errorMessage;
+}
+
+function getLegacyErrorMessage(trustDecision, trustInfo) {
+    let errorMessage = "";
+    errorMessage += "[legacy mode] Detected certificate issued by a CA that is more highly trusted than ";
+    errorMessage += getSubject(trustDecision.connectionTrustInfo.certChain[trustDecision.connectionTrustInfo.certChain.length-1]);
+    errorMessage += " [certificate issued by CA: ";
+    if (trustInfo.certChain.length === 0) {
+        errorMessage += "unknown";
+    } else {
+        errorMessage += getSubject(trustInfo.certChain[trustInfo.certChain.length-1]);
+    }
+    errorMessage += "]";
+    return errorMessage;
+}
+
 // combines trust information of multiple policies (possibly issued by different PCAs) issued for a given domain from a single mapserver
 export class PolicyTrustDecision {
     constructor(mapserver, domain, connectionCert, connectionCertChain, policyTrustInfos, decision="negative") {
         this.type = "policy";
-        this.decision = decision;
         this.mapserver = mapserver;
         this.domain = domain;
         this.connectionCert = connectionCert;
         this.connectionCertChain = connectionCertChain;
         this.policyTrustInfos = policyTrustInfos;
+        this.decision = hasFailedValidations(this) ? "negative" : "positive";
     }
 
     mergeIdenticalPolicies() {

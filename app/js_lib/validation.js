@@ -34,8 +34,6 @@ function policyFilterHighestTrustLevelPolicies(trustPreferenceEntries, domainPol
 }
 
 function policyValidateActualDomain(remoteInfo, config, actualDomain, domainPolicies) {
-    const CertificateException = "invalid CA";
-
     const caSets = config.get("ca-sets");
 
     const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("policy-trust-preference"), actualDomain);
@@ -43,8 +41,6 @@ function policyValidateActualDomain(remoteInfo, config, actualDomain, domainPoli
     // get policies whose PCAs have the highest trust level (II)
     const {highestTrustLevel, highestTrustLevelPolicies} = policyFilterHighestTrustLevelPolicies(filteredTrustPreferenceEntries, domainPolicies);
 
-    let checksPerformed = 0;
-    const violations = [];
     const trustInfos = [];
     highestTrustLevelPolicies.forEach(({pcaPolicy, originTrustPreference}, pcaIdentifier) => {
         if (pcaPolicy.TrustedCA !== null) {
@@ -55,48 +51,40 @@ function policyValidateActualDomain(remoteInfo, config, actualDomain, domainPoli
                     let evaluation;
                     if (pcaPolicy.TrustedCA.every(ca => !caSets.get(ca).includes(certificate.subject))) {
                         evaluation = new PolicyEvaluation(actualDomain, PolicyAttributes.TRUSTED_CA, EvaluationResult.FAILURE, highestTrustLevel, originTrustPreference);
-                        violations.push({pca: pcaIdentifier, reason: CertificateException + ": " + certificate.issuer});
                     } else {
                         evaluation = new PolicyEvaluation(actualDomain, PolicyAttributes.TRUSTED_CA, EvaluationResult.SUCCESS, highestTrustLevel, originTrustPreference);
                     }
                     const trustInfo = new PolicyTrustInfo(pcaIdentifier, actualDomain, pcaPolicy, [evaluation]);
                     trustInfos.push(trustInfo);
-                    checksPerformed += 1;
                 }
             });
         }
     });
-    return {success: violations.length === 0, violations, checksPerformed, trustInfos};
+    return {trustInfos};
 }
 
 function policyValidateParentDomain(remoteInfo, config, actualDomain, parentDomain, domainPolicies) {
-    const DomainNotAllowed = "domain not allowed";
-
     // only consider trust preference entries for the parent domain
     const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("policy-trust-preference"), parentDomain);
 
     // get policies whose PCAs have the highest trust level (II)
     const {highestTrustLevel, highestTrustLevelPolicies} = policyFilterHighestTrustLevelPolicies(filteredTrustPreferenceEntries, domainPolicies);
 
-    let checksPerformed = 0;
-    const violations = [];
     const trustInfos = [];
     highestTrustLevelPolicies.forEach(({pcaPolicy, originTrustPreference}, pcaIdentifier) => {
         if (pcaPolicy.AllowedSubdomains !== null) {
             let evaluation;
             if (pcaPolicy.AllowedSubdomains.every(d => d !== actualDomain)) {
                 evaluation = new PolicyEvaluation(parentDomain, PolicyAttributes.SUBDOMAINS, EvaluationResult.FAILURE, highestTrustLevel, originTrustPreference);
-                violations.push({pca: pcaIdentifier, reason: DomainNotAllowed + ": " + actualDomain});
             } else {
                 evaluation = new PolicyEvaluation(parentDomain, PolicyAttributes.SUBDOMAINS, EvaluationResult.SUCCESS, highestTrustLevel, originTrustPreference);
             }
             const trustInfo = new PolicyTrustInfo(pcaIdentifier, parentDomain, pcaPolicy, [evaluation]);
             trustInfos.push(trustInfo);
-            checksPerformed += 1
         }
     });
 
-    return {success: violations.length === 0, violations, checksPerformed, trustInfos};
+    return {trustInfos};
 }
 
 // check connection using the policies retrieved from a single mapserver
@@ -104,32 +92,25 @@ function policyValidateParentDomain(remoteInfo, config, actualDomain, parentDoma
 export function policyValidateConnection(remoteInfo, config, domainName, allPolicies, mapserver) {
     // iterate over all policies from all (trusted) mapservers
     // for example: the request for video.google.com, will contain the policies for "video.google.com" and "google.com"
-    let checksPerformed = 0;
-    const violations = [];
     const policyTrustInfos = [];
     allPolicies.forEach((value, key) => {
         if (key == domainName) {
             // validate policies defined on the actual domain (e.g., allowed CA issuers)
-            const {success, violations: actualDomainViolations, checksPerformed: actualDomainChecksPerformed, trustInfos} = policyValidateActualDomain(remoteInfo, config, key, value);
+            const {trustInfos} = policyValidateActualDomain(remoteInfo, config, key, value);
             policyTrustInfos.push(...trustInfos);
-            checksPerformed += actualDomainChecksPerformed;
-            violations.push(...actualDomainViolations);
         } else if (domainFunc.getParentDomain(domainName) == key) {
             // validate policies defined on the parent domain (e.g., allowed subdomains)
-            const {success, violations: parentDomainViolations, checksPerformed: parentDomainChecksPerformed, trustInfos} = policyValidateParentDomain(remoteInfo, config, domainName, key, value);
+            const {trustInfos} = policyValidateParentDomain(remoteInfo, config, domainName, key, value);
             policyTrustInfos.push(...trustInfos);
-            checksPerformed += parentDomainChecksPerformed;
-            violations.push(...parentDomainViolations);
         } else {
             // TODO: how to deal with violations of other ancestors (e.g., parent of parent)?
         }
     });
-    const success = violations.length === 0;
-    const trustDecision = new PolicyTrustDecision(mapserver, domainName, remoteInfo.certificates[0], remoteInfo.certificates.slice(1), policyTrustInfos, success ? "positive" : "negative");
+    const trustDecision = new PolicyTrustDecision(mapserver, domainName, remoteInfo.certificates[0], remoteInfo.certificates.slice(1), policyTrustInfos);
 
     trustDecision.mergeIdenticalPolicies();
 
-    return {success, violations, checksPerformed, trustDecision};
+    return {trustDecision};
 }
 
 function filterTrustPreferenceEntries(trustPreferenceEntries, domain) {
@@ -157,13 +138,12 @@ function legacyValidateActualDomain(connectionTrustInfo, config, actualDomain, d
 
     const caSets = config.get("ca-sets");
 
-    const violations = []
     const trustInfos = [];
 
     const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("legacy-trust-preference"), actualDomain);
 
     if (filteredTrustPreferenceEntries.length === 0) {
-        return {success: true, violations, trustInfos};
+        return {trustInfos};
     }
 
     const connectionCert = connectionTrustInfo.cert;
@@ -223,11 +203,10 @@ function legacyValidateActualDomain(connectionTrustInfo, config, actualDomain, d
             const publicKeyDiffers = true;
             if (publicKeyDiffers) {
                 trustInfos.push(new LegacyTrustInfo(c, highestTrustLevelCertChains[idx], highestTrustLevelRootCertTrustLevel, highestTrustLevelTrustPreferences[idx], CertificateException));
-                violations.push({ca: connectionRootCertSubject, reason: CertificateException + ": " + highestTrustLevelRootCertSubject[idx]});
             }
         });
     }
-    return {success: violations.length === 0, violations, trustInfos};
+    return {trustInfos};
 }
 
 // check connection using the policies retrieved from a single mapserver
@@ -236,7 +215,6 @@ export function legacyValidateConnection(remoteInfo, config, domainName, allCert
     // iterate over all certificates from all (trusted) mapservers
     // for example: the request for video.google.com, will only contain the certificates for "video.google.com"
     // TODO: currently all certificates are included in the response, could not return certificates for the parent domain in the future
-    const violations = [];
 
     // get connection cert
     // TODO: ensure that the first certificate is always the actual certificate
@@ -272,14 +250,13 @@ export function legacyValidateConnection(remoteInfo, config, domainName, allCert
     allCertificates.forEach((value, key) => {
         if (key == domainName) {
             // validate based on certificates for the actual domain
-            const {success, violations: actualDomainViolations, trustInfos} = legacyValidateActualDomain(connectionTrustInfo, config, key, value);
+            const {trustInfos} = legacyValidateActualDomain(connectionTrustInfo, config, key, value);
             certificateTrustInfos.push(...trustInfos);
-            violations.push(...actualDomainViolations);
         } else {
             // TODO: how to deal with certificate violations of other ancestors (e.g., parent of parent)?
         }
     });
-    const success = violations.length === 0;
-    const trustDecision = new LegacyTrustDecision(mapserver, domainName, connectionTrustInfo, certificateTrustInfos, success ? "positive" : "negative");
-    return {success, violations, trustDecision};
+    const trustDecision = new LegacyTrustDecision(mapserver, domainName, connectionTrustInfo, certificateTrustInfos);
+
+    return {trustDecision};
 }

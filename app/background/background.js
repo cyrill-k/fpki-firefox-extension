@@ -8,6 +8,7 @@ import {config} from "../js_lib/config.js"
 import {LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole} from "../js_lib/log.js"
 import {FpkiError, errorTypes} from "../js_lib/errors.js"
 import {policyValidateConnection, legacyValidateConnection} from "../js_lib/validation.js"
+import {hasApplicablePolicy, getShortErrorMessages, hasFailedValidations} from "../js_lib/validation-types.js"
 
 // communication between browser plugin popup and this background script
 browser.runtime.onConnect.addListener(function(port) {
@@ -223,28 +224,31 @@ async function checkInfo(details) {
         }
 
         // count how many policy validations were performed
-        var policyChecksPerformed = 0;
+        let policyChecksPerformed = false;
         // check each policy and throw an error if one of the verifications fails
         policiesMap.forEach((p, m) => {
             cLog(details.requestId, "starting policy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
 
-            const {success, violations, checksPerformed, trustDecision} = policyValidateConnection(remoteInfo, config, domain, p, m);
+            const {trustDecision} = policyValidateConnection(remoteInfo, config, domain, p, m);
             addTrustDecision(details, trustDecision);
-            policyChecksPerformed += checksPerformed;
-            if (!success) {
-                throw new FpkiError(errorTypes.POLICY_MODE_VALIDATION_ERROR, violations[0].reason+" ["+violations[0].pca+"]");
+
+            if (hasApplicablePolicy(trustDecision)) {
+                policyChecksPerformed = true;
+            }
+            if (hasFailedValidations(trustDecision)) {
+                throw new FpkiError(errorTypes.POLICY_MODE_VALIDATION_ERROR, getShortErrorMessages(trustDecision)[0]);
             }
         });
 
         // don't perform legacy validation if policy validation has already taken place
-        if (policyChecksPerformed === 0) {
+        if (!policyChecksPerformed) {
             // check each policy and throw an error if one of the verifications fails
             certificatesMap.forEach((c, m) => {
                 cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c));
-                const {success, violations, trustDecision} = legacyValidateConnection(remoteInfo, config, domain, c, m);
+                const {trustDecision} = legacyValidateConnection(remoteInfo, config, domain, c, m);
                 addTrustDecision(details, trustDecision);
-                if (!success) {
-                    throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, violations[0].reason+" ["+violations[0].ca+"]");
+                if (hasFailedValidations(trustDecision)) {
+                    throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, getShortErrorMessages(trustDecision)[0]);
                 }
             });
         }
