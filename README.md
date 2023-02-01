@@ -20,6 +20,7 @@ First, you need to set up the map server.
 
 ### Docker setup
 - Instruct all commands to use port number 3307 to interact with the docker mysql instance by setting some environment variables: ``. env.bash``
+- First, you start up the mysql database in a docker instance: ``docker-compose up``
 
 ### DB setup
 - ``cd db``

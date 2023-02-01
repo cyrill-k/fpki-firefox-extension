@@ -1,0 +1,2 @@
+# only commit the gzipped cert files since the uncompressed files get quite big
+/*.csv

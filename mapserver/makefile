@@ -1,6 +1,7 @@
 .PHONY: generate_test_certs_and_RPC_SP clean
 
-generate_test_certs_and_RPC_SP: 
+generate_test_certs_and_RPC_SP:
+	@gunzip -k ./testdata/ct_monitor_certs/certs.csv.gz
 	@./tools/scripts/generate_certs.sh
 
 clean:
