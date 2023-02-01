@@ -29,7 +29,8 @@
         "webRequestBlocking",
         "<all_urls>",
         "tabs",
-        "storage"
+        "storage",
+        "history"
     ],
     "web_accessible_resources": [
         "/pages/block.html"

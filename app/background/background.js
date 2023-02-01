@@ -3,7 +3,7 @@
 import {getDomainNameFromURL} from "../js_lib/domain.js"
 import {checkConnection} from "../js_lib/LF-PKI-accessor.js"
 import {FpkiRequest} from "../js_lib/fpki-request.js"
-import {printMap, cLog, mapGetList, mapGetMap} from "../js_lib/helper.js"
+import {printMap, cLog, mapGetList, mapGetMap, mapGetSet} from "../js_lib/helper.js"
 import {config} from "../js_lib/config.js"
 import {LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole} from "../js_lib/log.js"
 import {FpkiError, errorTypes} from "../js_lib/errors.js"
@@ -13,6 +13,11 @@ import {hasApplicablePolicy, getShortErrorMessages, hasFailedValidations} from "
 // communication between browser plugin popup and this background script
 browser.runtime.onConnect.addListener(function(port) {
     port.onMessage.addListener(async function(msg) {
+        if (msg.type === "acceptCertificate") {
+            const {domain, certificateFingerprint, tabId, url} = msg;
+            trustedCertificates.set(domain, mapGetSet(trustedCertificates, domain).add(certificateFingerprint));
+            browser.tabs.update(tabId, {url: url});
+        }
         switch (msg) {
         case 'initFinished':
             port.postMessage({msgType: "config", value: config});
@@ -103,7 +108,12 @@ config.set("root-cas", (()=>{
 
 const trustDecisions = new Map();
 
-function redirect(details, error) {
+// contains certificates that are trusted even if legacy (and policy) validation fails
+// data structure is a map [domain] => [x509 fingerprint]
+// https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/webRequest/CertificateInfo
+const trustedCertificates = new Map();
+
+function redirect(details, error, certificateChain=null) {
     cLog(details.requestId, "verification failed! -> redirecting. Reason: " + error+ " ["+details.url+"]");
     // if any error is caught, redirect to the blocking page, and show the error page
     let { tabId } = details;
@@ -117,14 +127,36 @@ function redirect(details, error) {
     } else {
         htmlErrorFile = "../htmls/block.html";
     }
-    browser.tabs.update(tabId, {
-        url: browser.runtime.getURL(htmlErrorFile) + "?reason=" + encodeURIComponent(error) + "&domain=" + encodeURIComponent(getDomainNameFromURL(details.url)) + "&url=" + encodeURIComponent(details.url)
-    });
+
+    let url = browser.runtime.getURL(htmlErrorFile) + "?reason=" + encodeURIComponent(error) + "&domain=" + encodeURIComponent(getDomainNameFromURL(details.url))
+
+    // set the gobackurl such that if the user accepts the certificate of the main page, he is redirected to this same main page.
+    // But if a resource such as an embedded image is blocked, the user should be redirected to the document url of the main page (and not the resource)
+    if (typeof details.documentUrl === "undefined") {
+        url += "&url=" + encodeURIComponent(details.url);
+    } else {
+        url += "&url=" + encodeURIComponent(details.documentUrl);
+    }
+
+    if (certificateChain !== null) {
+        url += "&fingerprint="+encodeURIComponent(certificateChain[0].fingerprint.sha256);
+    }
+
+    browser.tabs.update(tabId, {url: url});
 }
 
 function shouldValidateDomain(domain) {
     // ignore mapserver addresses since otherwise there would be a circular dependency which could not be resolved
     return config.get("mapservers").every(({ domain: d }) => getDomainNameFromURL(d) !== domain);
+}
+
+function addTrustDecision(details, trustDecision) {
+    // find document url of this request
+    const url = typeof details.documentUrl === "undefined" ? details.url : details.documentUrl;
+    const urlMap = mapGetMap(trustDecisions, details.tabId);
+    const tiList = mapGetList(urlMap, url);
+    urlMap.set(url, tiList.concat(trustDecision));
+    trustDecisions.set(details.tabId, urlMap);
 }
 
 async function requestInfo(details) {
@@ -157,15 +189,6 @@ async function requestInfo(details) {
     }
     // cLog(details.requestId, "tracking request: "+JSON.stringify(details));
     logEntry.trackRequest(details.requestId);
-}
-
-function addTrustDecision(details, trustDecision) {
-    // find document url of this request
-    const url = typeof details.documentUrl === "undefined" ? details.url : details.documentUrl;
-    const urlMap = mapGetMap(trustDecisions, details.tabId);
-    const tiList = mapGetList(urlMap, url);
-    urlMap.set(url, tiList.concat(trustDecision));
-    trustDecisions.set(details.tabId, urlMap);
 }
 
 async function checkInfo(details) {
@@ -206,64 +229,70 @@ async function checkInfo(details) {
 
     let decision = "accept";
     try {
-        const policiesMap = new Map();
-        const certificatesMap = new Map();
-        for (const [index, mapserver] of config.get("mapservers").entries()) {
-            if (index === config.get("mapserver-instances-queried")) {
-                break;
+        // check if this certificate for this domain was accepted despite the F-PKI legacy (or policy) warning
+        const certificateFingerprint = remoteInfo.certificates[0].fingerprint.sha256;
+        if (mapGetSet(trustedCertificates, domain).has(certificateFingerprint)) {
+            cLog(details.requestId, "skipping validation for domain ("+domain+") because of the trusted certificate: "+certificateFingerprint);
+        } else {
+            const policiesMap = new Map();
+            const certificatesMap = new Map();
+            for (const [index, mapserver] of config.get("mapservers").entries()) {
+                if (index === config.get("mapserver-instances-queried")) {
+                    break;
+                }
+                const fpkiRequest = new FpkiRequest(mapserver, domain, details.requestId);
+                cLog(details.requestId, "await fpki request for ["+domain+", "+mapserver.identity+"]");
+                const {policies, certificates, metrics} = await fpkiRequest.fetchPolicies();
+                policiesMap.set(mapserver, policies);
+                certificatesMap.set(mapserver, certificates);
+                if (logEntry !== null) {
+                    logEntry.fpkiResponse(mapserver, policies, certificates, metrics);
+                }
+                cLog(details.requestId, "await finished for fpki request for ["+domain+", "+mapserver.identity+"]");
             }
-            const fpkiRequest = new FpkiRequest(mapserver, domain, details.requestId);
-            cLog(details.requestId, "await fpki request for ["+domain+", "+mapserver.identity+"]");
-            const {policies, certificates, metrics} = await fpkiRequest.fetchPolicies();
-            policiesMap.set(mapserver, policies);
-            certificatesMap.set(mapserver, certificates);
-            if (logEntry !== null) {
-                logEntry.fpkiResponse(mapserver, policies, certificates, metrics);
-            }
-            cLog(details.requestId, "await finished for fpki request for ["+domain+", "+mapserver.identity+"]");
-        }
 
-        // count how many policy validations were performed
-        let policyChecksPerformed = false;
-        // check each policy and throw an error if one of the verifications fails
-        policiesMap.forEach((p, m) => {
-            cLog(details.requestId, "starting policy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
-
-            const {trustDecision} = policyValidateConnection(remoteInfo, config, domain, p, m);
-            addTrustDecision(details, trustDecision);
-
-            if (hasApplicablePolicy(trustDecision)) {
-                policyChecksPerformed = true;
-            }
-            if (hasFailedValidations(trustDecision)) {
-                throw new FpkiError(errorTypes.POLICY_MODE_VALIDATION_ERROR, getShortErrorMessages(trustDecision)[0]);
-            }
-        });
-
-        // don't perform legacy validation if policy validation has already taken place
-        if (!policyChecksPerformed) {
+            // remember if policy validations has been performed
+            let policyChecksPerformed = false;
             // check each policy and throw an error if one of the verifications fails
-            certificatesMap.forEach((c, m) => {
-                cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c));
-                const {trustDecision} = legacyValidateConnection(remoteInfo, config, domain, c, m);
+            policiesMap.forEach((p, m) => {
+                cLog(details.requestId, "starting policy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
+
+                const {trustDecision} = policyValidateConnection(remoteInfo, config, domain, p, m);
                 addTrustDecision(details, trustDecision);
+
+                if (hasApplicablePolicy(trustDecision)) {
+                    policyChecksPerformed = true;
+                }
                 if (hasFailedValidations(trustDecision)) {
-                    throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, getShortErrorMessages(trustDecision)[0]);
+                    throw new FpkiError(errorTypes.POLICY_MODE_VALIDATION_ERROR, getShortErrorMessages(trustDecision)[0]);
                 }
             });
+
+            // don't perform legacy validation if policy validation has already taken place
+            if (!policyChecksPerformed) {
+                // check each policy and throw an error if one of the verifications fails
+                certificatesMap.forEach((c, m) => {
+                    cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c));
+                    const {trustDecision} = legacyValidateConnection(remoteInfo, config, domain, c, m);
+                    addTrustDecision(details, trustDecision);
+                    if (hasFailedValidations(trustDecision)) {
+                        throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, getShortErrorMessages(trustDecision)[0]);
+                    }
+                });
+            }
+
+            // TODO: legacy (i.e., certificate-based) validation
+
+            // TODO: check connection for all policies and continue if at least config.get("mapserver-quorum") responses exist
+
+            // TODO: what happens if a response is invalid? we should definitely log it, but we could ignore it if enough other valid responses exist
+
+            cLog(details.requestId, "verification succeeded! ["+details.url+"]");
         }
-
-        // TODO: legacy (i.e., certificate-based) validation
-
-        // TODO: check connection for all policies and continue if at least config.get("mapserver-quorum") responses exist
-
-        // TODO: what happens if a response is invalid? we should definitely log it, but we could ignore it if enough other valid responses exist
-
-        cLog(details.requestId, "verification succeeded! ["+details.url+"]");
     } catch (error) {
         // TODO: in case that an exception was already thrown in requestInfo, then the redirection occurs twice (but this is not an issue since they both redirect to the same error url)
         decision = "reject: "+error
-        redirect(details, error);
+        redirect(details, error, remoteInfo.certificates);
         throw error;
     } finally {
         if (logEntry !== null) {

@@ -6,6 +6,10 @@ export function mapGetMap(map, key) {
     return map.get(key) || new Map();
 };
 
+export function mapGetSet(map, key) {
+    return map.get(key) || new Set();
+};
+
 export function printMap(m) {
     function replacer(key, value) {
         if(value instanceof Map) {
