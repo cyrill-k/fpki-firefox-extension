@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/go-sql-driver/mysql v1.6.0
-	github.com/netsec-ethz/fpki v0.0.0-20220924134249-86d57eaded47
+	github.com/netsec-ethz/fpki v0.0.0-20230113162440-2f74786143c5
 )
 
 require (
@@ -122,5 +122,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
-
-replace github.com/netsec-ethz/fpki => /home/cyrill/go/src/github.com/cyrill-k/fpki
