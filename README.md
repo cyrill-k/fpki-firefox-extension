@@ -23,7 +23,9 @@ First, you need to set up the map server.
 - First, you start up the mysql database in a docker instance: ``docker-compose up``
 
 ### DB setup
-- ``cd db``
+- ``cd mapserver``
+- ``go mod tidy``
+- ``cd ../db``
 - ``make initialize``
 - The DB should then be accessible via (replace 3307 with 3306 if a non-docker installation is used):
   - mysql -h localhost -P 3307 --protocol TCP -u root -proot
