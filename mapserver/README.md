@@ -13,3 +13,6 @@ To generate the test certs, RPC and SP, run:
 ```
 make generate_test_certs_and_RPC_SP
 ```
+
+## mysql debug commands
+select LENGTH(value) from domainEntries WHERE `key` = UNHEX(SHA2('google.com', 256));

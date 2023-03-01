@@ -9,6 +9,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"encoding/pem"
+	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -33,8 +34,14 @@ var queryCounterChannel = make(chan int)
 
 // ugly version.... I will refactor it later.
 func main() {
-	truncateTable()
-	mapResponder = prepareMapServer()
+	replaceDb := flag.Bool("replace", false, "replace the content of the database with test data")
+	flag.Parse()
+	if *replaceDb {
+		truncateTable()
+		mapResponder = prepareMapServer()
+	} else {
+		mapResponder = startMapServer()
+	}
 
 	go func(counterChannel chan int) {
 		counter := 0
@@ -50,6 +57,7 @@ func main() {
 		IdleTimeout: 5 * time.Second,
 	}
 	s.ListenAndServe()
+	fmt.Println("Mapserver ready")
 }
 
 func mapServerQueryHandler(w http.ResponseWriter, r *http.Request) {
@@ -198,7 +206,7 @@ func bitIsSet(bits []byte, i int) bool {
 	return hash.Sum(nil)
     }*/
 
-func truncateTable() {
+func openDb() (db *sql.DB, err error) {
 	env := map[string]string{"MYSQL_USER": "root", "MYSQL_PASSWORD": "", "MYSQL_HOST": "localhost", "MYSQL_PORT": ""}
 	for k := range env {
 		v, exists := os.LookupEnv(k)
@@ -216,7 +224,12 @@ func truncateTable() {
 	}
 	dsnString += ")/fpki?maxAllowedPacket=1073741824"
 	fmt.Printf("mapserver | truncateTable | using dsn: %s\n", dsnString)
-	db, err := sql.Open("mysql", dsnString)
+	db, err = sql.Open("mysql", dsnString)
+	return
+}
+
+func truncateTable() {
+	db, err := openDb()
 	if err != nil {
 		panic(err)
 	}
@@ -242,13 +255,39 @@ func truncateTable() {
 	}
 }
 
+func inferRootFromDb(db *sql.DB) (value []byte, err error) {
+	// find root using:
+	// SELECT `key` FROM tree ORDER BY id DESC LIMIT 1;
+	// TODO: ensure that this always returns the last root (e.g., what if the SMT updater stops in the middle of an update? then the last insterted node would not be actual root)
+	// possible solution: create a new table which contains the latest root (i.e., each time the SMT.commit call finishes, store the current root in this table)
+
+	stmt, err := db.Prepare("SELECT `key` FROM tree ORDER BY id DESC LIMIT 1;")
+	if err != nil {
+		return nil, err
+	}
+	row := stmt.QueryRow()
+	err = row.Scan(&value)
+	return
+}
+
 func startMapServer() *responder.MapResponder {
-	mapUpdater, err := updater.NewMapUpdater(nil, 233)
+	mapUpdater, err := updater.NewMapUpdater(nil, 32)
 	if err != nil {
 		panic(err)
 	}
 
-	root := mapUpdater.GetRoot()
+	db, err := openDb()
+	if err != nil {
+		panic(err)
+	}
+
+	root, err := inferRootFromDb(db)
+	if err != nil {
+		panic(err)
+	}
+
+	// mapUpdater.GetRoot()
+	fmt.Printf("root: %x\n", root)
 	err = mapUpdater.Close()
 	if err != nil {
 		panic(err)
@@ -258,7 +297,7 @@ func startMapServer() *responder.MapResponder {
 	defer cancelF()
 
 	// get a new responder, and load an existing tree
-	mapResponder, err := responder.NewMapResponder(ctx, root, 233, "./config/mapserver_config.json")
+	mapResponder, err := responder.NewMapResponder(ctx, root, 32, "./config/mapserver_config.json")
 	if err != nil {
 		panic(err)
 	}
@@ -267,7 +306,7 @@ func startMapServer() *responder.MapResponder {
 }
 
 func prepareMapServer() *responder.MapResponder {
-	mapUpdater, err := updater.NewMapUpdater(nil, 233)
+	mapUpdater, err := updater.NewMapUpdater(nil, 32)
 	if err != nil {
 		panic(err)
 	}
@@ -303,13 +342,14 @@ func prepareMapServer() *responder.MapResponder {
 	}
 
 	root := mapUpdater.GetRoot()
+	fmt.Printf("root: %x\n", root)
 	err = mapUpdater.Close()
 	if err != nil {
 		panic(err)
 	}
 
 	// get a new responder, and load an existing tree
-	mapResponder, err := responder.NewMapResponder(ctx, root, 233, "./config/mapserver_config.json")
+	mapResponder, err := responder.NewMapResponder(ctx, root, 32, "./config/mapserver_config.json")
 	if err != nil {
 		panic(err)
 	}
