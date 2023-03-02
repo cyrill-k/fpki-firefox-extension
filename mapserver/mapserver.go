@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"flag"
@@ -35,12 +36,32 @@ var queryCounterChannel = make(chan int)
 // ugly version.... I will refactor it later.
 func main() {
 	replaceDb := flag.Bool("replace", false, "replace the content of the database with test data")
+	rootFlag := flag.String("root", "", "hexadecimal form of root value without leading '0x'")
+	rootFileFlag := flag.String("rootfile", "", "path to the file storing the root in hexadecimal form without leading '0x'")
+	flag.Parse()
+
+	if len(*rootFlag) > 0 && len(*rootFileFlag) > 0 {
+		log.Fatal("Can only specify either 'root' or 'rootfile'")
+	} else if len(*rootFlag) == 0 && len(*rootFileFlag) == 0 {
+		log.Fatal("Must specify either 'root' or 'rootfile'")
+	}
+	var root []byte
+	var err error
+	if len(*rootFlag) > 0 {
+		root, err = hex.DecodeString(*rootFlag)
+	} else if len(*rootFileFlag) > 0 {
+		root, err = hex.DecodeString(*rootFileFlag)
+	}
+	if err != nil {
+		log.Fatal("Failed to parse root value")
+	}
+
 	flag.Parse()
 	if *replaceDb {
 		truncateTable()
-		mapResponder = prepareMapServer()
+		mapResponder = prepareMapServer(root)
 	} else {
-		mapResponder = startMapServer()
+		mapResponder = startMapServer(root)
 	}
 
 	go func(counterChannel chan int) {
@@ -255,36 +276,13 @@ func truncateTable() {
 	}
 }
 
-func inferRootFromDb(db *sql.DB) (value []byte, err error) {
-	// find root using:
-	// SELECT `key` FROM tree ORDER BY id DESC LIMIT 1;
-	// TODO: ensure that this always returns the last root (e.g., what if the SMT updater stops in the middle of an update? then the last insterted node would not be actual root)
-	// possible solution: create a new table which contains the latest root (i.e., each time the SMT.commit call finishes, store the current root in this table)
-
-	stmt, err := db.Prepare("SELECT `key` FROM tree ORDER BY id DESC LIMIT 1;")
-	if err != nil {
-		return nil, err
-	}
-	row := stmt.QueryRow()
-	err = row.Scan(&value)
-	return
-}
-
-func startMapServer() *responder.MapResponder {
+func startMapServer(root []byte) *responder.MapResponder {
 	mapUpdater, err := updater.NewMapUpdater(nil, 32)
 	if err != nil {
 		panic(err)
 	}
 
-	db, err := openDb()
-	if err != nil {
-		panic(err)
-	}
 
-	root, err := inferRootFromDb(db)
-	if err != nil {
-		panic(err)
-	}
 
 	// mapUpdater.GetRoot()
 	fmt.Printf("root: %x\n", root)
@@ -305,8 +303,8 @@ func startMapServer() *responder.MapResponder {
 	return mapResponder
 }
 
-func prepareMapServer() *responder.MapResponder {
-	mapUpdater, err := updater.NewMapUpdater(nil, 32)
+func prepareMapServer(root []byte) *responder.MapResponder {
+	mapUpdater, err := updater.NewMapUpdater(root, 32)
 	if err != nil {
 		panic(err)
 	}
@@ -341,7 +339,7 @@ func prepareMapServer() *responder.MapResponder {
 		panic(err)
 	}
 
-	root := mapUpdater.GetRoot()
+	root = mapUpdater.GetRoot()
 	fmt.Printf("root: %x\n", root)
 	err = mapUpdater.Close()
 	if err != nil {
