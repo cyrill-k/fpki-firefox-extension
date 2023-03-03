@@ -50,7 +50,11 @@ func main() {
 	if len(*rootFlag) > 0 {
 		root, err = hex.DecodeString(*rootFlag)
 	} else if len(*rootFileFlag) > 0 {
-		root, err = hex.DecodeString(*rootFileFlag)
+		dat, err := os.ReadFile(*rootFileFlag)
+		if err != nil {
+			log.Fatalf("Error reading file %s: %s", *rootFileFlag, err)
+		}
+		root, err = hex.DecodeString(string(dat))
 	}
 	if err != nil {
 		log.Fatal("Failed to parse root value")
@@ -281,8 +285,6 @@ func startMapServer(root []byte) *responder.MapResponder {
 	if err != nil {
 		panic(err)
 	}
-
-
 
 	// mapUpdater.GetRoot()
 	fmt.Printf("root: %x\n", root)
