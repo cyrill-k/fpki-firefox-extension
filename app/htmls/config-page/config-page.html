@@ -1,0 +1,25 @@
+<html xmlns="http://www.w3.org/1999/xhtml" dir="ltr" lang="en-US">
+  <head>
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" id="favicon" href="../../images/F-D_dark.png" />
+    <title>F-PKI Plugin Configuration</title></head>
+  <body>
+    <div id="config">
+      <p>Config</p>
+      <button id="printConfig">Print Config</button>
+      <button id="downloadConfig">Download Config</button>
+      <button id="resetConfig">Reset Config to Default</button>
+      <br/>
+      Upload new config:
+      <input type="file" id="file" onchange="handle_files()">
+      <button id="uploadConfig">Upload</button>
+      <br/>
+      <pre>
+        <code id="config-code">
+          { "hello": "world" }
+        </code>
+      </pre>
+    </div>
+  </body>
+  <script src="config-page.js" type="module"></script>
+</html>

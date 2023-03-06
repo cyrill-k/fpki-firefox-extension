@@ -6,18 +6,16 @@
     <title>(L)F-PKI</title>
   </head>
   <body>
-    <button id="printLog">Print Log to browser console</button>
-    <button id="downloadLog">Download Log as json file</button>
-    <button id="showValidationResult">Show validation result for the current tab</button>
+    <div> 
+      <button id="openConfigWindow">Configuration</button>
+    </div>
     <div id="validation">
       <p id="validation-title">Validation Results</p>
+      <button id="showValidationResult">Show validation result for the current tab</button>
     </div>
-    <div id="config">
-      <pre>
-        <code id="config-code">
-          { "hello": "world" }
-        </code>
-      </pre>
+    <div id="log">
+      <p>Log</p>
+      <button id="downloadLog">Download Log</button>
     </div>
   </body>
 </html>

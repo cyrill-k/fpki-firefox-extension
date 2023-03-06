@@ -4,35 +4,59 @@ import {getDomainNameFromURL} from "../js_lib/domain.js"
 import {checkConnection} from "../js_lib/LF-PKI-accessor.js"
 import {FpkiRequest} from "../js_lib/fpki-request.js"
 import {printMap, cLog, mapGetList, mapGetMap, mapGetSet} from "../js_lib/helper.js"
-import {config} from "../js_lib/config.js"
+import {config, downloadConfig, importConfigFromJSON, initializeConfig, saveConfig, resetConfig} from "../js_lib/config.js"
 import {LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole} from "../js_lib/log.js"
 import {FpkiError, errorTypes} from "../js_lib/errors.js"
 import {policyValidateConnection, legacyValidateConnection} from "../js_lib/validation.js"
 import {hasApplicablePolicy, getShortErrorMessages, hasFailedValidations} from "../js_lib/validation-types.js"
 
+try {
+    initializeConfig();
+} catch (e) {
+    console.log("initialize: "+e);
+}
+
 // communication between browser plugin popup and this background script
 browser.runtime.onConnect.addListener(function(port) {
     port.onMessage.addListener(async function(msg) {
-        if (msg.type === "acceptCertificate") {
+        switch (msg.type) {
+        case "acceptCertificate":
             const {domain, certificateFingerprint, tabId, url} = msg;
             trustedCertificates.set(domain, mapGetSet(trustedCertificates, domain).add(certificateFingerprint));
             browser.tabs.update(tabId, {url: url});
-        }
-        switch (msg) {
-        case 'initFinished':
-            port.postMessage({msgType: "config", value: config});
             break;
-        case 'printLog':
-            printLogEntriesToConsole();
-            port.postMessage({msgType: "config", value: config});
+        case "uploadConfig":
+            console.log("setting new config value...");
+            importConfigFromJSON(msg.value);
+            saveConfig();
             break;
-        case 'showValidationResult':
-            port.postMessage({msgType: "validationResults", value: trustDecisions});
-
-            break;
-        case 'downloadLog':
-            downloadLog();
-            break;
+        default:
+            switch (msg) {
+            case 'initFinished':
+                port.postMessage({msgType: "config", value: config});
+                break;
+            case 'printConfig':
+                port.postMessage({msgType: "config", value: config});
+                break;
+            case 'downloadConfig':
+                downloadConfig()
+                break;
+            case 'resetConfig':
+                resetConfig()
+                break;
+            case 'openConfigWindow':
+                browser.tabs.create({url: "../htmls/config-page/config-page.html"});
+                break;
+            case 'showValidationResult':
+                port.postMessage({msgType: "validationResults", value: trustDecisions});
+                break;
+            case 'printLog':
+                printLogEntriesToConsole();
+                break;
+            case 'downloadLog':
+                downloadLog();
+                break;
+            }
         }
     });
 })
@@ -43,68 +67,6 @@ browser.runtime.onConnect.addListener(function(port) {
 //   alert(event.reason); // Error: Whoops! - the unhandled error object
 // });
 
-// TODO: remove duplicate local mapserver (only used for testing)
-// use 127.0.0.11 instead of localhost to distinguish the second test server from the first one (although it is the same instance)
-// also, using 127.0.0.11 ensures that the mapserver IPs do not clash with the local test webpage at 127.0.0.1
-config.set("mapservers", [
-    {"identity": "local-mapserver", "domain": "http://localhost:8080", "querytype": "lfpki-http-get"},
-    {"identity": "local-mapserver-2", "domain": "http://127.0.0.11:8080", "querytype": "lfpki-http-get"}
-]);
-// cache timeout in ms
-config.set("cache-timeout", 10000);
-// max amount of time in ms that a connection setup takes. Used to ensure that a cached policy that is valid at the onBeforeRequest event is still valid when the onHeadersReceived event fires.
-config.set("max-connection-setup-time", 1000);
-// quorum of trusted map servers necessary to accept their result
-config.set("mapserver-quorum", 2);
-// number of mapservers queried per validated domain (currently always choosing the first n entries in the mapserver list)
-config.set("mapserver-instances-queried", 2);
-config.set("ca-sets", (()=>{
-    const caSet = new Map();
-    caSet.set("US CA", ["CN=GTS CA 1C3,O=Google Trust Services LLC,C=US",
-                        "CN=GTS Root R1,O=Google Trust Services LLC,C=US",
-                        "CN=Amazon,OU=Server CA 1B,O=Amazon,C=US",
-                        "CN=Amazon Root CA 1,O=Amazon,C=US",
-                        "CN=DigiCert Global CA G2,O=DigiCert Inc,C=US",
-                        "CN=DigiCert Global Root G2,OU=www.digicert.com,O=DigiCert Inc,C=US"]);
-    // don't include "C=US,O=Microsoft Corporation,CN=Microsoft RSA TLS CA 02"
-    caSet.set("Microsoft CA", ["CN=Microsoft RSA Root Certificate Authority 2017,O=Microsoft Corporation,C=US",
-                               "CN=Microsoft ECC Root Certificate Authority 2017,O=Microsoft Corporation,C=US",
-                               "CN=Microsoft RSA TLS CA 01,O=Microsoft Corporation,C=US"]);
-    return caSet;
-})());
-// the default level of a root certificate is 0
-// CAs with higher levels take precedence over CAs with lower levels
-config.set("legacy-trust-preference", (()=>{
-    const tp = new Map();
-    tp.set("google.com", [{caSet: "US CA", level: 1}]);
-    tp.set("qq.com", [{caSet: "US CA", level: 1}]);
-    tp.set("azure.microsoft.com", [{caSet: "Microsoft CA", level: 1}]);
-    tp.set("bing.com", [{caSet: "Microsoft CA", level: 1}]);
-    return tp;
-})());
-// the default level of a root certificate is 0
-// CAs with higher levels take precedence over CAs with lower levels
-config.set("policy-trust-preference", (()=>{
-    const tp = new Map();
-    tp.set("*", [{pca: "pca", level: 1}]);
-    return tp;
-})());
-config.set("root-pcas", (()=>{
-    const rootPcas = new Map();
-    rootPcas.set("pca", "local PCA for testing purposes");
-    return rootPcas;
-})());
-config.set("root-cas", (()=>{
-    const rootCas = new Map();
-    rootCas.set("GTS CA 1C3", "description: ...");
-    rootCas.set("DigiCert Global Root CA", "description: ...");
-    rootCas.set("TrustAsia TLS RSA CA", "description: ...");
-    rootCas.set("DigiCert SHA2 Secure Server CA", "description: ...");
-    rootCas.set("DigiCert Secure Site CN CA G3", "description: ...");
-    rootCas.set("GlobalSign Organization Validation CA - SHA256 - G2", "description: ...");
-    rootCas.set("DigiCert TLS Hybrid ECC SHA384 2020 CA1", "description: ...");
-    return rootCas;
-})());
 
 const trustDecisions = new Map();
 

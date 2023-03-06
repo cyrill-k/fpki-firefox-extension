@@ -1,34 +1,17 @@
 import {getSubject, getIssuer} from "../js_lib/x509utils.js"
 import {AllPolicyAttributes, EvaluationResult} from "../js_lib/validation-types.js"
 
-var synchronizedConfig = null;
 var validationResults = null;
 var port = browser.runtime.connect({
     name: "popup to background communication"
 });
-function updateConfig() {
-    const configCodeElement = getElement("config-code");
-    const printableConfig = new Map();
-    synchronizedConfig.forEach((value, key) => {
-        if (["ca-sets", "legacy-trust-preference", "policy-trust-preference", "root-pcas", "root-cas"].includes(key)) {
-            printableConfig.set(key, Object.fromEntries(value));
-        } else {
-            printableConfig.set(key, value);
-        }
-        // could try to implement using the datatype: e.g., if (typeof value === "map")
-    });
-    configCodeElement.innerHTML = "config = "+JSON.stringify(Object.fromEntries(printableConfig), null, 4);
 
     // hide other divs
-    getElement("config").style.visibility = "visible";
-    getElement("validation").style.visibility = "collapsed";
-}
 
 document.addEventListener('DOMContentLoaded', function() {
     try {
-        getElement('printLog').addEventListener('click', function() {
-            port.postMessage("printLog");
-            updateConfig();
+        getElement('openConfigWindow').addEventListener('click', function() {
+            port.postMessage("openConfigWindow");
         });
         getElement('downloadLog').addEventListener('click', function() {
             port.postMessage("downloadLog");
@@ -125,7 +108,6 @@ async function updateValidationResult() {
     if (validationResults === null) {
         getElement("legacy-connection-title").innerHTML = "No connection initiated yet";
         getElement("validation").style.visibility = "visible";
-        getElement("config").style.visibility = "visible";
         return;
     }
 
@@ -155,7 +137,6 @@ async function updateValidationResult() {
 
     // hide other divs
     getElement("validation").style.visibility = "visible";
-    getElement("config").style.visibility = "collapse";
 
     // TODO(cyrill) not sure if this is necessary
     validationResults = null;
@@ -287,10 +268,7 @@ function addLegacyValidationResult(trustDecision, predecessor, index) {
 // communication from background script to popup
 port.onMessage.addListener(async function(msg) {
     const {msgType, value} = msg;
-    if (msgType === "config") {
-        synchronizedConfig = value;
-        updateConfig();
-    } else if (msgType === "validationResults") {
+    if (msgType === "validationResults") {
         validationResults = value;
         await updateValidationResult();
     }

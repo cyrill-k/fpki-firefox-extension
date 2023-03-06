@@ -9,13 +9,13 @@
     },
     "content_scripts": [
         {
-            "matches": [
-                "<all_urls>"
-            ],
-            "js": [
-                "./content/content.js"
-            ]
-        }
+        "matches": [
+            "<all_urls>"
+        ],
+        "js": [
+            "./content/content.js"
+        ]
+    }
     ],
     "browser_action": {
         "default_icon": {
@@ -34,5 +34,12 @@
     ],
     "web_accessible_resources": [
         "/pages/block.html"
-    ]
+    ],
+    "commands":{
+        "_execute_browser_action": {
+            "suggested_key": {
+                "default": "Alt+Shift+J"
+            }
+        }
+    }
 }
