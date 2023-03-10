@@ -8,17 +8,21 @@ function defaultConfig() {
     // use 127.0.0.11 instead of localhost to distinguish the second test server from the first one (although it is the same instance)
     // also, using 127.0.0.11 ensures that the mapserver IPs do not clash with the local test webpage at 127.0.0.1
     c.set("mapservers", [
-        {"identity": "local-mapserver", "domain": "http://localhost:8080", "querytype": "lfpki-http-get"},
-        {"identity": "local-mapserver-2", "domain": "http://127.0.0.11:8080", "querytype": "lfpki-http-get"}
+        // {"identity": "local-mapserver", "domain": "http://localhost:8080", "querytype": "lfpki-http-get"},
+        {"identity": "ETH-mapserver-top-100k", "domain": "http://129.132.55.210:8080", "querytype": "lfpki-http-get"}
     ]);
     // cache timeout in ms
     c.set("cache-timeout", 10000);
     // max amount of time in ms that a connection setup takes. Used to ensure that a cached policy that is valid at the onBeforeRequest event is still valid when the onHeadersReceived event fires.
     c.set("max-connection-setup-time", 1000);
+    // timeout for fetching a proof from a mapserver in ms
+    c.set("proof-fetch-timeout", 10000);
+    // max number of attempted fetch operations before aborting
+    c.set("proof-fetch-max-tries", 3);
     // quorum of trusted map servers necessary to accept their result
     c.set("mapserver-quorum", 2);
     // number of mapservers queried per validated domain (currently always choosing the first n entries in the mapserver list)
-    c.set("mapserver-instances-queried", 2);
+    c.set("mapserver-instances-queried", 1);
     c.set("ca-sets", (()=>{
         const caSet = new Map();
         caSet.set("US CA", ["CN=GTS CA 1C3,O=Google Trust Services LLC,C=US",
@@ -56,6 +60,7 @@ function defaultConfig() {
         return rootPcas;
     })());
     c.set("root-cas", (()=>{
+        // TODO (cyrill): change this configuration to take the complete subject name into accound (not only CN)
         const rootCas = new Map();
         rootCas.set("GTS CA 1C3", "description: ...");
         rootCas.set("DigiCert Global Root CA", "description: ...");
