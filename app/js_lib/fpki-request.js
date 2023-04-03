@@ -123,7 +123,7 @@ export class FpkiRequest {
 
                 // extract policies from payload
                 const policies = extractPolicy(mapResponse);
-                const certificates = extractCertificates(mapResponse);
+                const certificates = await extractCertificates(mapResponse);
                 cLog(this.requestId, "fetch finished for: "+this);
 
                 // add policies to policy cache

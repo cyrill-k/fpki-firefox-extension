@@ -8838,7 +8838,11 @@ function parseDerName(derName) {
     return rfc5280.DirectoryString.decode(Buffer.from(derName));
 }
 
-module.exports = {parsePemCertificate,parseDerName};
+function getSubjectPublicKeyInfoDER(certificate) {
+    return rfc5280.SubjectPublicKeyInfo.encode(certificate.tbsCertificate.subjectPublicKeyInfo, 'der');
+}
+
+module.exports = {parsePemCertificate, parseDerName, getSubjectPublicKeyInfoDER};
 
 },{"asn1.js-rfc5280":1,"buffer":19,"js-encoding-utils":25}]},{},[29])(29)
 });

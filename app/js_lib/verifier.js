@@ -1,3 +1,5 @@
+import { sha256Hash_1, sha256Hash_2, sha256Hash_3, stringToArrayBuf } from "./helper.js"
+
 // verify the map server response
 async function verifyProofs(domainEntryList) {
     var ValidationException = "verification failed"
@@ -93,21 +95,6 @@ function _base64ToArrayBuffer(base64) {
     return bytes.buffer;
 }
 
-async function sha256Hash_1(input) {
-    let output = await window.crypto.subtle.digest('SHA-256', stringToArrayBuf(input))
-    return output
-}
-
-async function sha256Hash_2(input1, input2) {
-    let output = await window.crypto.subtle.digest('SHA-256', appendTwoArrayBuf(input1, input2))
-    return output
-}
-
-async function sha256Hash_3(input1, input2, input3) {
-    let output = await window.crypto.subtle.digest('SHA-256', appendThreeArrayBuf(input1, input2, input3))
-    return output
-}
-
 function bitIsSet(keyView, index) {
 
     let bitIndex = index % 8
@@ -119,56 +106,6 @@ function bitIsSet(keyView, index) {
     } else {
         return false
     }
-}
-
-function encode_utf8(s) {
-    return unescape(encodeURIComponent(s));
-}
-
-function stringToArrayBuf(str) {
-    var s = encode_utf8(str)
-    var buf = new ArrayBuffer(s.length);
-    var bufView = new Uint8Array(buf);
-    for (var i = 0, strLen = s.length; i < strLen; i++) {
-        bufView[i] = s.charCodeAt(i)
-    }
-    return buf;
-}
-
-// append two array buffer; for hashing
-function appendTwoArrayBuf(str1, str2) {
-    let str1View = new Uint8Array(str1)
-    let str2View = new Uint8Array(str2)
-
-    var buf = new ArrayBuffer(str1View.length + str2View.length);
-    var bufView = new Uint8Array(buf);
-    for (var i = 0, strLen = str1View.length; i < strLen; i++) {
-        bufView[i] = str1View[i];
-    }
-    for (var i = 0, strLen = str2View.length; i < strLen; i++) {
-        bufView[i + str1View.length] = str2View[i];
-    }
-    return buf;
-}
-
-// append three array buffer; for hashing
-function appendThreeArrayBuf(str1, str2, str3) {
-    let str1View = new Uint8Array(str1)
-    let str2View = new Uint8Array(str2)
-    let str3View = new Uint8Array(str3)
-
-    var buf = new ArrayBuffer(str1View.length + str2View.length + str3View.length);
-    var bufView = new Uint8Array(buf);
-    for (var i = 0, strLen = str1View.length; i < strLen; i++) {
-        bufView[i] = str1View[i];
-    }
-    for (var i = 0, strLen = str2View.length; i < strLen; i++) {
-        bufView[i + str1View.length] = str2View[i];
-    }
-    for (var i = 0, strLen = str3View.length; i < strLen; i++) {
-        bufView[i + str2View.length + str1View.length] = str3View[i];
-    }
-    return buf;
 }
 
 export {

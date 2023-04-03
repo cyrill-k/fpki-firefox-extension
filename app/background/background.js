@@ -1,14 +1,13 @@
 'use strict'
 
-import {getDomainNameFromURL} from "../js_lib/domain.js"
-import {checkConnection} from "../js_lib/LF-PKI-accessor.js"
-import {FpkiRequest} from "../js_lib/fpki-request.js"
-import {printMap, cLog, mapGetList, mapGetMap, mapGetSet} from "../js_lib/helper.js"
-import {config, downloadConfig, importConfigFromJSON, initializeConfig, saveConfig, resetConfig} from "../js_lib/config.js"
-import {LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole} from "../js_lib/log.js"
-import {FpkiError, errorTypes} from "../js_lib/errors.js"
-import {policyValidateConnection, legacyValidateConnection} from "../js_lib/validation.js"
-import {hasApplicablePolicy, getShortErrorMessages, hasFailedValidations} from "../js_lib/validation-types.js"
+import { getDomainNameFromURL } from "../js_lib/domain.js"
+import { FpkiRequest } from "../js_lib/fpki-request.js"
+import { printMap, cLog, mapGetList, mapGetMap, mapGetSet } from "../js_lib/helper.js"
+import { config, downloadConfig, importConfigFromJSON, initializeConfig, saveConfig, resetConfig } from "../js_lib/config.js"
+import { LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole } from "../js_lib/log.js"
+import { FpkiError, errorTypes } from "../js_lib/errors.js"
+import { policyValidateConnection, legacyValidateConnection } from "../js_lib/validation.js"
+import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations } from "../js_lib/validation-types.js"
 
 try {
     initializeConfig();

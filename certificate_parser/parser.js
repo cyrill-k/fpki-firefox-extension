@@ -10,4 +10,12 @@ function parsePemCertificate(pemCertificate) {
     return decoded;
 }
 
-module.exports = {parsePemCertificate};
+function parseDerName(derName) {
+    return rfc5280.DirectoryString.decode(Buffer.from(derName));
+}
+
+function getSubjectPublicKeyInfoDER(certificate) {
+    return rfc5280.SubjectPublicKeyInfo.encode(certificate.tbsCertificate.subjectPublicKeyInfo, 'der');
+}
+
+module.exports = {parsePemCertificate, parseDerName, getSubjectPublicKeyInfoDER};

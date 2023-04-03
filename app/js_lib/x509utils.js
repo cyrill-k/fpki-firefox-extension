@@ -1,4 +1,5 @@
-import {errorTypes, FpkiError} from "./errors.js"
+import { errorTypes, FpkiError } from "./errors.js"
+import { sha256Hash_arrayBuffer_1, convertArrayBufferToBase64 } from "./helper.js"
 
 // imports the function ParsePemCertificate as an object of the global variable certificateparser
 import * as mymodule from "./bundledparser.js"
@@ -9,6 +10,13 @@ export function parsePemCertificate(pemData, addHeaderAndFooter=false) {
     } else {
         return certificateparser.parsePemCertificate(pemData);
     }
+}
+
+export async function getSubjectPublicKeyInfoHash(certificate) {
+    const subjectPublicKeyInfoDER = certificateparser.getSubjectPublicKeyInfoDER(certificate)
+    const subjectPublicKeyInfoHash = await sha256Hash_arrayBuffer_1(subjectPublicKeyInfoDER);
+    const subjectPublicKeyInfoHashBase64 = convertArrayBufferToBase64(subjectPublicKeyInfoHash);
+    return subjectPublicKeyInfoHashBase64;
 }
 
 // extracts the subject of a certificate which is either in the https://github.com/indutny/asn1.js/tree/master/rfc/5280 format or the MDN format

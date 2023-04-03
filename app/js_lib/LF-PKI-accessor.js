@@ -1,7 +1,7 @@
 import * as domainFunc from "./domain.js"
 import * as verifier from "./verifier.js"
-import {cLog} from "./helper.js"
-import {parsePemCertificate} from "./x509utils.js"
+import { cLog } from "./helper.js"
+import { addCertificateChainToCacheIfNecessary, getCertificateChainFromCacheByHash } from "./cache.js"
 
 // get map server response and check the connection
 async function getMapServerResponseAndCheck(url, needVerification, remoteInfo) {
@@ -147,30 +147,61 @@ function extractRawCertificates(mapResponse) {
     return certificateMap;
 }
 
-function extractCertificates(mapResponse) {
+async function extractCertificates(mapResponse) {
+    const startRawExtraction = performance.now();
     const rawDomainMap = extractRawCertificates(mapResponse);
-    const domainMap = new Map();
+    const endRawExtraction = performance.now();
+    const startParse = performance.now();
+    const hashMap = new Map();
+    let totalCertificatesParsed = 0;
     for (const [domain, rawCaMap] of rawDomainMap) {
         const caMap = new Map();
         for (const [ca, {certs, certChains}] of rawCaMap) {
-            var parsedCerts = [];
+            let certHashes = [];
             if (certs !== null) {
-                parsedCerts = certs.map(c => parsePemCertificate(c, true));
-            }
-            var parsedCertChains = [];
-            if (certChains !== null) {
-                parsedCertChains = certChains.map(cc => {
-                    if (cc === null) {
-                        return [];
-                    } else {
-                        return cc.map(c => parsePemCertificate(c, true));
+                // don't use promise.all(...) since then the intermediate certificates will be parsed multiple times. `addCertificateChainToCacheIfNecessary` checks if the certificate is already cached and if not it starts parsing. The problem arises if multiple intermediate certificates for one domain use the same intermediate certificate and do this check before waiting for the other functions to parse and add the certificate to the cache.
+                for (const [i, c] of certs.entries()) {
+                    let chain = certChains[i];
+                    if (chain === null) {
+                        chain = [];
                     }
-                });
+                    const {hash, nCertificatesParsed} = await addCertificateChainToCacheIfNecessary(c, chain);
+                    totalCertificatesParsed += nCertificatesParsed;
+                    certHashes.push(hash);
+                };
             }
-            caMap.set(ca, {certs: parsedCerts, certChains: parsedCertChains});
+            caMap.set(ca, {certHashes: certHashes});
+        }
+        hashMap.set(domain, caMap);
+    }
+    const endParse = performance.now();
+    const nEntries = Array.from(hashMap.values()).reduce((a, caMap) => {
+        return a + Array.from(caMap.values()).reduce((aa, {certHashes}) => {
+            return aa + certHashes.length;
+        }, 0);
+    }, 0);
+
+    // Fetch the certificate for each of the certificate hashes
+    const startFetchCert = performance.now();
+    const domainMap = new Map();
+    for (const [domain, hashMapCa] of hashMap) {
+        const caMap = new Map();
+        for (const [ca, {certHashes}] of hashMapCa) {
+            const certs = [];
+            const certChains = [];
+            certHashes.forEach(hash => {
+                const certChainWithLeaf = getCertificateChainFromCacheByHash(hash);
+                certs.push(certChainWithLeaf[0]);
+                certChains.push(certChainWithLeaf.slice(1));
+            });
+            caMap.set(ca, {certs, certChains});
         }
         domainMap.set(domain, caMap);
     }
+    const endFetchCert = performance.now();
+
+    console.log(`Extraction (${nEntries} entries): raw=${endRawExtraction - startRawExtraction} ms, hash (and parse ${totalCertificatesParsed} certs)=${endParse - startParse} ms, fetch cert from cache=${endFetchCert-startFetchCert} ms`);
+
     return domainMap;
 }
 
