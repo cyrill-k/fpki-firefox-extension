@@ -9,6 +9,27 @@ import { FpkiError, errorTypes } from "../js_lib/errors.js"
 import { policyValidateConnection, legacyValidateConnection } from "../js_lib/validation.js"
 import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations } from "../js_lib/validation-types.js"
 
+import * as wasm from "./wasm_exec_tiny.js"
+
+// see ../../wasm for wasm_exec_tiny.js and for instruction how to build main-tiny.wasm
+// must copy both files in the same folder as this script for it to work
+const go = new Go();
+WebAssembly.instantiateStreaming(fetch("main-tiny.wasm"), go.importObject).then((result) => {
+    // works
+    go.run(result.instance);
+
+    // works
+    const a = result.instance.exports.add(12, 34);
+    console.log(a);
+
+    // doesn't work yet
+    const r = result.instance.exports.test();
+    console.log(r);
+
+    // doesn't work yet
+    console.log((new TextDecoder()).decode(new Uint8Array(result.instance.exports.memory.buffer, r, 3)));
+});
+
 try {
     initializeConfig();
 } catch (e) {
