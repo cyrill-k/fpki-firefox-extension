@@ -51,8 +51,6 @@ export class LogEntry {
         if (ongoingConnectionLogs.has(requestId)) {
             finishedConnectionLogs.push(this);
             ongoingConnectionLogs.delete(requestId);
-            console.log("finalize log entry rid="+requestId);
-            console.log(this);
         }
     }
 }

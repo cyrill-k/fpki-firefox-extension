@@ -181,14 +181,6 @@ function legacyValidateActualDomain(connectionTrustInfo, config, actualDomain, d
         });
     });
 
-    console.log("outcome");
-    console.log(connectionRootCertSubject);
-    console.log(connectionRootCertTrustLevel);
-    console.log(highestTrustLevelCerts);
-    console.log(highestTrustLevelCertChains);
-    console.log(highestTrustLevelRootCertSubject);
-    console.log(highestTrustLevelRootCertTrustLevel);
-    console.log(connectionCert);
 
     // if I >= II then fine
     // else

@@ -176,7 +176,6 @@ async function checkInfo(details) {
         rawDER: true
     });
 
-    cLog(details.requestId, remoteInfo);
     if (remoteInfo.certificates === undefined) {
         cLog(details.requestId, "establishing non-secure http connection");
         // TODO: could also implement protection against http downgrade
@@ -202,21 +201,21 @@ async function checkInfo(details) {
                     break;
                 }
                 const fpkiRequest = new FpkiRequest(mapserver, domain, details.requestId);
-                cLog(details.requestId, "await fpki request for ["+domain+", "+mapserver.identity+"]");
+                // cLog(details.requestId, "await fpki request for ["+domain+", "+mapserver.identity+"]");
                 const {policies, certificates, metrics} = await fpkiRequest.fetchPolicies();
                 policiesMap.set(mapserver, policies);
                 certificatesMap.set(mapserver, certificates);
                 if (logEntry !== null) {
                     logEntry.fpkiResponse(mapserver, policies, certificates, metrics);
                 }
-                cLog(details.requestId, "await finished for fpki request for ["+domain+", "+mapserver.identity+"]");
+                // cLog(details.requestId, "await finished for fpki request for ["+domain+", "+mapserver.identity+"]");
             }
 
             // remember if policy validations has been performed
             let policyChecksPerformed = false;
             // check each policy and throw an error if one of the verifications fails
             policiesMap.forEach((p, m) => {
-                cLog(details.requestId, "starting policy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
+                // cLog(details.requestId, "starting policy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
 
                 const {trustDecision} = policyValidateConnection(remoteInfo, config, domain, p, m);
                 addTrustDecision(details, trustDecision);

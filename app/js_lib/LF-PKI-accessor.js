@@ -147,7 +147,7 @@ function extractRawCertificates(mapResponse) {
     return certificateMap;
 }
 
-async function extractCertificates(mapResponse) {
+async function extractCertificates(mapResponse, requestId) {
     const startRawExtraction = performance.now();
     const rawDomainMap = extractRawCertificates(mapResponse);
     const endRawExtraction = performance.now();
@@ -200,7 +200,7 @@ async function extractCertificates(mapResponse) {
     }
     const endFetchCert = performance.now();
 
-    console.log(`Extraction (${nEntries} entries): raw=${endRawExtraction - startRawExtraction} ms, hash (and parse ${totalCertificatesParsed} certs)=${endParse - startParse} ms, fetch cert from cache=${endFetchCert-startFetchCert} ms`);
+    cLog(requestId, `LF-PKI response parsing (${nEntries} entries): raw=${endRawExtraction - startRawExtraction} ms, hash (and parse ${totalCertificatesParsed} certs)=${endParse - startParse} ms, fetch cert from cache=${endFetchCert-startFetchCert} ms`);
 
     return domainMap;
 }
@@ -225,7 +225,7 @@ async function fetchRetry(url, delay, tries, timeout, requestId, fetchIndex=0, f
     if (fetchIndex === 0) {
         fetchIndex = fetchCounter
         fetchCounter += 1;
-        cLog(requestId, "starting... "+fetchIndex+", triesLeft="+tries+", url="+url);
+        cLog(requestId, "["+fetchIndex+"] starting... triesLeft="+tries+", url="+url);
     }
     // function onError(err){
     //     const triesLeft = tries - 1;
@@ -237,19 +237,18 @@ async function fetchRetry(url, delay, tries, timeout, requestId, fetchIndex=0, f
     // }
     const controller = new AbortController();
     const id = setTimeout(() => {
-        cLog(requestId, "aborting after timeout... "+fetchIndex+", triesLeft="+tries);
-        cLog(requestId, url);
+        cLog(requestId, "["+fetchIndex+"] aborting after timeout... triesLeft="+tries);
         controller.abort();
     }, timeout);
-    cLog(requestId, "fetching... "+fetchIndex+", triesLeft="+tries);
+    cLog(requestId, "["+fetchIndex+"] fetching... triesLeft="+tries);
     try {
         const response = await fetch(url,{ ...fetchOptions, signal: controller.signal });
-        cLog(requestId, "finished... "+fetchIndex+", triesLeft="+tries);
+        cLog(requestId, "["+fetchIndex+"] finished... triesLeft="+tries);
         return {response, triesLeft: tries};
     } catch(err) {
         const triesLeft = tries - 1;
         if(!triesLeft){
-            cLog(requestId, "failed... "+fetchIndex+", triesLeft="+triesLeft);
+            cLog(requestId, "["+fetchIndex+"] failed... triesLeft="+triesLeft);
             throw err;
         }
         return wait(delay).then(() => fetchRetry(url, delay, triesLeft, timeout, requestId, fetchIndex, fetchOptions));

@@ -1,5 +1,5 @@
 import { parsePemCertificate, getSubjectPublicKeyInfoHash, getSubject } from "./x509utils.js"
-import { arrayToHexString, intToHexString, hashPemCertificateWithoutHeader } from "./helper.js"
+import { cLog, arrayToHexString, intToHexString, hashPemCertificateWithoutHeader } from "./helper.js"
 
 var domainToCertificateCache = new Map();
 var certificateCache = new Map();
@@ -57,7 +57,7 @@ function toHexString(byteArray) {
 }
 
 // adds the certificate to the cache and returns its hash (i.e., the hash of the leaf certificate) as a reference (i.e., key in the cache)
-export async function addCertificateChainToCacheIfNecessary(pemCertificateWithoutHeader, pemCertificateChainWithoutHeader) {
+export async function addCertificateChainToCacheIfNecessary(pemCertificateWithoutHeader, pemCertificateChainWithoutHeader, requestId) {
     const fullChain = [pemCertificateWithoutHeader].concat(pemCertificateChainWithoutHeader.map(c => c === null ? [] : c));
     const fullChainHashes = await Promise.all(fullChain.map(async c => arrayToHexString(await hashPemCertificateWithoutHeader(c), ":")));
     let nCertificatesParsed = 0;
@@ -76,14 +76,15 @@ export async function addCertificateChainToCacheIfNecessary(pemCertificateWithou
             const notValidAfter = certificate.tbsCertificate.validity.notAfter.value;
             const publicKeyHash = await getSubjectPublicKeyInfoHash(certificate);
 
-            console.log("adding certificate to cache: subject=" + getSubject(certificate) +
+            const logMessage = "adding certificate to cache: subject=" + getSubject(certificate) +
                 ", serial=" + intToHexString(certificate.tbsCertificate.serialNumber, ":") +
                 ", validity=" + notValidBefore + "-" + notValidAfter +
                 ", hash=" + hash +
                 ", subjectPublicKeyInfoHash=" + publicKeyHash +
                 ", parentHash=" + parentHash +
                 ", cache size=" + certificateCache.size +
-                ", time to parse=" + (performance.now() - startParsing));
+                ", time to parse=" + (performance.now() - startParsing);
+            // cLog(requestId, logMessage);
             certificateCache.set(hash,
                 new CertificateCacheEntry(
                     new Date(),

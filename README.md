@@ -49,9 +49,9 @@ First, you need to set up the map server.
 ### Test browser extension
 After the map server is set up, load the browser extension by visiting ``about:debugging``. And you can visit the following urls to test whether it correctly works:
 
-- Legacy allow: https://azure.microsoft.com
-- Legacy block: https://bing.com
-- Policy (issuer) allow: https://m.media-amazon.com
+- Legacy allow: https://bing.com
+- Legacy block: https://microsoft.com
+- Policy (issuer) allow: https://m.media-amazon.com/images/G/01/AmazonStores/Help/assets/img/gallery-img1.png
 - Policy (issuer) block: https://baidu.com
 - Policy (subcomains) allow: https://netsec.ethz.ch
 - Policy (subcomains) block: https://sellercentral.amazon.com

@@ -12,7 +12,7 @@ function defaultConfig() {
         {"identity": "ETH-mapserver-top-100k", "domain": "http://129.132.55.210:8080", "querytype": "lfpki-http-get"}
     ]);
     // cache timeout in ms
-    c.set("cache-timeout", 10000);
+    c.set("cache-timeout", 60*60*1000);
     // max amount of time in ms that a connection setup takes. Used to ensure that a cached policy that is valid at the onBeforeRequest event is still valid when the onHeadersReceived event fires.
     c.set("max-connection-setup-time", 1000);
     // timeout for fetching a proof from a mapserver in ms
@@ -25,25 +25,24 @@ function defaultConfig() {
     c.set("mapserver-instances-queried", 1);
     c.set("ca-sets", (()=>{
         const caSet = new Map();
+        // note that this is simply a subset of all US CAs for testing purposes
         caSet.set("US CA", ["CN=GTS CA 1C3,O=Google Trust Services LLC,C=US",
                             "CN=GTS Root R1,O=Google Trust Services LLC,C=US",
                             "CN=Amazon,OU=Server CA 1B,O=Amazon,C=US",
                             "CN=Amazon Root CA 1,O=Amazon,C=US",
                             "CN=DigiCert Global CA G2,O=DigiCert Inc,C=US",
                             "CN=DigiCert Global Root G2,OU=www.digicert.com,O=DigiCert Inc,C=US"]);
-        // don't include "C=US,O=Microsoft Corporation,CN=Microsoft RSA TLS CA 02"
-        caSet.set("Microsoft CA", ["CN=Microsoft RSA Root Certificate Authority 2017,O=Microsoft Corporation,C=US",
-                                   "CN=Microsoft ECC Root Certificate Authority 2017,O=Microsoft Corporation,C=US",
-                                   "CN=Microsoft RSA TLS CA 01,O=Microsoft Corporation,C=US"]);
+        // don't include the currently used root CA for testing purposes: "CN=DigiCert Global Root G2,OU=www.digicert.com,O=DigiCert Inc,C=US"
+        caSet.set("Microsoft CA",
+                  ["CN=Baltimore CyberTrust Root,OU=CyberTrust,O=Baltimore,C=IE",
+                   "CN=DigiCert Global Root CA,OU=www.digicert.com,O=DigiCert Inc,C=US"]);
         return caSet;
     })());
     // the default level of a root certificate is 0
     // CAs with higher levels take precedence over CAs with lower levels
     c.set("legacy-trust-preference", (()=>{
         const tp = new Map();
-        tp.set("google.com", [{caSet: "US CA", level: 1}]);
-        tp.set("qq.com", [{caSet: "US CA", level: 1}]);
-        tp.set("azure.microsoft.com", [{caSet: "Microsoft CA", level: 1}]);
+        tp.set("microsoft.com", [{caSet: "Microsoft CA", level: 1}]);
         tp.set("bing.com", [{caSet: "Microsoft CA", level: 1}]);
         return tp;
     })());
