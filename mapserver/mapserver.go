@@ -35,14 +35,16 @@ var queryCounterChannel = make(chan int)
 
 // ugly version.... I will refactor it later.
 func main() {
-	replaceDb := flag.Bool("replace", false, "replace the content of the database with test data")
+	replaceDbFlag := flag.Bool("replace-db", false, "replace the content of the database with test data")
+	includeCertificatesFlag := flag.Bool("include-certificates", false, "include some example certificates")
+	includePoliciesFlag := flag.Bool("include-policies", true, "include some example policies")
 	rootFlag := flag.String("root", "", "hexadecimal form of root value without leading '0x'")
 	rootFileFlag := flag.String("rootfile", "", "path to the file storing the root in hexadecimal form without leading '0x'")
 	flag.Parse()
 
 	if len(*rootFlag) > 0 && len(*rootFileFlag) > 0 {
 		log.Fatal("Can only specify either 'root' or 'rootfile'")
-	} else if len(*rootFlag) == 0 && len(*rootFileFlag) == 0 {
+	} else if len(*rootFlag) == 0 && len(*rootFileFlag) == 0 && !*replaceDbFlag {
 		log.Fatal("Must specify either 'root' or 'rootfile'")
 	}
 	var root []byte
@@ -61,9 +63,9 @@ func main() {
 	}
 
 	flag.Parse()
-	if *replaceDb {
+	if *replaceDbFlag {
 		truncateTable()
-		mapResponder = prepareMapServer(root)
+		mapResponder = prepareMapServer(root, *includeCertificatesFlag, *includePoliciesFlag)
 	} else {
 		mapResponder = startMapServer(root)
 	}
@@ -305,37 +307,43 @@ func startMapServer(root []byte) *responder.MapResponder {
 	return mapResponder
 }
 
-func prepareMapServer(root []byte) *responder.MapResponder {
+func prepareMapServer(root []byte, includeCertificates bool, includePolicies bool) *responder.MapResponder {
 	mapUpdater, err := updater.NewMapUpdater(root, 32)
 	if err != nil {
 		panic(err)
 	}
 
-	rpcs, sps, err := getRPCAndSP()
-	if err != nil {
-		panic(err)
+	if includeCertificates {
+		certs, certChains, err := getCerts()
+		if err != nil {
+			panic(err)
+		}
+
+		ctx, cancelFCerts := context.WithTimeout(context.Background(), time.Minute)
+		defer cancelFCerts()
+		err = mapUpdater.UpdateCertsLocally(ctx, certs, certChains)
+		if err != nil {
+			panic(err)
+		}
 	}
 
-	certs, certChains, err := getCerts()
-	if err != nil {
-		panic(err)
+	if includePolicies {
+		rpcs, sps, err := getRPCAndSP()
+		if err != nil {
+			panic(err)
+		}
+
+		ctx, cancelF := context.WithTimeout(context.Background(), time.Minute)
+		defer cancelF()
+
+		err = mapUpdater.UpdateRPCAndPCLocally(ctx, sps, rpcs)
+		if err != nil {
+			panic(err)
+		}
 	}
 
-	ctx, cancelFCerts := context.WithTimeout(context.Background(), time.Minute)
-	defer cancelFCerts()
-	err = mapUpdater.UpdateCertsLocally(ctx, certs, certChains)
-	if err != nil {
-		panic(err)
-	}
-
-	ctx, cancelF := context.WithTimeout(context.Background(), time.Minute)
-	defer cancelF()
-
-	err = mapUpdater.UpdateRPCAndPCLocally(ctx, sps, rpcs)
-	if err != nil {
-		panic(err)
-	}
-
+	ctx, cancelFCommit := context.WithTimeout(context.Background(), time.Minute)
+	defer cancelFCommit()
 	err = mapUpdater.CommitSMTChanges(ctx)
 	if err != nil {
 		panic(err)
