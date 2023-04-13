@@ -23,6 +23,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/netsec-ethz/fpki/pkg/common"
+	"github.com/netsec-ethz/fpki/pkg/domain"
 	mapCommon "github.com/netsec-ethz/fpki/pkg/mapserver/common"
 	"github.com/netsec-ethz/fpki/pkg/mapserver/responder"
 	"github.com/netsec-ethz/fpki/pkg/mapserver/updater"
@@ -99,12 +100,33 @@ func mapServerQueryHandler(w http.ResponseWriter, r *http.Request) {
 		ctx, cancelF := context.WithTimeout(context.Background(), time.Minute*10)
 		defer cancelF()
 
-		queriedDomain := r.URL.Query()["domain"][0]
+		queriedDomains := r.URL.Query()["domain"]
+		if len(queriedDomains) > 1 {
+			fmt.Println("[", queryIndex, "] multiple domain parameters")
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("Multiple domain parameters"))
+			return
+		}
+
+		queriedDomain := queriedDomains[0]
+		if queriedDomain == "" {
+			fmt.Println("[", queryIndex, "] missing domain parameter")
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("Missing domain name parameter"))
+			return
+		}
+
 		fmt.Println("[", queryIndex, "] get domain request:", queriedDomain)
 
 		fmt.Println("[", queryIndex, "] receive a request from:", r.RemoteAddr, r.Header)
 
 		response, err := mapResponder.GetProof(ctx, queriedDomain)
+		if err == domain.ErrInvalidDomainName {
+			fmt.Println("[", queryIndex, "] invalid domain name")
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("Invalid domain name"))
+			return
+		}
 		if err != nil {
 			log.Fatal(err)
 			return
