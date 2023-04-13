@@ -108,11 +108,17 @@ func mapServerQueryHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		queriedDomain := queriedDomains[0]
-		if queriedDomain == "" {
+		if len(queriedDomains) == 0 {
 			fmt.Println("[", queryIndex, "] missing domain parameter")
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("Missing domain name parameter"))
+			return
+		}
+		queriedDomain := queriedDomains[0]
+		if queriedDomain == "" {
+			fmt.Println("[", queryIndex, "] missing domain parameter value")
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("Missing domain name parameter value"))
 			return
 		}
 
