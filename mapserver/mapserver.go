@@ -134,7 +134,9 @@ func mapServerQueryHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println("[", queryIndex, "] internal server error: ", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Internal server error"))
 			return
 		}
 
