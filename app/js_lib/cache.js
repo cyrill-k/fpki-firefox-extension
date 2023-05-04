@@ -1,8 +1,11 @@
 import { parsePemCertificate, getSubjectPublicKeyInfoHash, getSubject } from "./x509utils.js"
 import { cLog, arrayToHexString, intToHexString, hashPemCertificateWithoutHeader } from "./helper.js"
+//import "./wasm_exec.js"
 
 var domainToCertificateCache = new Map();
 var certificateCache = new Map();
+var certificateCacheTest = new Map();
+
 
 // TODO: store encoded certificate in persistent storage? and only decode if necessary? Or pre-emptively decode them
 class CertificateCacheEntry {
@@ -10,14 +13,29 @@ class CertificateCacheEntry {
         this.timestamp = timestamp;
         this.certificate = certificate;
         this.parentHash = parentHash;
-        this.notValidBefore = notValidBefore;
-        this.notValidAfter = notValidAfter;
+        this.notValidBefore = new Date(notValidBefore);
+        this.notValidAfter = new Date(notValidAfter);
         this.publicKeyHash = publicKeyHash;
         this.highestTrustLevel = highestTrustLevel;
         this.highestTrustLevelEvaluationTimestamp = highestTrustLevelEvaluationTimestamp;
     }
 }
 
+
+class CertificateCacheEntryGo {
+    constructor(subjectStr, issuerStr, timestamp, certificateBase64, parentHash, notValidBefore, notValidAfter, subjectPublicKeyInfoHash, highestTrustLevel, highestTrustLevelEvaluationTimestamp) {
+        this.subjectStr = subjectStr;
+        this.issuerStr = issuerStr;
+        this.timestamp = new Date(timestamp);
+        this.certificateBase64 = certificateBase64;
+        this.parentHash = parentHash;
+        this.notValidBefore = new Date(notValidBefore);
+        this.notValidAfter = new Date(notValidAfter);
+        this.subjectPublicKeyInfoHash = subjectPublicKeyInfoHash
+        this.highestTrustLevel = highestTrustLevel;
+        this.highestTrustLevelEvaluationTimestamp = highestTrustLevelEvaluationTimestamp;
+    }
+}
 class DomainToCertificateCacheEntry {
     constructor(timestamp, domain, certificateHash) {
         this.timestamp = timestamp;
@@ -61,13 +79,73 @@ export async function addCertificateChainToCacheIfNecessary(pemCertificateWithou
     const fullChain = [pemCertificateWithoutHeader].concat(pemCertificateChainWithoutHeader.map(c => c === null ? [] : c));
     const fullChainHashes = await Promise.all(fullChain.map(async c => arrayToHexString(await hashPemCertificateWithoutHeader(c), ":")));
     let nCertificatesParsed = 0;
+
+    /*
+    START SILVAN
+    */
+   var startParsing = performance.now();
+
+   // decide which certificates should be parsed
+   // append certificates to parse and their hashes in 
+   // single strings 
+   window.CertificateCacheEntryGo = CertificateCacheEntryGo;
+    var pemCertificatesToAddStr = "";
+    var hashesOfCertificatesToAddStr = "";
+    var parentHashesOfCertificatesToAddStr = "";
     for (let i = fullChain.length - 1; i >= 0; i--) {
         const hash = fullChainHashes[i];
+
+        if (certificateCacheTest.has(hash)) {
+            // the certificate was already parsed and thus all parents must have been parsed as well
+            continue;
+        } else {
+            var parentHash = "";
+            if(i === 0) {
+                parentHash = null;
+    
+            } else {
+                parentHash = fullChainHashes[i-1];
+            }
+            const rawCertificate = fullChain[i];
+            pemCertificatesToAddStr += ("-----BEGIN CERTIFICATE-----\n"+rawCertificate+"\n-----END CERTIFICATE-----\n;");
+            hashesOfCertificatesToAddStr += (hash+"\n");
+            parentHashesOfCertificatesToAddStr += (parentHash+"\n")
+        }
+    }
+    
+    // if there are new certificates to parse, switch to Go 
+    if(pemCertificatesToAddStr !== "") {
+        var certificateMapObject = parsePEMCertificates(pemCertificatesToAddStr, hashesOfCertificatesToAddStr, parentHashesOfCertificatesToAddStr);
+        var certificateMap = new Map(Object.entries(certificateMapObject));
+
+        // append certificates to certificate cache
+        for (const [hash, certificate] of certificateMap) {
+            certificateCacheTest.set(hash, certificate);
+            //console.log(certificate.notValidBefore);
+            //console.log(certificate.notValidAfter);
+            //console.log(certificate.subjectStr);
+            //console.log(certificate.subjectPublicKeyInfoHash);
+        }
+    }
+
+
+    
+
+    console.log("NEW: " + (performance.now() - startParsing) + " ENTRIES: " + certificateCacheTest.size);
+    /*
+     END SILVAN
+    */
+
+    var startParsing = performance.now();
+    for (let i = fullChain.length - 1; i >= 0; i--) {
+        const hash = fullChainHashes[i];
+        //console.log(hash);
+        //console.log(certificateCache.has(hash));
         if (certificateCache.has(hash)) {
             // the certificate was already parsed and thus all parents must have been parsed as well
             continue;
         } else {
-            const startParsing = performance.now();
+            //const startParsing = performance.now();
             const rawCertificate = fullChain[i];
             const certificate = parsePemCertificate(rawCertificate, true);
             nCertificatesParsed += 1;
@@ -75,7 +153,9 @@ export async function addCertificateChainToCacheIfNecessary(pemCertificateWithou
             const notValidBefore = certificate.tbsCertificate.validity.notBefore.value;
             const notValidAfter = certificate.tbsCertificate.validity.notAfter.value;
             const publicKeyHash = await getSubjectPublicKeyInfoHash(certificate);
+            //console.log(publicKeyHash);
 
+            /*
             const logMessage = "adding certificate to cache: subject=" + getSubject(certificate) +
                 ", serial=" + intToHexString(certificate.tbsCertificate.serialNumber, ":") +
                 ", validity=" + notValidBefore + "-" + notValidAfter +
@@ -84,7 +164,8 @@ export async function addCertificateChainToCacheIfNecessary(pemCertificateWithou
                 ", parentHash=" + parentHash +
                 ", cache size=" + certificateCache.size +
                 ", time to parse=" + (performance.now() - startParsing);
-            // cLog(requestId, logMessage);
+            */
+            //cLog(requestId, logMessage);
             certificateCache.set(hash,
                 new CertificateCacheEntry(
                     new Date(),
@@ -98,5 +179,7 @@ export async function addCertificateChainToCacheIfNecessary(pemCertificateWithou
                 ));
         }
     }
+    console.log("OLD: " + (performance.now() - startParsing) + " ENTRIES: " + certificateCache.size);
+
     return { hash: fullChainHashes[0], nCertificatesParsed };
 }

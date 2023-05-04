@@ -8,12 +8,20 @@ import { LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole 
 import { FpkiError, errorTypes } from "../js_lib/errors.js"
 import { policyValidateConnection, legacyValidateConnection } from "../js_lib/validation.js"
 import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations } from "../js_lib/validation-types.js"
+import "../js_lib/wasm_exec.js"
 
 try {
     initializeConfig();
 } catch (e) {
     console.log("initialize: "+e);
 }
+
+const go = new Go();
+WebAssembly.instantiateStreaming(fetch("../js_lib/wasm/parsePEMCertificates.wasm"), go.importObject).then((result) => {
+        
+    go.run(result.instance);
+});
+
 
 // communication between browser plugin popup and this background script
 browser.runtime.onConnect.addListener(function(port) {
