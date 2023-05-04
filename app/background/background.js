@@ -8,12 +8,23 @@ import { LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole,
 import { FpkiError, errorTypes } from "../js_lib/errors.js"
 import { policyValidateConnection, legacyValidateConnection } from "../js_lib/validation.js"
 import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations } from "../js_lib/validation-types.js"
+import "../js_lib/wasm_exec.js"
 
 try {
     initializeConfig();
+    window.GOCACHE = config.get("wasm-certificate-parsing");
 } catch (e) {
     console.log("initialize: "+e);
 }
+
+// flag whether to use Go cache
+
+// instance to call Go Webassembly functions
+const go = new Go();
+WebAssembly.instantiateStreaming(fetch("../js_lib/wasm/parsePEMCertificates.wasm"), go.importObject).then((result) => {
+    go.run(result.instance);
+});
+
 
 // communication between browser plugin popup and this background script
 browser.runtime.onConnect.addListener(function(port) {
@@ -47,7 +58,7 @@ browser.runtime.onConnect.addListener(function(port) {
                 browser.tabs.create({url: "../htmls/config-page/config-page.html"});
                 break;
             case 'showValidationResult':
-                port.postMessage({msgType: "validationResults", value: trustDecisions});
+                port.postMessage({msgType: "validationResults", value: trustDecisions, config});
                 break;
             case 'printLog':
                 printLogEntriesToConsole();

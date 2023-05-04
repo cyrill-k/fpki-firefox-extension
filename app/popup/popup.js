@@ -2,6 +2,7 @@ import {getSubject, getIssuer} from "../js_lib/x509utils.js"
 import {AllPolicyAttributes, EvaluationResult} from "../js_lib/validation-types.js"
 
 var validationResults = null;
+var synchronizedConfig = null;
 var port = browser.runtime.connect({
     name: "popup to background communication"
 });
@@ -267,9 +268,14 @@ function addLegacyValidationResult(trustDecision, predecessor, index) {
 
 // communication from background script to popup
 port.onMessage.addListener(async function(msg) {
-    const {msgType, value} = msg;
+    const {msgType, value, config} = msg;
     if (msgType === "validationResults") {
         validationResults = value;
+
+        // config is necessary to enable/disable web assembly support
+        synchronizedConfig = config;
+        window.GOCACHE = config.get("wasm-certificate-parsing");
+
         await updateValidationResult();
     }
     console.log("message received: " + JSON.stringify(msg));
