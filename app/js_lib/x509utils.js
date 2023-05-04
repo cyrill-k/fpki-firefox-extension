@@ -24,7 +24,11 @@ export function getSubject(cert) {
     if ("subject" in cert) {
         return cert.subject;
     } else {
-        return convertX509NameToString(cert.tbsCertificate.subject);
+        if(window.GOCACHE) {
+            return cert.subjectStr;
+        } else {
+            return convertX509NameToString(cert.tbsCertificate.subject);
+        }
     }
 }
 
@@ -32,7 +36,11 @@ export function getIssuer(cert) {
     if ("issuer" in cert) {
         return cert.issuer;
     } else {
-        return convertX509NameToString(cert.tbsCertificate.issuer);
+        if(window.GOCACHE) {
+            return cert.IssuerStr;
+        } else {
+            return convertX509NameToString(cert.tbsCertificate.issuer);
+        }
     }
 }
 
