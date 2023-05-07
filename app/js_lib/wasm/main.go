@@ -62,19 +62,35 @@ func parsePEMCertificates(pemCertificatesString string, hashesString string, par
 				panic("failed to parse certificate: " + err.Error())
 			}
 
+			var certificate js.Value
+			if parentHashes[ci] == "null" {
+				certificate = certificateCacheEntryGoConstructor.New(
+					cert.Subject.String(),
+					cert.Issuer.String(),
+					time.Now().UTC().UnixMilli(), // TODO: maybe need to adjust
+					base64.StdEncoding.EncodeToString(cert.RawTBSCertificate), // TODO: or just cert.Raw
+					nil,
+					cert.NotBefore.UnixMilli(),
+					cert.NotAfter.UnixMilli(),
+					getSubjectPublicKeyInfoHash(cert.RawSubjectPublicKeyInfo),
+					nil,
+					nil,
+				)
+			} else {
+				certificate = certificateCacheEntryGoConstructor.New(
+					cert.Subject.String(),
+					cert.Issuer.String(),
+					time.Now().UTC().UnixMilli(), // TODO: maybe need to adjust
+					base64.StdEncoding.EncodeToString(cert.RawTBSCertificate), // TODO: or just cert.Raw
+					parentHashes[ci],
+					cert.NotBefore.UnixMilli(),
+					cert.NotAfter.UnixMilli(),
+					getSubjectPublicKeyInfoHash(cert.RawSubjectPublicKeyInfo),
+					nil,
+					nil,
+				)
+			}
 			// create JavaScript type
-			certificate := certificateCacheEntryGoConstructor.New(
-				cert.Subject.String(),
-				cert.Issuer.String(),
-				time.Now().UTC().UnixMilli(), // TODO: maybe need to adjust
-				base64.StdEncoding.EncodeToString(cert.RawTBSCertificate), // TODO: or just cert.Raw
-				parentHashes[ci],
-				cert.NotBefore.UnixMilli(),
-				cert.NotAfter.UnixMilli(),
-				getSubjectPublicKeyInfoHash(cert.RawSubjectPublicKeyInfo),
-				nil,
-				nil,
-			)
 
 			// append certificate to list
 			mu.Lock()

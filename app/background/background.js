@@ -16,6 +16,10 @@ try {
     console.log("initialize: "+e);
 }
 
+// flag whether to use Go cache
+window.GOCACHE = true;
+
+// instance to call Go Webassembly functions
 const go = new Go();
 WebAssembly.instantiateStreaming(fetch("../js_lib/wasm/parsePEMCertificates.wasm"), go.importObject).then((result) => {
         

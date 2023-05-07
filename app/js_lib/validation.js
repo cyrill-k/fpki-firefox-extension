@@ -2,6 +2,7 @@ import * as domainFunc from "./domain.js"
 import {FpkiError} from "./errors.js"
 import {printMap} from "./helper.js"
 import {LegacyTrustInfo, LegacyTrustDecision, PolicyEvaluation, PolicyTrustInfo, PolicyTrustDecision, PolicyAttributes, EvaluationResult} from "./validation-types.js"
+import {getSubject} from "./x509utils.js"
 
 // policy mode
 // start from highest ancestor -> go to actual domain
@@ -179,6 +180,9 @@ function legacyValidateActualDomain(connectionTrustInfo, config, actualDomain, d
                 });
             });
         });
+    });
+    highestTrustLevelCerts.forEach(cert => {
+        console.log("SUB: " + getSubject(cert));
     });
 
 
