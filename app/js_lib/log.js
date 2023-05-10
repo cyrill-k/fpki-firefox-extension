@@ -64,6 +64,10 @@ export function printLogEntriesToConsole() {
     //console.log("finalized logs:" + JSON.stringify(finishedConnectionLogs, null, 2));
 }
 
+export function getSerializedLogEntries() {
+    return JSON.stringify(finishedConnectionLogs);
+}
+
 export function downloadLog() {
     download("logs.json", JSON.stringify(finishedConnectionLogs, null, 2));
 }

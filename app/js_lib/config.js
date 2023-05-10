@@ -23,6 +23,8 @@ function defaultConfig() {
     c.set("mapserver-quorum", 2);
     // number of mapservers queried per validated domain (currently always choosing the first n entries in the mapserver list)
     c.set("mapserver-instances-queried", 1);
+    // send the log entries as a custom event after fetching a webpage (used to debug/measure the extension)
+    c.set("send-log-entries-via-event", true);
     c.set("ca-sets", (()=>{
         const caSet = new Map();
         // note that this is simply a subset of all US CAs for testing purposes

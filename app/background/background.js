@@ -4,7 +4,7 @@ import { getDomainNameFromURL } from "../js_lib/domain.js"
 import { FpkiRequest } from "../js_lib/fpki-request.js"
 import { printMap, cLog, mapGetList, mapGetMap, mapGetSet } from "../js_lib/helper.js"
 import { config, downloadConfig, importConfigFromJSON, initializeConfig, saveConfig, resetConfig } from "../js_lib/config.js"
-import { LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole } from "../js_lib/log.js"
+import { LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole, getSerializedLogEntries } from "../js_lib/log.js"
 import { FpkiError, errorTypes } from "../js_lib/errors.js"
 import { policyValidateConnection, legacyValidateConnection } from "../js_lib/validation.js"
 import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations } from "../js_lib/validation-types.js"
@@ -54,6 +54,9 @@ browser.runtime.onConnect.addListener(function(port) {
                 break;
             case 'downloadLog':
                 downloadLog();
+                break;
+            case 'getLogEntries':
+                port.postMessage({msgType: "logEntries", value: getSerializedLogEntries()});
                 break;
             }
         }
@@ -285,6 +288,9 @@ async function onCompleted(details) {
         cLog(details.requestId, "validation skipped (invoked onCompleted without onHeadersReceived)");
         logEntry.validationSkipped(onCompleted);
         logEntry.finalizeLogEntry(details.requestId);
+    }
+    if (config.get("send-log-entries-via-event") && details.type === "main_frame") {
+        browser.tabs.executeScript(details.tabId, { file: "../content/sendLogEntries.js" })
     }
     const remoteInfo = await browser.webRequest.getSecurityInfo(details.requestId, {
         certificateChain: true,
