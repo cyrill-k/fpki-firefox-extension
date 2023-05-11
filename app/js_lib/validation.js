@@ -181,9 +181,11 @@ function legacyValidateActualDomain(connectionTrustInfo, config, actualDomain, d
             });
         });
     });
+    /*
     highestTrustLevelCerts.forEach(cert => {
         console.log("SUB: " + getSubject(cert));
     });
+    */
 
 
     // if I >= II then fine

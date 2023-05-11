@@ -3,7 +3,7 @@ import { cLog, arrayToHexString, intToHexString, hashPemCertificateWithoutHeader
 
 var domainToCertificateCache = new Map();
 var certificateCache = new Map();
-var certificateCacheTest = new Map();
+var certificateCacheGO = new Map();
 
 
 // TODO: store encoded certificate in persistent storage? and only decode if necessary? Or pre-emptively decode them
@@ -45,11 +45,17 @@ class DomainToCertificateCacheEntry {
 
 // returns the certificate stored in the cache for a specific key
 export function getCertificateFromCacheByHash(certificateHash) {
-    if (certificateCacheTest.has(certificateHash)) {
-        return certificateCacheTest.get(certificateHash).certificate;
-        //return certificateCache.get(certificateHash).certificateBase64;
+    if(window.GOCACHE) {
+        if (certificateCacheGO.has(certificateHash)) {
+            return certificateCacheGO.get(certificateHash).certificateBase64;
+        }
+        return null;
+    } else {
+        if (certificateCache.has(certificateHash)) {
+            return certificateCache.get(certificateHash).certificate;
+        }
+        return null;
     }
-    return null;
 }
 
 // returns the certificate and the corresponding certificate chain stored in the cache for a specific key
@@ -78,13 +84,13 @@ function getCertificateChainFromCacheByHashJS(leafCertificateHash) {
 }
 
 function getCertificateChainFromCacheByHashGO(leafCertificateHash) {
-    if (!certificateCacheTest.has(leafCertificateHash)) {
+    if (!certificateCacheGO.has(leafCertificateHash)) {
         return null;
     } else {
         const certChain = [];
         let parentHash = leafCertificateHash;
         do {
-            const currentCert = certificateCacheTest.get(parentHash);
+            const currentCert = certificateCacheGO.get(parentHash);
             certChain.push(currentCert);
             parentHash = currentCert.parentHash;
         } while (parentHash !== null)
@@ -105,52 +111,53 @@ export async function addCertificateChainToCacheIfNecessary(pemCertificateWithou
     let nCertificatesParsed = 0;
 
     if(window.GOCACHE) {
-        var startParsing = performance.now();
+        //var startParsing = performance.now();
 
         // decide which certificates should be parsed
         // append certificates to parse and their hashes in 
         // single strings 
         window.CertificateCacheEntryGo = CertificateCacheEntryGo;
-         var pemCertificatesToAddStr = "";
-         var hashesOfCertificatesToAddStr = "";
-         var parentHashesOfCertificatesToAddStr = "";
-         for (let i = fullChain.length - 1; i >= 0; i--) {
-             const hash = fullChainHashes[i];
-     
-             if (certificateCacheTest.has(hash)) {
-                 // the certificate was already parsed and thus all parents must have been parsed as well
-                 continue;
-             } else {
-                 var parentHash = "";
-                 if(i === 0) {
-                     parentHash = null;    
-                 } else {
-                     parentHash = fullChainHashes[i-1];
-                 }
-                 const rawCertificate = fullChain[i];
-                 pemCertificatesToAddStr += ("-----BEGIN CERTIFICATE-----\n"+rawCertificate+"\n-----END CERTIFICATE-----\n;");
-                 hashesOfCertificatesToAddStr += (hash+"\n");
-                 parentHashesOfCertificatesToAddStr += (parentHash+"\n")
-             }
-         }
+        var pemCertificatesToAddStr = "";
+        var hashesOfCertificatesToAddStr = "";
+        var parentHashesOfCertificatesToAddStr = "";
+        for (let i = fullChain.length - 1; i >= 0; i--) {
+            const hash = fullChainHashes[i];
+
+            if (certificateCacheGO.has(hash)) {
+                // the certificate was already parsed and thus all parents must have been parsed as well
+                continue;
+            } else {
+                nCertificatesParsed += 1;
+                var parentHash = "";
+                if(i === 0) {
+                    parentHash = null;    
+                } else {
+                    parentHash = fullChainHashes[i-1];
+                }
+                const rawCertificate = fullChain[i];
+                pemCertificatesToAddStr += ("-----BEGIN CERTIFICATE-----\n"+rawCertificate+"\n-----END CERTIFICATE-----\n;");
+                hashesOfCertificatesToAddStr += (hash+"\n");
+                parentHashesOfCertificatesToAddStr += (parentHash+"\n")
+            }
+        }
          
          // if there are new certificates to parse, switch to Go 
          if(pemCertificatesToAddStr !== "") {
-             var certificateMapObject = parsePEMCertificates(pemCertificatesToAddStr, hashesOfCertificatesToAddStr, parentHashesOfCertificatesToAddStr);
-             var certificateMap = new Map(Object.entries(certificateMapObject));
+            var certificateMapObject = parsePEMCertificates(pemCertificatesToAddStr, hashesOfCertificatesToAddStr, parentHashesOfCertificatesToAddStr);
+            var certificateMap = new Map(Object.entries(certificateMapObject));
      
-             // append certificates to certificate cache
-             for (const [hash, certificate] of certificateMap) {
-                 certificateCacheTest.set(hash, certificate);
-                 //console.log(certificate.notValidBefore);
-                 //console.log(certificate.notValidAfter);
-                 //console.log(certificate.subjectStr);
-                 //console.log(certificate.subjectPublicKeyInfoHash);
-             }
-         }
-         console.log("NEW: " + (performance.now() - startParsing) + " ENTRIES: " + certificateCacheTest.size);
+            // append certificates to certificate cache
+            for (const [hash, certificate] of certificateMap) {
+                certificateCacheGO.set(hash, certificate);
+                //console.log(certificate.notValidBefore);
+                //console.log(certificate.notValidAfter);
+                //console.log(certificate.subjectStr);
+                //console.log(certificate.subjectPublicKeyInfoHash);
+            }
+        }
+         //console.log("NEW: " + (performance.now() - startParsing) + " ENTRIES: " + certificateCacheGO.size);
     } else {
-        var startParsing = performance.now();
+        //var startParsing = performance.now();
         for (let i = fullChain.length - 1; i >= 0; i--) {
             const hash = fullChainHashes[i];
             //console.log(hash);
@@ -193,7 +200,7 @@ export async function addCertificateChainToCacheIfNecessary(pemCertificateWithou
                     ));
             }
         }
-        console.log("OLD: " + (performance.now() - startParsing) + " ENTRIES: " + certificateCache.size);
+        //console.log("OLD: " + (performance.now() - startParsing) + " ENTRIES: " + certificateCache.size);
     }
     return { hash: fullChainHashes[0], nCertificatesParsed };
 }
