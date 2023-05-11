@@ -82,6 +82,8 @@ function redirect(details, error, certificateChain=null) {
     // if any error is caught, redirect to the blocking page, and show the error page
     let { tabId } = details;
     let htmlErrorFile;
+    let reason = error.toString();
+    let stacktrace = null;
     if (error.errorType === errorTypes.MAPSERVER_NETWORK_ERROR) {
         htmlErrorFile = "../htmls/map-server-error/block.html";
     } else if (error.errorType === errorTypes.LEGACY_MODE_VALIDATION_ERROR) {
@@ -89,10 +91,15 @@ function redirect(details, error, certificateChain=null) {
     } else if (error.errorType === errorTypes.POLICY_MODE_VALIDATION_ERROR) {
         htmlErrorFile = "../htmls/validation-error-blocking/block.html";
     } else {
-        htmlErrorFile = "../htmls/block.html";
+        htmlErrorFile = "../htmls/other-error/block.html";
+        stacktrace = error.stack;
     }
 
-    let url = browser.runtime.getURL(htmlErrorFile) + "?reason=" + encodeURIComponent(error) + "&domain=" + encodeURIComponent(getDomainNameFromURL(details.url))
+    let url = browser.runtime.getURL(htmlErrorFile) + "?reason=" + encodeURIComponent(reason) + "&domain=" + encodeURIComponent(getDomainNameFromURL(details.url));
+
+    if (stacktrace !== null) {
+        url += "&stacktrace="+encodeURIComponent(stacktrace);
+    }
 
     // set the gobackurl such that if the user accepts the certificate of the main page, he is redirected to this same main page.
     // But if a resource such as an embedded image is blocked, the user should be redirected to the document url of the main page (and not the resource)

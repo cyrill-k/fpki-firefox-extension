@@ -7,20 +7,20 @@
     <link rel="icon" id="favicon" href="../../images/F-D_dark.png" />
     <link rel="localization" href="branding/brand.ftl" />
     <link rel="localization" href="browser/safebrowsing/blockedSite.ftl" />
-  <title data-l10n-id="safeb-blocked-malware-page-title">Visiting this website may harm your computer</title></head>
+    <title data-l10n-id="safeb-blocked-malware-page-title">Error occurred in F-PKI Plugin</title></head>
   <body>
     <div id="errorPageContainer" class="container">
 
       <!-- Error Title -->
       <div id="errorTitle" class="title">
-        <h1 class="title-text" id="errorTitleText" data-l10n-id="safeb-blocked-malware-page-title">Visiting this website may harm your computer</h1>
+        <h1 class="title-text" id="errorTitleText" data-l10n-id="safeb-blocked-malware-page-title">Error occurred in F-PKI Plugin</h1>
       </div>
 
       <div id="errorLongContent">
 
         <!-- Short Description -->
         <div id="errorShortDesc">
-          <p id="errorShortDescText">The flexible web security plugin blocked this page (<span id="errorShortDescDomain">FILL IN</span>) because there was a problem looking up this domains trust policy. This could be a sign of an active attack, please do not proceed.</p>
+          <p id="errorShortDescText" style="background-color: #b00;">The flexible web security plugin experienced an unexpected failure when resolving page (<span id="errorShortDescDomain">FILL IN</span>).</p>
           <p id="errorShortDescErrorMessage">FILL IN</p>
         </div>
 
@@ -28,24 +28,23 @@
         <div id="buttons" class="button-container">
           <!-- Commands handled in browser.js -->
           <button id="goBackButton" class="primary" data-l10n-id="safeb-palm-accept-label">Go back</button>
-          <button id="acceptCertificateButton" data-telemetry-id="exception_button">Accept the Risk and Continue</button>
         </div>
       </div>
       <div id="errorDescriptionContainer">
         <!-- Error Descriptions Handled in blockedSite.js -->
         <div class="error-description" id="errorLongDesc">
-          <p id="errorInnerDescription"><span id="error_desc_sitename" data-l10n-name="sitename" class="sitename">Looking up example.ethz.ch's policy returned a history violation. This indicates an active attack, you must not proceed to this site! </span><a id="error_desc_link" data-l10n-name="error_desc_link" href="TODO:insert Wiki Link">Error E103.</a> </p>
+          <p id="errorInnerDescription"><span id="error_desc_sitename" data-l10n-name="sitename" class="sitename"></span><a id="error_desc_link" data-l10n-name="error_desc_link" href="TODO:insert Wiki Link">Error E103.</a> </p>
           <p id="learn_more">Learn more about how the flexible web security plugin protects you here: <a id="firefox_support" href="https://support.mozilla.org/1/firefox/105.0.3/WINNT/en-US/phishing-malware">https://wiki.f-pki.ethz.ch</a>.</p>
         </div>
       </div>
 
       <button id="downloadErrorReport">Show error report</button>
       <div id="errorReportDiv" class="content">
-      <pre>
-        <code id="errorReport">
-          FILL IN
-        </code>
-      </pre>
+        <pre>
+          <code id="errorReport">
+            FILL IN
+          </code>
+        </pre>
       </div>
     </div>
   </body>
