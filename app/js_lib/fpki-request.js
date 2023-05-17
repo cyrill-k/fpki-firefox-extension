@@ -97,7 +97,12 @@ export class FpkiRequest {
                 // fetch policy for the mapserver over the configured channel (e.g., http get)
                 switch (this.mapserver.querytype) {
                 case "lfpki-http-get":
-                    const result = await queryMapServerHttp(this.mapserver.domain, this.domain, {timeout: config.get("proof-fetch-timeout"), requestId: this.requestId, maxTries: config.get("proof-fetch-max-tries")});
+                    let result;
+                    try {
+                        result = await queryMapServerHttp(this.mapserver.domain, this.domain, {timeout: config.get("proof-fetch-timeout"), requestId: this.requestId, maxTries: config.get("proof-fetch-max-tries")});
+                    } catch(error) {
+                        throw new FpkiError(errorTypes.MAPSERVER_NETWORK_ERROR, error);
+                    }
                     mapResponse = result.response;
                     nRetries = result.nRetries;
                     performanceResourceEntry = this.#getLatestPerformanceResourceEntry(result.fetchUrl);
@@ -131,7 +136,7 @@ export class FpkiRequest {
 
                 return {policies, certificates, metrics};
             } catch (error) {
-                throw new FpkiError(errorTypes.MAPSERVER_NETWORK_ERROR, error);
+                throw error;
             } finally {
                 this.removeFromActiveRequestsIfPossible();
             }
