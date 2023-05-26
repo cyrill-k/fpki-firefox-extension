@@ -43,6 +43,20 @@ class DomainToCertificateCacheEntry {
     }
 }
 
+export function getCertificateEntryByHash(certificateHash) {
+    if (window.GOCACHE) {
+        if (certificateCacheGO.has(certificateHash)) {
+            return certificateCacheGO.get(certificateHash);
+        }
+        return null;
+    } else {
+        if (certificateCache.has(certificateHash)) {
+            return certificateCache.get(certificateHash);
+        }
+        return null;
+    }
+}
+
 // returns the certificate stored in the cache for a specific key
 export function getCertificateFromCacheByHash(certificateHash) {
     if(window.GOCACHE) {
@@ -125,6 +139,8 @@ export async function addCertificateChainToCacheIfNecessary(pemCertificateWithou
 
             if (certificateCacheGO.has(hash)) {
                 // the certificate was already parsed and thus all parents must have been parsed as well
+                // TODO: this is not true, since a CA could have two certificates with the same subject and public key but a diferent certificate (e.g., validity times, algorithms, serial numbers, ...)
+                // so, even if the certificate is already contained in the cache, we still need to check if we have to add another parent
                 continue;
             } else {
                 nCertificatesParsed += 1;

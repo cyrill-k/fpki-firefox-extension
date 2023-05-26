@@ -33,7 +33,7 @@ function policyFilterHighestTrustLevelPolicies(trustPreferenceEntries, domainPol
     return {highestTrustLevel, highestTrustLevelPolicies};
 }
 
-function policyValidateActualDomain(remoteInfo, config, actualDomain, domainPolicies) {
+function policyValidateActualDomain(tlsCertificateChain, config, actualDomain, domainPolicies) {
     const caSets = config.get("ca-sets");
 
     const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("policy-trust-preference"), actualDomain);
@@ -44,7 +44,7 @@ function policyValidateActualDomain(remoteInfo, config, actualDomain, domainPoli
     const trustInfos = [];
     highestTrustLevelPolicies.forEach(({pcaPolicy, originTrustPreference}, pcaIdentifier) => {
         if (pcaPolicy.TrustedCA !== null) {
-            remoteInfo.certificates.forEach((certificate, i) => {
+            tlsCertificateChain.forEach((certificate, i) => {
                 // if certificate is in browsers trust store
                 if (certificate.isBuiltInRoot) {
                     // check if CA is in the trusted list
@@ -63,7 +63,7 @@ function policyValidateActualDomain(remoteInfo, config, actualDomain, domainPoli
     return {trustInfos};
 }
 
-function policyValidateParentDomain(remoteInfo, config, actualDomain, parentDomain, domainPolicies) {
+function policyValidateParentDomain(tlsCertificateChain, config, actualDomain, parentDomain, domainPolicies) {
     // only consider trust preference entries for the parent domain
     const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("policy-trust-preference"), parentDomain);
 
@@ -89,24 +89,24 @@ function policyValidateParentDomain(remoteInfo, config, actualDomain, parentDoma
 
 // check connection using the policies retrieved from a single mapserver
 // allPolicies has the following structure: {domain: {pca: SP}}, where SP has the structure: {attribute: value}, e.g., {AllowedSubdomains: ["allowed.mydomain.com"]}
-export function policyValidateConnection(remoteInfo, config, domainName, allPolicies, mapserver) {
+export function policyValidateConnection(tlsCertificateChain, config, domainName, allPolicies, mapserver) {
     // iterate over all policies from all (trusted) mapservers
     // for example: the request for video.google.com, will contain the policies for "video.google.com" and "google.com"
     const policyTrustInfos = [];
     allPolicies.forEach((value, key) => {
         if (key == domainName) {
             // validate policies defined on the actual domain (e.g., allowed CA issuers)
-            const {trustInfos} = policyValidateActualDomain(remoteInfo, config, key, value);
+            const {trustInfos} = policyValidateActualDomain(tlsCertificateChain, config, key, value);
             policyTrustInfos.push(...trustInfos);
         } else if (domainFunc.getParentDomain(domainName) == key) {
             // validate policies defined on the parent domain (e.g., allowed subdomains)
-            const {trustInfos} = policyValidateParentDomain(remoteInfo, config, domainName, key, value);
+            const {trustInfos} = policyValidateParentDomain(tlsCertificateChain, config, domainName, key, value);
             policyTrustInfos.push(...trustInfos);
         } else {
             // TODO: how to deal with violations of other ancestors (e.g., parent of parent)?
         }
     });
-    const trustDecision = new PolicyTrustDecision(mapserver, domainName, remoteInfo.certificates[0], remoteInfo.certificates.slice(1), policyTrustInfos);
+    const trustDecision = new PolicyTrustDecision(mapserver, domainName, tlsCertificateChain[0], tlsCertificateChain.slice(1), policyTrustInfos);
 
     trustDecision.mergeIdenticalPolicies();
 
@@ -203,18 +203,18 @@ function legacyValidateActualDomain(connectionTrustInfo, config, actualDomain, d
 
 // check connection using the policies retrieved from a single mapserver
 // allPolicies has the following structure: {domain: {pca: SP}}, where SP has the structure: {attribute: value}, e.g., {AllowedSubdomains: ["allowed.mydomain.com"]}
-export function legacyValidateConnection(remoteInfo, config, domainName, allCertificates, mapserver) {
+export function legacyValidateConnection(tlsCertificateChain, config, domainName, allCertificates, mapserver) {
     // iterate over all certificates from all (trusted) mapservers
     // for example: the request for video.google.com, will only contain the certificates for "video.google.com"
     // TODO: currently all certificates are included in the response, could not return certificates for the parent domain in the future
 
     // get connection cert
     // TODO: ensure that the first certificate is always the actual certificate
-    let connectionCert = remoteInfo.certificates[0];
+    let connectionCert = tlsCertificateChain[0];
 
     // get connection root cert
     let connectionRootCertSubject = null;
-    remoteInfo.certificates.forEach((certificate, i) => {
+    tlsCertificateChain.forEach((certificate, i) => {
         if (certificate.isBuiltInRoot) {
             connectionRootCertSubject = certificate.subject;
         }
@@ -237,7 +237,7 @@ export function legacyValidateConnection(remoteInfo, config, domainName, allCert
         });
     });
 
-    const connectionTrustInfo = new LegacyTrustInfo(connectionCert, remoteInfo.certificates.slice(1), connectionRootCertTrustLevel, connectionOriginTrustPreference, null);
+    const connectionTrustInfo = new LegacyTrustInfo(connectionCert, tlsCertificateChain.slice(1), connectionRootCertTrustLevel, connectionOriginTrustPreference, null);
     const certificateTrustInfos = [];
     allCertificates.forEach((value, key) => {
         if (key == domainName) {

@@ -9,6 +9,7 @@ import { FpkiError, errorTypes } from "../js_lib/errors.js"
 import { policyValidateConnection, legacyValidateConnection } from "../js_lib/validation.js"
 import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations } from "../js_lib/validation-types.js"
 import "../js_lib/wasm_exec.js"
+import { addCertificateChainToCacheIfNecessary, getCertificateEntryByHash } from "../js_lib/cache.js"
 
 try {
     initializeConfig();
@@ -121,7 +122,7 @@ function redirect(details, error, certificateChain=null) {
     }
 
     if (certificateChain !== null) {
-        url += "&fingerprint="+encodeURIComponent(certificateChain[0].fingerprint.sha256);
+        url += "&fingerprint="+encodeURIComponent(certificateChain[0].fingerprintSha256);
     }
 
     browser.tabs.update(tabId, {url: url});
@@ -173,6 +174,17 @@ async function requestInfo(details) {
     logEntry.trackRequest(details.requestId);
 }
 
+async function getTlsCertificateChain(securityInfo) {
+    const chain = securityInfo.certificates.map(c => ({pem: window.btoa(String.fromCharCode(...c.rawDER)), fingerprintSha256: c.fingerprint.sha256, serial: c.serialNumber, isBuiltInRoot: c.isBuiltInRoot}));
+    await addCertificateChainToCacheIfNecessary(chain[0].pem, chain.slice(1).map(c => c.pem));
+    chain.forEach((c, index) => {
+        const entry = getCertificateEntryByHash(c.fingerprintSha256);
+        chain[index].subject = entry.subjectStr;
+        chain[index].issuer = entry.issuerStr;
+    });
+    return chain;
+}
+
 async function checkInfo(details) {
     const onHeadersReceived = performance.now();
     const logEntry = getLogEntryForRequest(details.requestId);
@@ -203,15 +215,16 @@ async function checkInfo(details) {
         return;
     }
 
+    const certificateChain = await getTlsCertificateChain(remoteInfo);
+
     if (logEntry !== null) {
-        const certificateChain = remoteInfo.certificates.map(c => ({fingerprintSha256: c.fingerprint.sha256, serial: c.serialNumber, subject: c.subject, issuer: c.issuer}));
         logEntry.certificateChainReceived(certificateChain);
     }
 
     let decision = "accept";
     try {
         // check if this certificate for this domain was accepted despite the F-PKI legacy (or policy) warning
-        const certificateFingerprint = remoteInfo.certificates[0].fingerprint.sha256;
+        const certificateFingerprint = certificateChain[0].fingerprintSha256;
         if (mapGetSet(trustedCertificates, domain).has(certificateFingerprint)) {
             cLog(details.requestId, "skipping validation for domain ("+domain+") because of the trusted certificate: "+certificateFingerprint);
         } else {
@@ -238,7 +251,7 @@ async function checkInfo(details) {
             policiesMap.forEach((p, m) => {
                 // cLog(details.requestId, "starting policy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
 
-                const {trustDecision} = policyValidateConnection(remoteInfo, config, domain, p, m);
+                const {trustDecision} = policyValidateConnection(certificateChain, config, domain, p, m);
                 addTrustDecision(details, trustDecision);
 
                 if (hasApplicablePolicy(trustDecision)) {
@@ -254,7 +267,7 @@ async function checkInfo(details) {
                 // check each policy and throw an error if one of the verifications fails
                 certificatesMap.forEach((c, m) => {
                     cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c));
-                    const {trustDecision} = legacyValidateConnection(remoteInfo, config, domain, c, m);
+                    const {trustDecision} = legacyValidateConnection(certificateChain, config, domain, c, m);
                     addTrustDecision(details, trustDecision);
                     if (hasFailedValidations(trustDecision)) {
                         throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, getShortErrorMessages(trustDecision)[0]);
@@ -273,7 +286,7 @@ async function checkInfo(details) {
     } catch (error) {
         // TODO: in case that an exception was already thrown in requestInfo, then the redirection occurs twice (but this is not an issue since they both redirect to the same error url)
         decision = "reject: "+error
-        redirect(details, error, remoteInfo.certificates);
+        redirect(details, error, certificateChain);
         throw error;
     } finally {
         if (logEntry !== null) {
@@ -310,10 +323,6 @@ async function onCompleted(details) {
     if (config.get("send-log-entries-via-event") && details.type === "main_frame") {
         browser.tabs.executeScript(details.tabId, { file: "../content/sendLogEntries.js" })
     }
-    const remoteInfo = await browser.webRequest.getSecurityInfo(details.requestId, {
-        certificateChain: true,
-        rawDER: true
-    });
 }
 
 // add listener to header-received.
