@@ -2,9 +2,9 @@
 Firefox extension for F-PKI
 
 ## Folder Structure
-The `app` folder contains the browser extension
+The [app](./app) folder contains the browser extension
 
-The `mapserver` folder contains the HTTP version of the map server and the tools to generate testing RPC and SP
+The [mapserver](./mapserver) folder contains the HTTP version of the map server and the tools to generate testing RPC and SP
 
 ## How to run
 There are two ways to try out the extension: a quick and easy setup using an existing map server and a more involved setup including locally running your own map server.
