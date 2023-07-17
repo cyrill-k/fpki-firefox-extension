@@ -13,7 +13,7 @@ There are two ways to try out the extension: a quick and easy setup using an exi
 For this setup, you can simply clone this repository and load the browser extension by visiting ``about:debugging``.
 Then you're ready to go.
 
-### Involved Setup (including running the map serer locally)
+### Involved Setup (including running the map server locally)
 Instead of using an existing map server, you can set up your own map server and add arbitrary certificates and policies.
 
 #### Demo Setup
