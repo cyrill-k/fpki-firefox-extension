@@ -20,7 +20,7 @@ function defaultConfig() {
     // max number of attempted fetch operations before aborting
     c.set("proof-fetch-max-tries", 3);
     // quorum of trusted map servers necessary to accept their result
-    c.set("mapserver-quorum", 2);
+    c.set("mapserver-quorum", 1);
     // number of mapservers queried per validated domain (currently always choosing the first n entries in the mapserver list)
     c.set("mapserver-instances-queried", 1);
     // send the log entries as a custom event after fetching a webpage (used to debug/measure the extension)

@@ -2,27 +2,34 @@
 Firefox extension for F-PKI
 
 ## Folder Structure
-The app folder contains the browser extension
+The `app` folder contains the browser extension
 
-The mapserver folder contains the HTTP version of the map server and the tools to generate testing RPC and SP
+The `mapserver` folder contains the HTTP version of the map server and the tools to generate testing RPC and SP
 
-## Demo Setup
+## How to run
+There are two ways to try out the extension: a quick and easy setup using an existing map server and a more involved setup including locally running your own map server.
+
+### Quick Setup (no map server)
+For this setup, you can simply clone this repository and load the browser extension by visiting ``about:debugging``.
+Then you're ready to go.
+
+### Involved Setup (including running the map serer locally)
+Instead of using an existing map server, you can set up your own map server and add arbitrary certificates and policies.
+
+#### Demo Setup
 ![Alt text](images/overview.png?raw=true"Overview")
 The map server will run as a local server, and communicate with the extension via HTTP. During the TLS connection, the extension will query the map server and stop the connection if any malicious behavior is found.
 
-## How to run
-First, you need to set up the map server.
-
-### Prerequisites
+#### Prerequisites
 - go version 1.19.2
 - mysql 8.0.31 with access for 'root' with password 'root' (only if a native, i.e., non-docker db should be used)
 - docker and docker-compose (only if a docker db should be used)
 
-### Docker setup
+#### Docker setup
 - Instruct all commands to use port number 3307 to interact with the docker mysql instance by setting some environment variables: ``. env.bash``
 - First, you start up the mysql database in a docker instance: ``docker-compose up``
 
-### DB setup
+#### DB setup
 - ``cd mapserver``
 - ``go mod tidy``
 - ``cd ../db``
@@ -31,22 +38,22 @@ First, you need to set up the map server.
   - mysql -h localhost -P 3307 --protocol TCP -u root -proot
   - mysql -h localhost -P 3307 --protocol TCP -u test -pzaphod
 
-### Generate test policies along with all necessary certificates
+#### Generate test policies along with all necessary certificates
 - ``cd ../mapserver``
 - ``make generate_test_certs_and_RPC_SP``
 
-### Add additional certificates
+#### Add additional certificates
 - Put additional certificate that should be used for legacy validation under ``./mapserver/testdata/additional_certs/certs.csv`` with the following format:
   - Row 1 (cert): PEM-encoded leaf certificate
   - Row 2 (chain): list of PEM-encoded intermediate and root certificates forming a chain. First entry is the certificate that issued the leaf certificate, last entry is the root certificate.
 
-### Run mapserver
+#### Run mapserver
 - ``go run mapserver.go``
 
-### If mysql root access is lost
+#### If mysql root access is lost
 - ``create user root@localhost identified by '';``
 
-### Test browser extension
+#### Test browser extension
 After the map server is set up, load the browser extension by visiting ``about:debugging``. And you can visit the following urls to test whether it correctly works:
 
 - Legacy allow: https://bing.com
