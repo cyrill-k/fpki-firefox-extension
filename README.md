@@ -10,8 +10,12 @@ The [mapserver](./mapserver) folder contains the HTTP version of the map server 
 There are two ways to try out the extension: a quick and easy setup using an existing map server and a more involved setup including locally running your own map server.
 
 ### Quick Setup (no map server)
-For this setup, you can simply clone this repository and load the browser extension by visiting ``about:debugging``.
+For this setup, you can simply clone this repository and load the browser extension in your firefox browser.
+To load the extension, you have to visit `about:debugging`, click `Load Temporary Add-on...`, and open the file `app/manifest.json`.
 Then you're ready to go.
+
+After visiting a website, you can display extension-related information by clicking on the extension icon on the top right and choosing `LF-PKI Browser Extension` or simply using the shortcut `Alt-Shift-J`.
+This will show you the validation results, the configuration, and an option to download a log of the extension's operations.
 
 ### Involved Setup (including running the map server locally)
 Instead of using an existing map server, you can set up your own map server and add arbitrary certificates and policies.
