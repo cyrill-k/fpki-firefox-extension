@@ -57,6 +57,15 @@ The map server will run as a local server, and communicate with the extension vi
 #### If mysql root access is lost
 - ``create user root@localhost identified by '';``
 
+#### Add local mapserver to browser extension config file
+To fetch mapserver proofs from the local mapserver, you have to add it in the [config file](app/js_lib/config.js):
+- uncomment the following line: `{"identity": "local-mapserver", "domain": "http://localhost:8080", "querytype": "lfpki-http-get"},`
+- change the following two config values from 1 to 2:
+  - `c.set("mapserver-quorum", 2);`
+  - `c.set("mapserver-instances-queried", 2);`
+
+Note that you can also **only** use the local mapserver (and ignore the mapserver running at ETH) by uncommenting the line with `ETH-mapserver-top-100k` and setting the values `mapserver-quorum` and `mapserver-instances-queried` to 1.
+
 #### Test browser extension
 After the map server is set up, load the browser extension by visiting ``about:debugging``. And you can visit the following urls to test whether it correctly works:
 
