@@ -39,6 +39,37 @@ export class LegacyTrustDecision {
     }
 }
 
+export class LegacyTrustDecisionGo {
+    constructor(domain, connectionTrustLevel, connectionRelevantCASetID, connectionExampleSubject, evaluationResult,
+        highestTrustLevel, relevantCASetIDs, exampleSubjects, validUntilUnix) {
+
+        // information describing the certificate obtained in the
+        // handshake and its trust level
+        this.type = "legacy";
+        this.domain = domain;
+        this.connectionCertificateChain = null;
+        this.connectionTrustLevel = connectionTrustLevel;
+        this.connectionRelevantCASetID = connectionRelevantCASetID;
+        this.connectionExampleSubject = connectionExampleSubject;
+
+        // outcome of the legacy validation
+        this.evaluationResult = evaluationResult;
+
+        // highest trust level detected
+        this.highestTrustLevel = highestTrustLevel;
+
+        // information describing why legacy validation failed
+        // lists consisting of CA Set IDs and corresponding 
+        // subjects found in cached certificates that led to
+        // failure
+        this.relevantCASetIDs = relevantCASetIDs;
+        this.exampleSubjects = exampleSubjects;
+
+        // timestamp until which this entry can be cached
+        this.validUntil = new Date(validUntilUnix*1000);
+    }
+}
+
 export const PolicyAttributes = {
     TRUSTED_CA: "Trusted CA",
     SUBDOMAINS: "Subdomains"
@@ -106,6 +137,20 @@ export function getShortErrorMessages(trustDecision) {
         }
     });
     return errorMessages;
+}
+
+export function getLegacyValidationErrorMessageGo(legacyTrustDecisionGo) {
+    let errorMessage = "";
+    errorMessage += "[legacy mode] ";
+    errorMessage += "Detected " + legacyTrustDecisionGo.relevantCASetIDs.length +" more highly trusted certificate chains than the chain received in the connection \n";
+    errorMessage += "Connection certificate chain has trust level " + legacyTrustDecisionGo.connectionTrustLevel + " due to subject: ";
+    errorMessage += legacyTrustDecisionGo.connectionExampleSubject + " within CA Set: " + legacyTrustDecisionGo.connectionRelevantCASetID + "\n";
+    for(let i = 0; i < legacyTrustDecisionGo.relevantCASetIDs.length; i++) {
+        errorMessage += "Detected certificate chain with trust level: " + legacyTrustDecisionGo.highestTrustLevel;
+        errorMessage += "due to subject: " + legacyTrustDecisionGo.exampleSubjects[i] + " within CA Set: " + legacyTrustDecisionGo.relevantCASetIDs[i] + "\n"; 
+    }
+
+    return errorMessage;
 }
 
 function getPolicyErrorMessage(trustDecision, trustInfo, evaluation) {

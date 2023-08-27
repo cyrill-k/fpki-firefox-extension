@@ -239,8 +239,8 @@ func verifyLegacyWrapper() js.Func {
 		// allocate object to return
 		return legacyTrustDecisionClass.New(dnsName, legacyTrustInfo.ConnectionTrustLevel,
 			legacyTrustInfo.ConnectionRelevantCASetID, legacyTrustInfo.ConnectionExampleSubject,
-			legacyTrustInfo.EvaluationResult, relevantCASetIDs,
-			exampleSubjects, legacyTrustInfo.MaxValidity.Unix(), legacyTrustInfo.HighestTrustLevel)
+			legacyTrustInfo.EvaluationResult, legacyTrustInfo.HighestTrustLevel, relevantCASetIDs,
+			exampleSubjects, legacyTrustInfo.MaxValidity.Unix())
 	})
 	return jsf
 }

@@ -1,6 +1,6 @@
 import * as domainFunc from "./domain.js"
 import * as verifier from "./verifier.js"
-import { cLog } from "./helper.js"
+import { cLog, convertArrayBufferToBase64, hashPemCertificateWithoutHeader } from "./helper.js"
 import { addCertificateChainToCacheIfNecessary, getCertificateChainFromCacheByHash } from "./cache.js"
 
 // get map server response and check the connection
@@ -153,6 +153,108 @@ async function extractCertificates(mapResponse, requestId) {
     const endRawExtraction = performance.now();
     const startParse = performance.now();
     const hashMap = new Map();
+
+    // NOTE: the following code is used to create "mock" map server responses of 
+    // the new interface based on responses via the old interface
+    // TODO: remove this once new map server interface is available 
+    if(window.GOCACHEV2) {
+        var hashToPEMMap = {};
+        for (const [domain, rawCaMap] of rawDomainMap) {
+            for (const [ca, {certs, certChains}] of rawCaMap) {
+                if (certs !== null) {
+                    // don't use promise.all(...) since then the intermediate certificates will be parsed multiple times. `addCertificateChainToCacheIfNecessary` checks if the certificate is already cached and if not it starts parsing. The problem arises if multiple intermediate certificates for one domain use the same intermediate certificate and do this check before waiting for the other functions to parse and add the certificate to the cache.
+                    for (const [i, c] of certs.entries()) {
+                        let chain = certChains[i];
+                        if (chain === null) {
+                            chain = [];
+                        }
+                        const fullChain = [c].concat(chain.map(c => c === null ? [] : c));
+                        const fullChainHashes = await Promise.all(fullChain.map(async c => convertArrayBufferToBase64(await hashPemCertificateWithoutHeader(c)))); 
+                        for (let i = 0; i < fullChainHashes.length; i++) {
+                            let certificate = fullChain[i];
+                            hashToPEMMap[fullChainHashes[i]] = certificate;
+                        }
+                    };
+                }
+            }
+        }
+
+        var enc = new TextEncoder(); 
+           
+        // create input JSON for getMissingCertificatesList
+        var hashes = [];
+        for (var hash in hashToPEMMap) {
+            hashes.push(hash);
+        }
+        let obj = {
+            hashesb64: hashes
+        }
+        let json = JSON.stringify(obj);
+
+        //var jsonDecodeStart = performance.now();
+        hashes = enc.encode(json);
+        //var jsonDecodeEnd = performance.now();
+        //window.jsGetMissingCertificatesListJSONDecode.push(jsonDecodeEnd - jsonDecodeStart);
+        //console.log("[JS] getMissingCertificatesList unmarshalling JSON took ", jsonDecodeEnd - jsonDecodeStart, "ms");
+
+        // check which of the certificate hashes are not yet cached
+        //const getMissingCertificatesListStart = performance.now();
+        var missingCertificateHashes = getMissingCertificatesList(hashes, hashes.length);
+        //const getMissingCertificatesListEnd = performance.now();
+    
+        //console.log("[Go] getMissingCertificatesList took ", getMissingCertificatesListEnd - getMissingCertificatesListStart, " ms, #certificates missing: ", missingCertificateHashes.length );
+        //window.GoGetMissingCertificatesListTime.push(getMissingCertificatesListEnd - getMissingCertificatesListStart);
+        //window.domains.push(this.domain);
+        //window.GoGetMissingCertificatesListb64Decode.push(window.Gob64Decode):
+        //window.GoGetMissingCertificatesListJSONDecode.push(window.GoJSONDecode);
+        //window.GoGetMissingCertificatesListCopyBytes.push(window.GoCopy);
+
+        // TODO: in the new map server interface version, need to make a second request 
+        // here to get the PEM encodings of the certificates corresponding to the 
+        // missing certificates
+
+        // create input for addCertificatesToCache
+        var missingCertificatesArray = [];
+        for (var i in missingCertificateHashes) {
+            missingCertificatesArray.push(hashToPEMMap[missingCertificateHashes[i]]);
+        }
+        obj = {
+            certificatesb64: missingCertificatesArray
+        };
+        json = JSON.stringify(obj);
+
+        //jsonDecodeStart = performance.now();
+        var jsonBytes = enc.encode(json); 
+        //jsonDecodeEnd = performance.now();
+        //window.jsAddCertificatesToCacheJSONDecode.push(jsonDecodeEnd - jsonDecodeStart);
+        //console.log("[JS] addCertificatesToCache unmarshalling JSON took ", jsonDecodeEnd - jsonDecodeStart, "ms");
+
+        //base64DecodeStart = performance.now();
+        //base64DecodeEnd = performance.now();
+        //window.jsAddCertificatesToCacheb64Decode.push(base64DecodeEnd - base64DecodeStart);
+        //console.log("[JS] addCertificatesToCache base64decode took ", base64DecodeEnd - base64DecodeStart, "ms");
+
+
+
+        // add the missing certificates to the cache
+        //const addCertificatesToCacheStart = performance.now();
+        addCertificatesToCache(jsonBytes, jsonBytes.length);
+        //const addCertificatesToCacheEnd = performance.now();
+        //window.GoAddCertificatesToCacheTime.push(addCertificatesToCacheEnd - addCertificatesToCacheStart);
+        //window.GoAddCertificatesSignatureTime.push(window.GoSignature);
+        //window.GoAddCertificatesToCacheb64Decode.push(window.Gob64Decode);
+        //window.GoAddCertificatesToCacheJSONDecode.push(window.GoJSONDecode);
+        //window.GoAddCertificatesToCacheCopyBytes.push(window.GoCopy);
+        //window.GoAddCertificatesToCacheParseCertificates.push(window.GoParseCertificates);
+        //window.GoNCertificatesAdded.push(window.GoNCertsAdded);
+
+        //console.log("[Go] addCertificatesToCache took ", window.GoAddCertificatesToCacheTime, " ms");   
+        
+        // to prevent crash of the addMapserverResponse call
+        // in fpki-request.js LOC 135
+        return new Map([]); 
+    }
+
     let totalCertificatesParsed = 0;
     for (const [domain, rawCaMap] of rawDomainMap) {
         const caMap = new Map();

@@ -6,25 +6,37 @@ import { printMap, cLog, mapGetList, mapGetMap, mapGetSet } from "../js_lib/help
 import { config, downloadConfig, importConfigFromJSON, initializeConfig, saveConfig, resetConfig } from "../js_lib/config.js"
 import { LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole, getSerializedLogEntries } from "../js_lib/log.js"
 import { FpkiError, errorTypes } from "../js_lib/errors.js"
-import { policyValidateConnection, legacyValidateConnection } from "../js_lib/validation.js"
-import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations } from "../js_lib/validation-types.js"
+import { policyValidateConnection, legacyValidateConnection, legacyValidateConnectionGo } from "../js_lib/validation.js"
+import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations, LegacyTrustDecisionGo, getLegacyValidationErrorMessageGo} from "../js_lib/validation-types.js"
 import "../js_lib/wasm_exec.js"
 import { addCertificateChainToCacheIfNecessary, getCertificateEntryByHash } from "../js_lib/cache.js"
 
 try {
     initializeConfig();
     window.GOCACHE = config.get("wasm-certificate-parsing");
+    window.GOCACHEV2 = config.get("wasm-certificate-caching");
 } catch (e) {
     console.log("initialize: "+e);
 }
 
 // flag whether to use Go cache
-
 // instance to call Go Webassembly functions
-const go = new Go();
-WebAssembly.instantiateStreaming(fetch("../js_lib/wasm/parsePEMCertificates.wasm"), go.importObject).then((result) => {
-    go.run(result.instance);
-});
+if (window.GOCACHE) {
+    const go = new Go();
+    WebAssembly.instantiateStreaming(fetch("../js_lib/wasm/parsePEMCertificates.wasm"), go.importObject).then((result) => {
+        go.run(result.instance);
+    });
+} else if (window.GOCACHEV2) {
+    const go = new Go();
+    WebAssembly.instantiateStreaming(fetch("../go_wasm/gocachev2.wasm"), go.importObject).then((result) => {
+        go.run(result.instance);
+        console.log("[Go] Initialize cache with trust roots: #certificates = ",initializeGODatastructures("embedded/ca-certificates", "embedded/config.json"));
+        
+        // make LegacyTrustDecisionGo available to WASM
+        window.LegacyTrustDecisionGo = LegacyTrustDecisionGo;
+
+    });    
+}
 
 
 // communication between browser plugin popup and this background script
@@ -83,6 +95,9 @@ browser.runtime.onConnect.addListener(function(port) {
 
 
 const trustDecisions = new Map();
+
+// cache mapping (domain, leaf certificate fingerprint) tuples to legacy trust decisions.
+const legacyTrustDecisionCache = new Map();
 
 // contains certificates that are trusted even if legacy (and policy) validation fails
 // data structure is a map [domain] => [x509 fingerprint]
@@ -264,15 +279,33 @@ async function checkInfo(details) {
 
             // don't perform legacy validation if policy validation has already taken place
             if (!policyChecksPerformed) {
-                // check each policy and throw an error if one of the verifications fails
-                certificatesMap.forEach((c, m) => {
-                    cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c));
-                    const {trustDecision} = legacyValidateConnection(certificateChain, config, domain, c, m);
-                    addTrustDecision(details, trustDecision);
-                    if (hasFailedValidations(trustDecision)) {
-                        throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, getShortErrorMessages(trustDecision)[0]);
+                if(window.GOCACHEV2) {
+                    // check if have a cached trust decision for this domain+leaf certificate
+                    const key = domain+certificateChain[0].fingerprintSha256;
+                    var trustDecision = null;
+                    trustDecision = legacyTrustDecisionCache.get(key);
+                    var currentTime = new Date();
+                    if (trustDecision === undefined || currentTime > trustDecision.validUntil) {
+                        trustDecision = legacyValidateConnectionGo(certificateChain, domain);
+                        legacyTrustDecisionCache.set(key, trustDecision)
+
                     }
-                });
+                    addTrustDecision(details, trustDecision);
+                    if (trustDecision.evaluationResult !== 1) {
+                        throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, getLegacyValidationErrorMessageGo(trustDecision));
+                    }                    
+                } else {
+                    // check each policy and throw an error if one of the verifications fails
+                    certificatesMap.forEach((c, m) => {
+                        cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c));
+                        const {trustDecision} = legacyValidateConnection(certificateChain, config, domain, c, m);
+                        addTrustDecision(details, trustDecision);
+                        if (hasFailedValidations(trustDecision)) {
+                            throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, getShortErrorMessages(trustDecision)[0]);
+                        }
+                    });
+                }
+
             }
 
             // TODO: legacy (i.e., certificate-based) validation

@@ -1,4 +1,9 @@
 
+## Enabling the Go cache
+Adjust the following two configurations in `../js_lib/config.js`:
+- set `wasm-certificate-parsing` to `false`
+- set `wasm-certificate-caching` to `true`
+
 ## Interface
 The `cache_v2/` directory contains the Go implementation of the certificate cache (`cache_v2/cache.go`),
 the legacy validation (`cache_v2/validation.go`) and some utility functionality that can be used to integrate the 

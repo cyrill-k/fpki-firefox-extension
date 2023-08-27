@@ -26,7 +26,10 @@ function defaultConfig() {
     // send the log entries as a custom event after fetching a webpage (used to debug/measure the extension)
     c.set("send-log-entries-via-event", true);
     // enable parsing X.509 certificates using web assembly (golang)
-    c.set("wasm-certificate-parsing", true);
+    c.set("wasm-certificate-parsing", false);
+    // enable caching X.509 certificates and legacy validation using web assembly (golang)
+    c.set("wasm-certificate-caching", true);
+
     c.set("ca-sets", (()=>{
         const caSet = new Map();
         // note that this is simply a subset of all US CAs for testing purposes
