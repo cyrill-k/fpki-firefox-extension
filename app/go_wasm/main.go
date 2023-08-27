@@ -161,7 +161,7 @@ func addCertificatesToCacheWrapper() js.Func {
 
 			// TODO: remove this line after evaluation, it is only used because most
 			// certificates in the log server are expired currently
-			certificateParsed.NotAfter = time.Date(2023, 8, 25, 12, 0, 0, 0, time.UTC)
+			certificateParsed.NotAfter = time.Date(2023, 8, 30, 12, 0, 0, 0, time.UTC)
 			certificatesGo[i] = certificateParsed
 
 			// TODO (proof): check that certificate is in proofCacheEntry.missingCertificateHashes (identified by key passed as input)

@@ -49,7 +49,7 @@ crucial that `main.go` is declared to be part of the `main` package**
 5. Inside the current directory, execute `GOOS=js GOARCH=wasm go build -o cache_v2.wasm` to create
 a WASM file called `cachev2.wasm`
 
-## Integrating WASM in JS
+## Integrating WASM in JS /as done in `../background/background.js`
 1. import [wasm_exec.js](https://github.com/golang/go/blob/master/misc/wasm/wasm_exec.js) file:
 `import wasm_exec.js`
 2. Instantiate and initialize the WASM backend
@@ -63,3 +63,5 @@ initializeGODatastructures([path_to_trust_store_dir], [path_to_config]);
 ```
 
 Now you can call WASM functions from JS using the above interface.
+
+**IMPORTANT NOTE: As most certificates stored at the map server are currently expired, we manually adjust the certificate validity period (NotAfter) to 2023-08-30 (LOC 164 in `../main.go`).For further testing of the browser extension, this validity period must be adjusted. For an actual release, the certificates at the map server should be reloaded and the manual adjustments MUST be deleted.**
