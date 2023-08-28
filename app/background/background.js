@@ -305,7 +305,6 @@ async function checkInfo(details) {
                         }
                     });
                 }
-
             }
 
             // TODO: legacy (i.e., certificate-based) validation

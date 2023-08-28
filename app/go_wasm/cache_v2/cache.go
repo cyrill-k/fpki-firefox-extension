@@ -417,13 +417,11 @@ func processCertificate(certificate *x509.Certificate,
 	// recursively process parent certificates present in the request
 	issuerAKIHash := GetRawCertificateIssuerAKIHash(certificate)
 	parentCertificates := certificatesInRequest[issuerAKIHash]
-	if len(parentCertificates) > 0 {
-		for _, parentCertificate := range parentCertificates {
-			if processCertificate(parentCertificate, certificatesInRequestProcessed, certificatesInRequest) {
-				NCertificatesAdded++
-			} else {
-				log.Printf("[Go] Did not add certificate with subject: " + certificate.Subject.String() + " " + certificate.Issuer.String() + "\n")
-			}
+	for _, parentCertificate := range parentCertificates {
+		if processCertificate(parentCertificate, certificatesInRequestProcessed, certificatesInRequest) {
+			NCertificatesAdded++
+		} else {
+			log.Printf("[Go] Did not add certificate with subject: " + certificate.Subject.String() + " " + certificate.Issuer.String() + "\n")
 		}
 	}
 

@@ -154,15 +154,15 @@ async function extractCertificates(mapResponse, requestId) {
     const startParse = performance.now();
     const hashMap = new Map();
 
-    // NOTE: the following code is used to create "mock" map server responses of 
-    // the new interface based on responses via the old interface
-    // TODO: remove this once new map server interface is available 
+    // NOTE: the following code is used to create "mock" map server responses
+    // respecting the new interface based on responses via the old interface
+    // TODO: remove this once new map server interface is available and integrate the
+    // actual map server response
     if(window.GOCACHEV2) {
         var hashToPEMMap = {};
         for (const [domain, rawCaMap] of rawDomainMap) {
             for (const [ca, {certs, certChains}] of rawCaMap) {
                 if (certs !== null) {
-                    // don't use promise.all(...) since then the intermediate certificates will be parsed multiple times. `addCertificateChainToCacheIfNecessary` checks if the certificate is already cached and if not it starts parsing. The problem arises if multiple intermediate certificates for one domain use the same intermediate certificate and do this check before waiting for the other functions to parse and add the certificate to the cache.
                     for (const [i, c] of certs.entries()) {
                         let chain = certChains[i];
                         if (chain === null) {
@@ -192,14 +192,14 @@ async function extractCertificates(mapResponse, requestId) {
         let json = JSON.stringify(obj);
 
         //var jsonDecodeStart = performance.now();
-        hashes = enc.encode(json);
+        var jsonBytes = enc.encode(json);
         //var jsonDecodeEnd = performance.now();
         //window.jsGetMissingCertificatesListJSONDecode.push(jsonDecodeEnd - jsonDecodeStart);
         //console.log("[JS] getMissingCertificatesList unmarshalling JSON took ", jsonDecodeEnd - jsonDecodeStart, "ms");
 
         // check which of the certificate hashes are not yet cached
         //const getMissingCertificatesListStart = performance.now();
-        var missingCertificateHashes = getMissingCertificatesList(hashes, hashes.length);
+        var missingCertificateHashes = getMissingCertificatesList(jsonBytes, jsonBytes.length);
         //const getMissingCertificatesListEnd = performance.now();
     
         //console.log("[Go] getMissingCertificatesList took ", getMissingCertificatesListEnd - getMissingCertificatesListStart, " ms, #certificates missing: ", missingCertificateHashes.length );
@@ -224,7 +224,7 @@ async function extractCertificates(mapResponse, requestId) {
         json = JSON.stringify(obj);
 
         //jsonDecodeStart = performance.now();
-        var jsonBytes = enc.encode(json); 
+        jsonBytes = enc.encode(json); 
         //jsonDecodeEnd = performance.now();
         //window.jsAddCertificatesToCacheJSONDecode.push(jsonDecodeEnd - jsonDecodeStart);
         //console.log("[JS] addCertificatesToCache unmarshalling JSON took ", jsonDecodeEnd - jsonDecodeStart, "ms");

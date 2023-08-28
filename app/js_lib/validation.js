@@ -218,19 +218,18 @@ export function legacyValidateConnectionGo(tlsCertificateChain, domainName) {
     var json = JSON.stringify(obj);
     connectionChainArray = enc.encode(json);
 
-    
+    // perform validation
     const verifyLegacyStart = performance.now();
     var legacyTrustDecision = verifyLegacy(domainName, connectionChainArray, connectionChainArray.length);
     legacyTrustDecision.connectionCertificateChain = tlsCertificateChain;
 
-    const verifyLegacyEnd = performance.now()
+    const verifyLegacyEnd = performance.now();
     window.verifyLegacyTime = verifyLegacyEnd - verifyLegacyStart;
     console.log("[Go] verifyLegacy took ", window.verifyLegacyTime, " ms", domainName);
     console.log("[Go] evaluation result = ", legacyTrustDecision.evaluationResult);
     //window.GoVerifyLegacyTime.push({"domain": domainName, "time" : window.verifyLegacyTime});
 
     return legacyTrustDecision;
-
 }
 
 // check connection using the policies retrieved from a single mapserver

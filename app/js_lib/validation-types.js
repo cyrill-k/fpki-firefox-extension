@@ -55,7 +55,7 @@ export class LegacyTrustDecisionGo {
         // outcome of the legacy validation
         this.evaluationResult = evaluationResult;
 
-        // highest trust level detected
+        // highest trust level detected in the cache for this domain
         this.highestTrustLevel = highestTrustLevel;
 
         // information describing why legacy validation failed
@@ -147,7 +147,7 @@ export function getLegacyValidationErrorMessageGo(legacyTrustDecisionGo) {
     errorMessage += legacyTrustDecisionGo.connectionExampleSubject + " within CA Set: " + legacyTrustDecisionGo.connectionRelevantCASetID + "\n";
     for(let i = 0; i < legacyTrustDecisionGo.relevantCASetIDs.length; i++) {
         errorMessage += "Detected certificate chain with trust level: " + legacyTrustDecisionGo.highestTrustLevel;
-        errorMessage += "due to subject: " + legacyTrustDecisionGo.exampleSubjects[i] + " within CA Set: " + legacyTrustDecisionGo.relevantCASetIDs[i] + "\n"; 
+        errorMessage += " due to subject: " + legacyTrustDecisionGo.exampleSubjects[i] + " within CA Set: " + legacyTrustDecisionGo.relevantCASetIDs[i] + "\n"; 
     }
 
     return errorMessage;
