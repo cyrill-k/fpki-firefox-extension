@@ -2,7 +2,7 @@
 
 This directory contains the implementation of the Go components:
 - `cache.go`contains the implementation of the certificate cache.
-It provides the cache initialization (`InitializeCache`), `GetMissingCertificatesList` (process first map server response) and `AddCertificatesToCache` (processing second map server response) functionality.
+It provides the cache initialization (`InitializeCache`), `GetMissingCertificatesList` (process first map server response) and `AddCertificatesToCache` (process second map server response) functionality.
 - `validation.go` contains the implementation of the legacy validation. 
 It provides the `verifyLegacy` functionality.
 - `proofs.go` contains the implementation of some (yet untested) utility
