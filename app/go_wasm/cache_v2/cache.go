@@ -349,11 +349,13 @@ func verifyChildWithParentAndAllocateCaches(certificate *x509.Certificate, paren
 // process a certificate by potentially adding
 // it to the cache
 // recursively processes parent certificates
+// returns the hashes of all processed certificates
 func processCertificate(certificate *x509.Certificate,
 	certificatesInRequestProcessed map[*x509.Certificate]bool,
-	certificatesInRequest map[string][]*x509.Certificate) bool {
+	certificatesInRequest map[string][]*x509.Certificate) ([]string, bool) {
 
 	certificateHash := GetRawCertificateHash(certificate)
+	processedCertificateHashes := []string{certificateHash}
 	certificateSubjectSKIHash := GetRawCertificateSubjectSKIHash(certificate)
 
 	// mark the certificate as processed on exit
@@ -365,11 +367,11 @@ func processCertificate(certificate *x509.Certificate,
 	// it was added to the cache
 	_, inCache := certificateCache[certificateHash]
 	if certificatesInRequestProcessed[certificate] || inCache {
-		return inCache
+		return processedCertificateHashes, inCache
 	}
 	_, ignored := ignoredCertificateHashes[certificateHash]
 	if ignored {
-		return false
+		return processedCertificateHashes, false
 	}
 
 	// remove white-listed unhandled critical extensions
@@ -388,7 +390,7 @@ func processCertificate(certificate *x509.Certificate,
 			}
 		}
 		if !isTrustRoot {
-			return false
+			return processedCertificateHashes, false
 		}
 		// check if currently valid time-wise (hence, treat it as a leaf)
 		err := certificate.IsValid(x509.LeafCertificate, []*x509.Certificate{}, &x509.VerifyOptions{})
@@ -396,7 +398,7 @@ func processCertificate(certificate *x509.Certificate,
 			if ignoreError(err) {
 				ignoredCertificateHashes[certificateHash] = struct{}{}
 			}
-			return false
+			return processedCertificateHashes, false
 		}
 
 		// add the certificate as trust root to both caches
@@ -411,14 +413,15 @@ func processCertificate(certificate *x509.Certificate,
 		certificateCache[certificateHash] = certificateCacheEntry
 
 		ownSubjectSKICacheEntry.certificates[certificateHash] = struct{}{}
-		return true
+		return processedCertificateHashes, true
 	}
 
 	// recursively process parent certificates present in the request
 	issuerAKIHash := GetRawCertificateIssuerAKIHash(certificate)
 	parentCertificates := certificatesInRequest[issuerAKIHash]
 	for _, parentCertificate := range parentCertificates {
-		if processCertificate(parentCertificate, certificatesInRequestProcessed, certificatesInRequest) {
+		if parentHashes, added := processCertificate(parentCertificate, certificatesInRequestProcessed, certificatesInRequest); added {
+			processedCertificateHashes = append(processedCertificateHashes, parentHashes...)
 			NCertificatesAdded++
 		} else {
 			log.Printf("[Go] Did not add certificate with subject: " + certificate.Subject.String() + " " + certificate.Issuer.String() + "\n")
@@ -434,7 +437,7 @@ func processCertificate(certificate *x509.Certificate,
 	// if no potential parent certificate is present in the cache,
 	// cannot add the certificate to the cache
 	if issuerAKICacheEntry == nil || len(issuerAKICacheEntry.certificates) == 0 {
-		return false
+		return processedCertificateHashes, false
 	}
 
 	// check signature
@@ -451,14 +454,14 @@ func processCertificate(certificate *x509.Certificate,
 	// parent certificate and the certificate is currently valid.
 	// all other checks on the certificate chain are performed lazily
 	// when calling VerifyLegacy
-	return verifyChildWithParentAndAllocateCaches(certificate, potParentCertificate, certificateHash,
+	return processedCertificateHashes, verifyChildWithParentAndAllocateCaches(certificate, potParentCertificate, certificateHash,
 		certificateSubjectSKIHash, issuerAKIHash)
 }
 
 // adds a list of certificates to the cache
 // TODO: pot. hashing the certificates is unnecessary as the hashes might already
 // be available from the first mapserver response
-func AddCertificatesToCache(certificates []*x509.Certificate) {
+func AddCertificatesToCache(certificates []*x509.Certificate) []string {
 
 	nEntriesBefore := len(certificateCache)
 	now := time.Now()
@@ -480,9 +483,12 @@ func AddCertificatesToCache(certificates []*x509.Certificate) {
 	// add all certificates to cache
 	// skip certificates that have already been added
 	// in a recursive step
+	var processedCertificateHashes []string
 	for _, certificate := range certificates {
 		if !certificatesInRequestProcessed[certificate] {
-			if processCertificate(certificate, certificatesInRequestProcessed, certificatesInRequest) {
+			hashes, added := processCertificate(certificate, certificatesInRequestProcessed, certificatesInRequest)
+			processedCertificateHashes = append(processedCertificateHashes, hashes...)
+			if added {
 				NCertificatesAdded++
 			} else {
 				fmt.Printf("[Go] Did not add certificate with subject: " + certificate.Subject.String() + " " + certificate.Issuer.String() + "\n")
@@ -496,6 +502,8 @@ func AddCertificatesToCache(certificates []*x509.Certificate) {
 
 	MS = 0
 	NCertificatesAdded = int64(len(certificateCache) - nEntriesBefore)
+
+	return processedCertificateHashes
 }
 
 // helper function to recursively build certificate chains

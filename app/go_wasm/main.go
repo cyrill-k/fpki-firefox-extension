@@ -106,6 +106,7 @@ func getMissingCertificatesListWrapper() js.Func {
 // wrapper to make addCertificatesToCache visible from JavaScript
 // param 1: length of response in bytes
 // param 2: map server response containing PEM encoded certificates
+// returns: a list of hashes of all certificates provided as input
 func addCertificatesToCacheWrapper() js.Func {
 	jsf := js.FuncOf(func(this js.Value, args []js.Value) any {
 		cache_v2.MSS = 0
@@ -161,7 +162,7 @@ func addCertificatesToCacheWrapper() js.Func {
 
 			// TODO: remove this line after evaluation, it is only used because most
 			// certificates in the log server are expired currently
-			certificateParsed.NotAfter = time.Date(2023, 8, 30, 12, 0, 0, 0, time.UTC)
+			certificateParsed.NotAfter = time.Date(2024, 8, 30, 12, 0, 0, 0, time.UTC)
 			certificatesGo[i] = certificateParsed
 
 			// TODO (proof): check that certificate is in proofCacheEntry.missingCertificateHashes (identified by key passed as input)
@@ -176,11 +177,17 @@ func addCertificatesToCacheWrapper() js.Func {
 		//jsWindow.Set("GoParseCertificates", timeParseNS/1000000)
 
 		// add parsed certificates to cache
-		cache_v2.AddCertificatesToCache(certificatesGo)
+		processedCertificates := cache_v2.AddCertificatesToCache(certificatesGo)
 		//jsWindow.Set("GoSignature", cache_v2.MSS)
 		//jsWindow.Set("GoNCertsAdded", cache_v2.NCertificatesAdded)
 
-		return nil
+		// copy processed certificate hashes into correct format
+		processedCertificatesOut := make([]interface{}, len(processedCertificates))
+		for i, certificateHash := range processedCertificates {
+			processedCertificatesOut[i] = certificateHash
+		}
+
+		return processedCertificatesOut
 	})
 	return jsf
 }

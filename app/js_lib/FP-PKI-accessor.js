@@ -1,7 +1,9 @@
+import {errorTypes, FpkiError} from "./errors.js"
 import * as domainFunc from "./domain.js"
 import * as verifier from "./verifier.js"
-import { cLog, convertArrayBufferToBase64, hashPemCertificateWithoutHeader } from "./helper.js"
+import { cLog, convertArrayBufferToBase64, hashPemCertificateWithoutHeader, arrayToHexString, base64ToHex, trimString } from "./helper.js"
 import { addCertificateChainToCacheIfNecessary, getCertificateChainFromCacheByHash } from "./cache.js"
+import {config} from "./config.js"
 
 // get map server response and check the connection
 async function getMapServerResponseAndCheck(url, needVerification, remoteInfo) {
@@ -147,111 +149,73 @@ function extractRawCertificates(mapResponse) {
     return certificateMap;
 }
 
-async function extractCertificates(mapResponse, requestId) {
+async function retrieveMissingCertificates(mapResponse, requestId, mapResponseNew) {
     const startRawExtraction = performance.now();
     const rawDomainMap = extractRawCertificates(mapResponse);
     const endRawExtraction = performance.now();
     const startParse = performance.now();
     const hashMap = new Map();
 
-    // NOTE: the following code is used to create "mock" map server responses
-    // respecting the new interface based on responses via the old interface
-    // TODO: remove this once new map server interface is available and integrate the
-    // actual map server response
     if(window.GOCACHEV2) {
-        var hashToPEMMap = {};
-        for (const [domain, rawCaMap] of rawDomainMap) {
-            for (const [ca, {certs, certChains}] of rawCaMap) {
-                if (certs !== null) {
-                    for (const [i, c] of certs.entries()) {
-                        let chain = certChains[i];
-                        if (chain === null) {
-                            chain = [];
-                        }
-                        const fullChain = [c].concat(chain.map(c => c === null ? [] : c));
-                        const fullChainHashes = await Promise.all(fullChain.map(async c => convertArrayBufferToBase64(await hashPemCertificateWithoutHeader(c)))); 
-                        for (let i = 0; i < fullChainHashes.length; i++) {
-                            let certificate = fullChain[i];
-                            hashToPEMMap[fullChainHashes[i]] = certificate;
-                        }
-                    };
+        // extract required certificate ids from the map server response
+        const requiredHashes = new Set();
+        var nTotalHashes = 0;
+        for (const entry of mapResponseNew) {
+            if (entry.DomainEntry.CertIDs !== null) {
+                const base64Ids = entry.DomainEntry.CertIDs;
+                const rawIds = atob(base64Ids);
+                const nHashes = rawIds.length/32
+                nTotalHashes += nHashes;
+                for (let i = 0; i < nHashes; i++) {
+                    requiredHashes.add(btoa(rawIds.slice(i*32, (i+1)*32)));
                 }
+                cLog(requestId, `entry for ${entry.DomainEntry.DomainName} contains ${nHashes} ids`);
+            }
+        }
+        cLog(requestId, `total: ${nTotalHashes} ids (${requiredHashes.size} unique ids)`);
+
+        // find certificate hashes that are not yet locally cached
+        let obj = {
+            hashesb64: [...requiredHashes]
+        }
+        let json = JSON.stringify(obj);
+        const enc = new TextEncoder();
+        let jsonBytes = enc.encode(json);
+        const missingCertificateHashes = getMissingCertificatesList(jsonBytes, jsonBytes.length);
+        cLog(requestId, `Found ${missingCertificateHashes.length} missing certificates: ${trimString(String(missingCertificateHashes))}`);
+
+        if (missingCertificateHashes.length > 0) {
+            // fetch missing certificates
+            var getParameter = "";
+            for (const hash of missingCertificateHashes) {
+                getParameter += base64ToHex(hash);
+            }
+            let result;
+            try {
+                result = await queryMapServerPayloads("http://127.0.0.1:8443", getParameter, { timeout: config.get("proof-fetch-timeout"), requestId: requestId, maxTries: config.get("proof-fetch-max-tries") });
+            } catch (error) {
+                throw new FpkiError(errorTypes.MAPSERVER_NETWORK_ERROR, error);
+            }
+
+            // add the missing certificates to the cache
+            obj = {
+                certificatesb64: [...result.response]
+            };
+            json = JSON.stringify(obj);
+            jsonBytes = enc.encode(json);
+            const addedCertificates = addCertificatesToCache(jsonBytes, jsonBytes.length);
+            cLog(requestId, `Added ${addedCertificates.length} certificates to the cache`);
+
+            // check if all missing certificates were returned by the map server
+            const addedCertificatesSet = new Set(addedCertificates)
+            let unprovidedCertificates = missingCertificateHashes.filter((value, index) => !addedCertificatesSet.has(value));
+            if (unprovidedCertificates.length > 0) {
+                console.log(`certs that are not provided by the map server = ${unprovidedCertificates}`);
+                throw new FpkiError(errorTypes.MAPSERVER_NETWORK_ERROR, "certificate hashes not provided");
             }
         }
 
-        var enc = new TextEncoder(); 
-           
-        // create input JSON for getMissingCertificatesList
-        var hashes = [];
-        for (var hash in hashToPEMMap) {
-            hashes.push(hash);
-        }
-        let obj = {
-            hashesb64: hashes
-        }
-        let json = JSON.stringify(obj);
-
-        //var jsonDecodeStart = performance.now();
-        var jsonBytes = enc.encode(json);
-        //var jsonDecodeEnd = performance.now();
-        //window.jsGetMissingCertificatesListJSONDecode.push(jsonDecodeEnd - jsonDecodeStart);
-        //console.log("[JS] getMissingCertificatesList unmarshalling JSON took ", jsonDecodeEnd - jsonDecodeStart, "ms");
-
-        // check which of the certificate hashes are not yet cached
-        //const getMissingCertificatesListStart = performance.now();
-        var missingCertificateHashes = getMissingCertificatesList(jsonBytes, jsonBytes.length);
-        //const getMissingCertificatesListEnd = performance.now();
-    
-        //console.log("[Go] getMissingCertificatesList took ", getMissingCertificatesListEnd - getMissingCertificatesListStart, " ms, #certificates missing: ", missingCertificateHashes.length );
-        //window.GoGetMissingCertificatesListTime.push(getMissingCertificatesListEnd - getMissingCertificatesListStart);
-        //window.domains.push(this.domain);
-        //window.GoGetMissingCertificatesListb64Decode.push(window.Gob64Decode):
-        //window.GoGetMissingCertificatesListJSONDecode.push(window.GoJSONDecode);
-        //window.GoGetMissingCertificatesListCopyBytes.push(window.GoCopy);
-
-        // TODO: in the new map server interface version, need to make a second request 
-        // here to get the PEM encodings of the certificates corresponding to the 
-        // missing certificates
-
-        // create input for addCertificatesToCache
-        var missingCertificatesArray = [];
-        for (var i in missingCertificateHashes) {
-            missingCertificatesArray.push(hashToPEMMap[missingCertificateHashes[i]]);
-        }
-        obj = {
-            certificatesb64: missingCertificatesArray
-        };
-        json = JSON.stringify(obj);
-
-        //jsonDecodeStart = performance.now();
-        jsonBytes = enc.encode(json); 
-        //jsonDecodeEnd = performance.now();
-        //window.jsAddCertificatesToCacheJSONDecode.push(jsonDecodeEnd - jsonDecodeStart);
-        //console.log("[JS] addCertificatesToCache unmarshalling JSON took ", jsonDecodeEnd - jsonDecodeStart, "ms");
-
-        //base64DecodeStart = performance.now();
-        //base64DecodeEnd = performance.now();
-        //window.jsAddCertificatesToCacheb64Decode.push(base64DecodeEnd - base64DecodeStart);
-        //console.log("[JS] addCertificatesToCache base64decode took ", base64DecodeEnd - base64DecodeStart, "ms");
-
-
-
-        // add the missing certificates to the cache
-        //const addCertificatesToCacheStart = performance.now();
-        addCertificatesToCache(jsonBytes, jsonBytes.length);
-        //const addCertificatesToCacheEnd = performance.now();
-        //window.GoAddCertificatesToCacheTime.push(addCertificatesToCacheEnd - addCertificatesToCacheStart);
-        //window.GoAddCertificatesSignatureTime.push(window.GoSignature);
-        //window.GoAddCertificatesToCacheb64Decode.push(window.Gob64Decode);
-        //window.GoAddCertificatesToCacheJSONDecode.push(window.GoJSONDecode);
-        //window.GoAddCertificatesToCacheCopyBytes.push(window.GoCopy);
-        //window.GoAddCertificatesToCacheParseCertificates.push(window.GoParseCertificates);
-        //window.GoNCertificatesAdded.push(window.GoNCertsAdded);
-
-        //console.log("[Go] addCertificatesToCache took ", window.GoAddCertificatesToCacheTime, " ms");   
-        
-        // to prevent crash of the addMapserverResponse call
-        // in fpki-request.js LOC 135
+        // TODO: remove return value once the old map server is not supported anymore
         return new Map([]); 
     }
 
@@ -327,7 +291,7 @@ async function fetchRetry(url, delay, tries, timeout, requestId, fetchIndex=0, f
     if (fetchIndex === 0) {
         fetchIndex = fetchCounter
         fetchCounter += 1;
-        cLog(requestId, "["+fetchIndex+"] starting... triesLeft="+tries+", url="+url);
+        cLog(requestId, "["+fetchIndex+"] starting... triesLeft="+tries+", url="+trimString(url));
     }
     // function onError(err){
     //     const triesLeft = tries - 1;
@@ -382,6 +346,27 @@ async function fetchWithTimeout(resource, options = {}) {
     return response;
 }
 
+// query map server for certificate and policy IDs
+async function queryMapServerIdsWithProof(mapServerUrl, domainName, options) {
+    const fetchUrl = mapServerUrl+"/getproof?domain="+domainName;
+    console.log(`initiating request: ${trimString(fetchUrl)}`);
+    const { delay=0, timeout=60000, maxTries=3, requestId } = options;
+    const {response, triesLeft} = await fetchRetry(fetchUrl, delay, maxTries, timeout, requestId, 0, { keepalive: true });
+    const decodedResponse = await response.json();
+
+    return {response: decodedResponse, fetchUrl: fetchUrl, nRetries: maxTries-triesLeft};
+}
+
+// query map server for certificate and policy payloads
+async function queryMapServerPayloads(mapServerUrl, ids, options) {
+    const fetchUrl = mapServerUrl+"/getpayloads?ids="+ids;
+    const { delay=0, timeout=60000, maxTries=3, requestId } = options;
+    const {response, triesLeft} = await fetchRetry(fetchUrl, delay, maxTries, timeout, requestId, 0, { keepalive: true });
+    const decodedResponse = await response.json();
+
+    return {response: decodedResponse, fetchUrl: fetchUrl, nRetries: maxTries-triesLeft};
+}
+
 // query map server
 async function queryMapServerHttp(mapServerUrl, domainName, options) {
     const fetchUrl = mapServerUrl+"/?domain="+domainName;
@@ -407,7 +392,9 @@ function base64DecodeDomainEntry(response) {
 export {
     queryMapServer,
     queryMapServerHttp,
+    queryMapServerIdsWithProof,
+    queryMapServerPayloads,
     extractPolicy,
-    extractCertificates,
+    retrieveMissingCertificates,
     checkConnection
 }

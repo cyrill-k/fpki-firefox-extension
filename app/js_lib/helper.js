@@ -165,3 +165,24 @@ export function intToHexString(intValue, separator = "") {
     }
     return components.join(separator);
 }
+
+
+export function base64ToHex(base64Value, separator = "") {
+    const raw = atob(base64Value);
+    let result = '';
+    for (let i = 0; i < raw.length; i++) {
+        const hex = raw.charCodeAt(i).toString(16);
+        if (i > 0) {
+            result += separator;
+        }
+        result += (hex.length === 2 ? hex : '0' + hex);
+    }
+    return result.toUpperCase();
+}
+
+export function trimString(string, maxLength = 100) {
+    const trimmedString = string.length > maxLength ?
+        string.substring(0, maxLength - 3) + "..." :
+        string;
+    return trimmedString;
+}

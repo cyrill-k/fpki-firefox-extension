@@ -2,7 +2,7 @@
 
 import { getDomainNameFromURL } from "../js_lib/domain.js"
 import { FpkiRequest } from "../js_lib/fpki-request.js"
-import { printMap, cLog, mapGetList, mapGetMap, mapGetSet } from "../js_lib/helper.js"
+import { printMap, cLog, mapGetList, mapGetMap, mapGetSet, trimString } from "../js_lib/helper.js"
 import { config, downloadConfig, importConfigFromJSON, initializeConfig, saveConfig, resetConfig } from "../js_lib/config.js"
 import { LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole, getSerializedLogEntries } from "../js_lib/log.js"
 import { FpkiError, errorTypes } from "../js_lib/errors.js"
@@ -27,15 +27,19 @@ if (window.GOCACHE) {
         go.run(result.instance);
     });
 } else if (window.GOCACHEV2) {
-    const go = new Go();
-    WebAssembly.instantiateStreaming(fetch("../go_wasm/gocachev2.wasm"), go.importObject).then((result) => {
-        go.run(result.instance);
-        console.log("[Go] Initialize cache with trust roots: #certificates = ",initializeGODatastructures("embedded/ca-certificates", "embedded/config.json"));
-        
-        // make LegacyTrustDecisionGo available to WASM
-        window.LegacyTrustDecisionGo = LegacyTrustDecisionGo;
+    try {
+        const go = new Go();
+        WebAssembly.instantiateStreaming(fetch("../go_wasm/gocachev2.wasm"), go.importObject).then((result) => {
+            go.run(result.instance);
+            console.log("[Go] Initialize cache with trust roots: #certificates = ", initializeGODatastructures("embedded/ca-certificates", "embedded/config.json"));
 
-    });    
+            // make LegacyTrustDecisionGo available to WASM
+            window.LegacyTrustDecisionGo = LegacyTrustDecisionGo;
+
+        });
+    } catch (error) {
+        console.log(`failed to initiate wasm context: ${error}`);
+    }
 }
 
 
@@ -160,7 +164,7 @@ function addTrustDecision(details, trustDecision) {
 async function requestInfo(details) {
     const perfStart = performance.now();
     const startTimestamp = new Date();
-    cLog(details.requestId, "requestInfo ["+details.url+"]");
+    cLog(details.requestId, "requestInfo ["+trimString(details.url)+"]");
 
     const domain = getDomainNameFromURL(details.url);
     if (!shouldValidateDomain(domain)) {
@@ -203,7 +207,7 @@ async function getTlsCertificateChain(securityInfo) {
 async function checkInfo(details) {
     const onHeadersReceived = performance.now();
     const logEntry = getLogEntryForRequest(details.requestId);
-    cLog(details.requestId, "checkInfo ["+details.url+"]");
+    cLog(details.requestId, "checkInfo ["+trimString(details.url)+"]");
     const domain = getDomainNameFromURL(details.url);
     if (!shouldValidateDomain(domain)) {
         // cLog(details.requestId, "ignoring (no checkInfo): " + domain);
@@ -344,7 +348,7 @@ async function onCompleted(details) {
         // cLog(details.requestId, "ignoring (no requestInfo): " + domain);
         return;
     }
-    cLog(details.requestId, "onCompleted ["+details.url+"]");
+    cLog(details.requestId, "onCompleted ["+trimString(details.url)+"]");
     // cLog(details.requestId, printLogEntriesToConsole());
     const logEntry = getLogEntryForRequest(details.requestId);
     if (logEntry !== null) {
