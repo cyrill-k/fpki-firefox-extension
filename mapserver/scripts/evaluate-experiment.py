@@ -74,13 +74,13 @@ def plot_size_comparison(raw_data, lim=None, logaxis=False, top_threshold=None):
     raw_data["estimated_hash_only_size"] = raw_data["n_hashes"]*32+raw_data["sum_signature_length"]
     raw_data["id_only"] = raw_data["estimated_hash_only_size"]/pow(10, 3)
 
-    ax.hist(raw_data["id_only"].head(top_threshold) if top_threshold is not None else raw_data["id_only"], density=True, cumulative=True, bins=1000000, histtype='step', label="IDs only")
+    ax.hist(raw_data["id_only"].head(top_threshold) if top_threshold is not None else raw_data["id_only"], density=True, cumulative=True, bins=1000000, histtype='step', label="IDs Only")
     raw_data["v0"] = raw_data["total_size"]/pow(10, 3)
-    ax.hist(raw_data["v0"].head(top_threshold) if top_threshold is not None else raw_data["v0"], density=True, cumulative=True, bins=100000, histtype='step', label="full payload", linestyle="dotted")
+    ax.hist(raw_data["v0"].head(top_threshold) if top_threshold is not None else raw_data["v0"], density=True, cumulative=True, bins=100000, histtype='step', label="Certificates", linestyle="dotted")
     raw_data["v1"] = raw_data["total_size"]/pow(10, 3)+raw_data["estimated_hash_only_size"]/pow(10, 3)*3
-    ax.hist(raw_data["v1"].head(top_threshold) if top_threshold is not None else raw_data["v1"], density=True, cumulative=True, bins=100000, histtype='step', label="overhead (IDs only, Q=3)", linestyle="dashed")
+    ax.hist(raw_data["v1"].head(top_threshold) if top_threshold is not None else raw_data["v1"], density=True, cumulative=True, bins=100000, histtype='step', label="Total Overhead\n(Q=3)", linestyle="dashed")
     raw_data["v2"] = raw_data["total_size"]/pow(10, 3)*3
-    ax.hist(raw_data["v2"].head(top_threshold) if top_threshold is not None else raw_data["v2"], density=True, cumulative=True, bins=100000, histtype='step', label="overhead (Q=3)", linestyle="dashdot")
+    ax.hist(raw_data["v2"].head(top_threshold) if top_threshold is not None else raw_data["v2"], density=True, cumulative=True, bins=100000, histtype='step', label="Total Overhead\n(Q=3 Without IDs)", linestyle="dashdot")
     fix_hist_step_vertical_line_at_end(ax)
     ax.set_xlim((pow(10, -0.9), pow(10, 4)))
     ax.set_xscale("log")
@@ -129,6 +129,19 @@ def plot_total_size_rolling_window_combined(raw_data, window_size=1000):
     ax.grid()
     ax.legend()
     save_fig(fig, f"total_size_rolling_window_{window_size}_combined.pdf")
+
+
+def plot_total_size_rolling_window_combined_presentation_format(raw_data, window_size=1000):
+    with mpl.rc_context({'font.family': 'sans-serif', 'font.size': 22}):
+        fig, ax = plt.subplots(figsize=(10, 4.8))
+        raw_data["total_size_kb"] = raw_data["total_size"]/pow(10, 3)
+        ax.plot(raw_data["total_size_kb"].rolling(window_size, center=True).quantile(0.95), label="95th percentile")
+        ax.plot(raw_data["total_size_kb"].rolling(window_size, center=True).median(), label="median", linestyle="dashed")
+        ax.set_ylim((1, pow(10, 3)))
+        ax.set_yscale("log")
+        ax.grid(axis='y')
+        ax.legend()
+        save_fig(fig, f"total_size_rolling_window_{window_size}_combined.pdf")
 
 
 def plot_total_size_rolling_window(raw_data, window_size=1000, agg="median"):
@@ -278,6 +291,7 @@ def main():
     plot_status(raw_data)
     success_df = raw_data[raw_data["status"] == 201]
     print(success_df)
+    plot_total_size_rolling_window_combined_presentation_format(success_df)
     plot_size_comparison(success_df, top_threshold=1000)
     plot_size_comparison(success_df)
     plot_total_size_rolling_window_combined(success_df)
