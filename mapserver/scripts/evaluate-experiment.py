@@ -141,7 +141,7 @@ def plot_total_size_rolling_window_combined_presentation_format(raw_data, window
         ax.set_yscale("log")
         ax.grid(axis='y')
         ax.legend()
-        save_fig(fig, f"total_size_rolling_window_{window_size}_combined.pdf")
+        save_fig(fig, f"total_size_rolling_window_{window_size}_combined_presentation_format.pdf")
 
 
 def plot_total_size_rolling_window(raw_data, window_size=1000, agg="median"):
