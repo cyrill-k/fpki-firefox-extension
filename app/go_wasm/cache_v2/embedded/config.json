@@ -25,11 +25,11 @@
             "CN=Amazon,OU=Server CA 1B,O=Amazon,C=US",
             "CN=Amazon Root CA 1,O=Amazon,C=US",
             "CN=DigiCert Global CA G2,O=DigiCert Inc,C=US",
-            "CN=DigiCert Global Root G2,OU=www.digicert.com,O=DigiCert Inc,C=US"
+            "CN=DigiCert Global Root G2,OU=www.digicert.com,O=DigiCert Inc,C=US",
+            "CN=Baltimore CyberTrust Root,OU=CyberTrust,O=Baltimore,C=IE"
         ],
         "Microsoft CA": [
-            "CN=Baltimore CyberTrust Root,OU=CyberTrust,O=Baltimore,C=IE",
-            "CN=DigiCert Global Root CA,OU=www.digicert.com,O=DigiCert Inc,C=US"
+            "CN=Microsoft RSA Root Certificate Authority 2017,O=Microsoft Corporation,C=US"
         ]
     },
     "legacy-trust-preference": {
@@ -41,7 +41,7 @@
         ],
         "bing.com": [
             {
-                "caSet": "Microsoft CA",
+                "caSet": "US CA",
                 "level": 1
             }
         ]
