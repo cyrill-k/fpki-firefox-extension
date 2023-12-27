@@ -1,9 +1,9 @@
-import {errorTypes, FpkiError} from "./errors.js"
+import { errorTypes, FpkiError } from "./errors.js"
 import * as domainFunc from "./domain.js"
 import * as verifier from "./verifier.js"
 import { cLog, convertArrayBufferToBase64, hashPemCertificateWithoutHeader, arrayToHexString, base64ToHex, trimString } from "./helper.js"
 import { addCertificateChainToCacheIfNecessary, getCertificateChainFromCacheByHash } from "./cache.js"
-import {config} from "./config.js"
+import { config } from "./config.js"
 
 // get map server response and check the connection
 async function getMapServerResponseAndCheck(url, needVerification, remoteInfo) {
@@ -30,11 +30,11 @@ function checkConnection(policies, remoteInfo, domainName) {
     // map countries => CAs in that country
     let countryToCAMap = new Map()
     countryToCAMap.set("US CA", ["CN=GTS CA 1C3,O=Google Trust Services LLC,C=US",
-                                 "CN=GTS Root R1,O=Google Trust Services LLC,C=US",
-                                 "CN=Amazon,OU=Server CA 1B,O=Amazon,C=US",
-                                 "CN=Amazon Root CA 1,O=Amazon,C=US",
-                                 "CN=DigiCert Global CA G2,O=DigiCert Inc,C=US",
-                                 "CN=DigiCert Global Root G2,OU=www.digicert.com,O=DigiCert Inc,C=US"])
+        "CN=GTS Root R1,O=Google Trust Services LLC,C=US",
+        "CN=Amazon,OU=Server CA 1B,O=Amazon,C=US",
+        "CN=Amazon Root CA 1,O=Amazon,C=US",
+        "CN=DigiCert Global CA G2,O=DigiCert Inc,C=US",
+        "CN=DigiCert Global Root G2,OU=www.digicert.com,O=DigiCert Inc,C=US"])
 
     var CertificateException = "invalid CA"
     var DomainNotAllowed = "domain not allowed"
@@ -102,10 +102,10 @@ function extractPolicy(mapResponse) {
                 if (trustedPCAMap.has(entry.CAEntry[j].CAName)) {
                     // group policies by CAs
                     policiesOfCurrentDomain.set(entry.CAEntry[j].CAName,
-                                                {
-                                                    TrustedCA: entry.CAEntry[j].CurrentPC.Policies.TrustedCA,
-                                                    AllowedSubdomains: entry.CAEntry[j].CurrentPC.Policies.AllowedSubdomains
-                                                })
+                        {
+                            TrustedCA: entry.CAEntry[j].CurrentPC.Policies.TrustedCA,
+                            AllowedSubdomains: entry.CAEntry[j].CurrentPC.Policies.AllowedSubdomains
+                        })
                 }
             }
             allPolicies.set(mapResponse[i].Domain, policiesOfCurrentDomain)
@@ -140,7 +140,7 @@ function extractRawCertificates(mapResponse) {
                 // if (trustedCAMap.has(entry.CAEntry[j].CAName)) {
                 // group certificates by CAs
                 certificatesOfCurrentDomain.set(entry.CAEntry[j].CAName,
-                                                {certs: entry.CAEntry[j].DomainCerts, certChains: entry.CAEntry[j].DomainCertChains});
+                    { certs: entry.CAEntry[j].DomainCerts, certChains: entry.CAEntry[j].DomainCertChains });
                 // }
             }
             certificateMap.set(mapResponse[i].Domain, certificatesOfCurrentDomain);
@@ -264,7 +264,7 @@ async function retrieveMissingCertificatesAndPolicies(mapResponse, requestId, ma
     let totalCertificatesParsed = 0;
     for (const [domain, rawCaMap] of rawDomainMap) {
         const caMap = new Map();
-        for (const [ca, {certs, certChains}] of rawCaMap) {
+        for (const [ca, { certs, certChains }] of rawCaMap) {
             let certHashes = [];
             if (certs !== null) {
                 // don't use promise.all(...) since then the intermediate certificates will be parsed multiple times. `addCertificateChainToCacheIfNecessary` checks if the certificate is already cached and if not it starts parsing. The problem arises if multiple intermediate certificates for one domain use the same intermediate certificate and do this check before waiting for the other functions to parse and add the certificate to the cache.
@@ -273,18 +273,18 @@ async function retrieveMissingCertificatesAndPolicies(mapResponse, requestId, ma
                     if (chain === null) {
                         chain = [];
                     }
-                    const {hash, nCertificatesParsed} = await addCertificateChainToCacheIfNecessary(c, chain);
+                    const { hash, nCertificatesParsed } = await addCertificateChainToCacheIfNecessary(c, chain);
                     totalCertificatesParsed += nCertificatesParsed;
                     certHashes.push(hash);
                 };
             }
-            caMap.set(ca, {certHashes: certHashes});
+            caMap.set(ca, { certHashes: certHashes });
         }
         hashMap.set(domain, caMap);
     }
     const endParse = performance.now();
     const nEntries = Array.from(hashMap.values()).reduce((a, caMap) => {
-        return a + Array.from(caMap.values()).reduce((aa, {certHashes}) => {
+        return a + Array.from(caMap.values()).reduce((aa, { certHashes }) => {
             return aa + certHashes.length;
         }, 0);
     }, 0);
@@ -294,7 +294,7 @@ async function retrieveMissingCertificatesAndPolicies(mapResponse, requestId, ma
     const domainMap = new Map();
     for (const [domain, hashMapCa] of hashMap) {
         const caMap = new Map();
-        for (const [ca, {certHashes}] of hashMapCa) {
+        for (const [ca, { certHashes }] of hashMapCa) {
             const certs = [];
             const certChains = [];
             certHashes.forEach(hash => {
@@ -302,13 +302,13 @@ async function retrieveMissingCertificatesAndPolicies(mapResponse, requestId, ma
                 certs.push(certChainWithLeaf[0]);
                 certChains.push(certChainWithLeaf.slice(1));
             });
-            caMap.set(ca, {certs, certChains});
+            caMap.set(ca, { certs, certChains });
         }
         domainMap.set(domain, caMap);
     }
     const endFetchCert = performance.now();
 
-    cLog(requestId, `LF-PKI response parsing (${nEntries} entries): raw=${endRawExtraction - startRawExtraction} ms, hash (and parse ${totalCertificatesParsed} certs)=${endParse - startParse} ms, fetch cert from cache=${endFetchCert-startFetchCert} ms`);
+    cLog(requestId, `LF-PKI response parsing (${nEntries} entries): raw=${endRawExtraction - startRawExtraction} ms, hash (and parse ${totalCertificatesParsed} certs)=${endParse - startParse} ms, fetch cert from cache=${endFetchCert - startFetchCert} ms`);
 
     return { certificatesOld: domainMap };
 }
@@ -325,15 +325,15 @@ async function queryMapServer(domainName) {
 
 var fetchCounter = 1;
 
-function wait(delay){
+function wait(delay) {
     return new Promise((resolve) => setTimeout(resolve, delay));
 }
 
-async function fetchRetry(url, delay, tries, timeout, requestId, fetchIndex=0, fetchOptions = {}) {
+async function fetchRetry(url, delay, tries, timeout, requestId, fetchIndex = 0, fetchOptions = {}) {
     if (fetchIndex === 0) {
         fetchIndex = fetchCounter
         fetchCounter += 1;
-        cLog(requestId, "["+fetchIndex+"] starting... triesLeft="+tries+", url="+trimString(url));
+        cLog(requestId, "[" + fetchIndex + "] starting... triesLeft=" + tries + ", url=" + trimString(url));
     }
     // function onError(err){
     //     const triesLeft = tries - 1;
@@ -345,18 +345,18 @@ async function fetchRetry(url, delay, tries, timeout, requestId, fetchIndex=0, f
     // }
     const controller = new AbortController();
     const id = setTimeout(() => {
-        cLog(requestId, "["+fetchIndex+"] aborting after timeout... triesLeft="+tries);
+        cLog(requestId, "[" + fetchIndex + "] aborting after timeout... triesLeft=" + tries);
         controller.abort();
     }, timeout);
-    cLog(requestId, "["+fetchIndex+"] fetching... triesLeft="+tries);
+    cLog(requestId, "[" + fetchIndex + "] fetching... triesLeft=" + tries);
     try {
-        const response = await fetch(url,{ ...fetchOptions, signal: controller.signal });
-        cLog(requestId, "["+fetchIndex+"] finished... triesLeft="+tries);
-        return {response, triesLeft: tries};
-    } catch(err) {
+        const response = await fetch(url, { ...fetchOptions, signal: controller.signal });
+        cLog(requestId, "[" + fetchIndex + "] finished... triesLeft=" + tries);
+        return { response, triesLeft: tries };
+    } catch (err) {
         const triesLeft = tries - 1;
-        if(!triesLeft){
-            cLog(requestId, "["+fetchIndex+"] failed... triesLeft="+triesLeft);
+        if (!triesLeft) {
+            cLog(requestId, "[" + fetchIndex + "] failed... triesLeft=" + triesLeft);
             throw err;
         }
         return wait(delay).then(() => fetchRetry(url, delay, triesLeft, timeout, requestId, fetchIndex, fetchOptions));
@@ -374,52 +374,52 @@ async function fetchWithTimeout(resource, options = {}) {
 
     const controller = new AbortController();
     const id = setTimeout(() => {
-        cLog(requestId, "aborting... "+currentFetchId);
+        cLog(requestId, "aborting... " + currentFetchId);
         cLog(requestId, resource);
         controller.abort();
     }, timeout);
-    cLog(requestId, "starting... "+currentFetchId);
+    cLog(requestId, "starting... " + currentFetchId);
     const response = await fetch(resource, {
         ...options,
         signal: controller.signal
     });
-    cLog(requestId, "cancelling... "+currentFetchId);
+    cLog(requestId, "cancelling... " + currentFetchId);
     clearTimeout(id);
     return response;
 }
 
 // query map server for certificate and policy IDs
 async function queryMapServerIdsWithProof(mapServerUrl, domainName, options) {
-    const fetchUrl = mapServerUrl+"/getproof?domain="+domainName;
+    const fetchUrl = mapServerUrl + "/getproof?domain=" + domainName;
     console.log(`initiating request: ${trimString(fetchUrl)}`);
-    const { delay=0, timeout=60000, maxTries=3, requestId } = options;
-    const {response, triesLeft} = await fetchRetry(fetchUrl, delay, maxTries, timeout, requestId, 0, { keepalive: true });
+    const { delay = 0, timeout = 60000, maxTries = 3, requestId } = options;
+    const { response, triesLeft } = await fetchRetry(fetchUrl, delay, maxTries, timeout, requestId, 0, { keepalive: true });
     const decodedResponse = await response.json();
 
-    return {response: decodedResponse, fetchUrl: fetchUrl, nRetries: maxTries-triesLeft};
+    return { response: decodedResponse, fetchUrl: fetchUrl, nRetries: maxTries - triesLeft };
 }
 
 // query map server for certificate and policy payloads
 async function queryMapServerPayloads(mapServerUrl, ids, options) {
-    const fetchUrl = mapServerUrl+"/getpayloads?ids="+ids;
-    const { delay=0, timeout=60000, maxTries=3, requestId } = options;
-    const {response, triesLeft} = await fetchRetry(fetchUrl, delay, maxTries, timeout, requestId, 0, { keepalive: true });
+    const fetchUrl = mapServerUrl + "/getpayloads?ids=" + ids;
+    const { delay = 0, timeout = 60000, maxTries = 3, requestId } = options;
+    const { response, triesLeft } = await fetchRetry(fetchUrl, delay, maxTries, timeout, requestId, 0, { keepalive: true });
     const decodedResponse = await response.json();
 
-    return {response: decodedResponse, fetchUrl: fetchUrl, nRetries: maxTries-triesLeft};
+    return { response: decodedResponse, fetchUrl: fetchUrl, nRetries: maxTries - triesLeft };
 }
 
 // query map server
 async function queryMapServerHttp(mapServerUrl, domainName, options) {
-    const fetchUrl = mapServerUrl+"/?domain="+domainName;
+    const fetchUrl = mapServerUrl + "/?domain=" + domainName;
     // let resp = await fetchWithTimeout(fetchUrl, options);
-    const { delay=0, timeout=60000, maxTries=3, requestId } = options;
-    let {response, triesLeft} = await fetchRetry(fetchUrl, delay, maxTries, timeout, requestId, 0, { keepalive: true });
+    const { delay = 0, timeout = 60000, maxTries = 3, requestId } = options;
+    let { response, triesLeft } = await fetchRetry(fetchUrl, delay, maxTries, timeout, requestId, 0, { keepalive: true });
     let domainEntries = await response.json();
 
     let base64decodedEntries = base64DecodeDomainEntry(domainEntries);
 
-    return {response: domainEntries, fetchUrl: fetchUrl, nRetries: maxTries-triesLeft};
+    return { response: domainEntries, fetchUrl: fetchUrl, nRetries: maxTries - triesLeft };
 }
 
 function base64DecodeDomainEntry(response) {
