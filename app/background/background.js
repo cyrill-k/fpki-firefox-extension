@@ -6,10 +6,11 @@ import { printMap, cLog, mapGetList, mapGetMap, mapGetSet, trimString } from "..
 import { config, downloadConfig, importConfigFromJSON, initializeConfig, saveConfig, resetConfig } from "../js_lib/config.js"
 import { LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole, getSerializedLogEntries } from "../js_lib/log.js"
 import { FpkiError, errorTypes } from "../js_lib/errors.js"
-import { policyValidateConnection, legacyValidateConnection, legacyValidateConnectionGo } from "../js_lib/validation.js"
-import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations, LegacyTrustDecisionGo, getLegacyValidationErrorMessageGo} from "../js_lib/validation-types.js"
+import { policyValidateConnection, legacyValidateConnection, legacyValidateConnectionGo, policyValidateConnectionGo } from "../js_lib/validation.js"
+import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations, LegacyTrustDecisionGo, PolicyTrustDecisionGo, getLegacyValidationErrorMessageGo, getPolicyValidationErrorMessageGo} from "../js_lib/validation-types.js"
 import "../js_lib/wasm_exec.js"
 import { addCertificateChainToCacheIfNecessary, getCertificateEntryByHash } from "../js_lib/cache.js"
+import { VerifyAndGetMissingIDsResponseGo, AddMissingPayloadsResponseGo } from "../js_lib/FP-PKI-accessor.js"
 
 try {
     initializeConfig();
@@ -31,10 +32,14 @@ if (window.GOCACHE) {
         const go = new Go();
         WebAssembly.instantiateStreaming(fetch("../go_wasm/gocachev2.wasm"), go.importObject).then((result) => {
             go.run(result.instance);
-            console.log("[Go] Initialize cache with trust roots: #certificates = ", initializeGODatastructures("embedded/ca-certificates", "embedded/config.json"));
+            const nCertificatesAdded = initializeGODatastructures("embedded/ca-certificates", "embedded/pca-certificates", "embedded/config.json");
+            console.log(`[Go] Initialize cache with trust roots: #certificates = ${nCertificatesAdded[0]}, #policies = ${nCertificatesAdded[1]}`);
 
-            // make LegacyTrustDecisionGo available to WASM
+            // make js classes for encapsulating return values available to WASM
             window.LegacyTrustDecisionGo = LegacyTrustDecisionGo;
+            window.PolicyTrustDecisionGo = PolicyTrustDecisionGo;
+            window.VerifyAndGetMissingIDsResponseGo = VerifyAndGetMissingIDsResponseGo;
+            window.AddMissingPayloadsResponseGo = AddMissingPayloadsResponseGo;
 
         });
     } catch (error) {
@@ -102,6 +107,9 @@ const trustDecisions = new Map();
 
 // cache mapping (domain, leaf certificate fingerprint) tuples to legacy trust decisions.
 const legacyTrustDecisionCache = new Map();
+
+// cache mapping (domain, leaf certificate fingerprint) tuples to policy trust decisions.
+const policyTrustDecisionCache = new Map();
 
 // contains certificates that are trusted even if legacy (and policy) validation fails
 // data structure is a map [domain] => [x509 fingerprint]
@@ -266,20 +274,41 @@ async function checkInfo(details) {
 
             // remember if policy validations has been performed
             let policyChecksPerformed = false;
-            // check each policy and throw an error if one of the verifications fails
-            policiesMap.forEach((p, m) => {
-                // cLog(details.requestId, "starting policy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
 
-                const {trustDecision} = policyValidateConnection(certificateChain, config, domain, p, m);
+            if (window.GOCACHEV2) {
+                // check if have a cached trust decision for this domain+leaf certificate
+                const key = domain + certificateChain[0].fingerprintSha256;
+                var trustDecision = null;
+                trustDecision = policyTrustDecisionCache.get(key);
+                var currentTime = new Date();
+                if (trustDecision === undefined || currentTime > trustDecision.validUntil) {
+                    trustDecision = policyValidateConnectionGo(certificateChain, domain);
+                    if (trustDecision.policyChain.length > 0) {
+                        policyChecksPerformed = true;
+                    }
+                    policyTrustDecisionCache.set(key, trustDecision)
+
+                }
                 addTrustDecision(details, trustDecision);
+                if (trustDecision.evaluationResult !== 1) {
+                    throw new FpkiError(errorTypes.POLICY_MODE_VALIDATION_ERROR, getPolicyValidationErrorMessageGo(trustDecision));
+                }
+            } else {
+                // check each policy and throw an error if one of the verifications fails
+                policiesMap.forEach((p, m) => {
+                    // cLog(details.requestId, "starting policy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
 
-                if (hasApplicablePolicy(trustDecision)) {
-                    policyChecksPerformed = true;
-                }
-                if (hasFailedValidations(trustDecision)) {
-                    throw new FpkiError(errorTypes.POLICY_MODE_VALIDATION_ERROR, getShortErrorMessages(trustDecision)[0]);
-                }
-            });
+                    const { trustDecision } = policyValidateConnection(certificateChain, config, domain, p, m);
+                    addTrustDecision(details, trustDecision);
+
+                    if (hasApplicablePolicy(trustDecision)) {
+                        policyChecksPerformed = true;
+                    }
+                    if (hasFailedValidations(trustDecision)) {
+                        throw new FpkiError(errorTypes.POLICY_MODE_VALIDATION_ERROR, getShortErrorMessages(trustDecision)[0]);
+                    }
+                });
+            }
 
             // don't perform legacy validation if policy validation has already taken place
             if (!policyChecksPerformed) {
@@ -297,7 +326,7 @@ async function checkInfo(details) {
                     addTrustDecision(details, trustDecision);
                     if (trustDecision.evaluationResult !== 1) {
                         throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, getLegacyValidationErrorMessageGo(trustDecision));
-                    }                    
+                    }
                 } else {
                     // check each policy and throw an error if one of the verifications fails
                     certificatesMap.forEach((c, m) => {

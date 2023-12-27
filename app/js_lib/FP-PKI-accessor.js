@@ -149,74 +149,116 @@ function extractRawCertificates(mapResponse) {
     return certificateMap;
 }
 
-async function retrieveMissingCertificates(mapResponse, requestId, mapResponseNew) {
+function* splitIntoIDs(base64IDs) {
+    const rawIds = atob(base64IDs);
+    const nHashes = rawIds.length / 32
+    for (let i = 0; i < nHashes; i++) {
+        yield btoa(rawIds.slice(i * 32, (i + 1) * 32))
+    }
+}
+
+function extractIDsFromMapserverResponse(mapResponse, requestId) {
+    const requiredHashes = new Set();
+    const requiredPolicyHashes = new Set();
+    let nTotalHashes = 0;
+    let nTotalPolicyHashes = 0;
+    for (const entry of mapResponse) {
+        if (entry.DomainEntry.CertIDs !== null) {
+            const base64IDs = entry.DomainEntry.CertIDs;
+            let nHashes = 0;
+            for (const id of splitIntoIDs(base64IDs)) {
+                requiredHashes.add(id);
+                nHashes += 1;
+            }
+            nTotalHashes += nHashes;
+            cLog(requestId, `entry for ${entry.DomainEntry.DomainName} contains ${nHashes} ids`);
+        }
+        if (entry.DomainEntry.PolicyIDs !== null) {
+            const base64IDs = entry.DomainEntry.PolicyIDs;
+            let nHashes = 0;
+            for (const id of splitIntoIDs(base64IDs)) {
+                requiredPolicyHashes.add(id);
+                nHashes += 1;
+            }
+            nTotalPolicyHashes += nHashes;
+            cLog(requestId, `[policy] entry for ${entry.DomainEntry.DomainName} contains ${nHashes} ids`);
+        }
+    }
+    cLog(requestId, `total: ${nTotalHashes} ids (${requiredHashes.size} unique ids)`);
+    cLog(requestId, `[policy] total: ${nTotalPolicyHashes} ids (${requiredPolicyHashes.size} unique ids)`);
+    return { requiredCertificateIDs: requiredHashes, requiredPolicyIDs: requiredPolicyHashes };
+}
+
+export class VerifyAndGetMissingIDsResponseGo {
+    constructor(verificationResult, certificateIDs, policyIDs) {
+        this.verificationResult = verificationResult;
+        this.certificateIDs = certificateIDs;
+        this.policyIDs = policyIDs;
+    }
+}
+
+export class AddMissingPayloadsResponseGo {
+    constructor(processedCertificateIDs, processedPolicyIDs) {
+        this.processedCertificateIDs = processedCertificateIDs;
+        this.processedPolicyIDs = processedPolicyIDs;
+    }
+}
+
+async function retrieveMissingCertificatesAndPolicies(mapResponse, requestId, mapResponseNew, mapserverDomain) {
     const startRawExtraction = performance.now();
-    const rawDomainMap = extractRawCertificates(mapResponse);
+    const rawDomainMap = new Map()
     const endRawExtraction = performance.now();
     const startParse = performance.now();
     const hashMap = new Map();
 
-    if(window.GOCACHEV2) {
-        // extract required certificate ids from the map server response
-        const requiredHashes = new Set();
-        var nTotalHashes = 0;
-        for (const entry of mapResponseNew) {
-            if (entry.DomainEntry.CertIDs !== null) {
-                const base64Ids = entry.DomainEntry.CertIDs;
-                const rawIds = atob(base64Ids);
-                const nHashes = rawIds.length/32
-                nTotalHashes += nHashes;
-                for (let i = 0; i < nHashes; i++) {
-                    requiredHashes.add(btoa(rawIds.slice(i*32, (i+1)*32)));
-                }
-                cLog(requestId, `entry for ${entry.DomainEntry.DomainName} contains ${nHashes} ids`);
-            }
-        }
-        cLog(requestId, `total: ${nTotalHashes} ids (${requiredHashes.size} unique ids)`);
-
-        // find certificate hashes that are not yet locally cached
-        let obj = {
-            hashesb64: [...requiredHashes]
-        }
-        let json = JSON.stringify(obj);
+    if (window.GOCACHEV2) {
+        cLog(requestId, "Verifying MHT inclusion proof and finding missing IDs");
+        let json = JSON.stringify(mapResponseNew);
         const enc = new TextEncoder();
         let jsonBytes = enc.encode(json);
-        const missingCertificateHashes = getMissingCertificatesList(jsonBytes, jsonBytes.length);
-        cLog(requestId, `Found ${missingCertificateHashes.length} missing certificates: ${trimString(String(missingCertificateHashes))}`);
+        const { verificationResult, certificateIDs: missingCertificateIDs, policyIDs: missingPolicyIDs } = verifyAndGetMissingIDs(jsonBytes, jsonBytes.length);
+        // TODO: check verification result
 
-        if (missingCertificateHashes.length > 0) {
+        const missingIDs = missingCertificateIDs.concat(missingPolicyIDs);
+        if (missingIDs.length > 0) {
+            cLog(requestId, `Detected ${missingIDs.length} missing IDs (${missingCertificateIDs.length} certs, ${missingPolicyIDs.length} policies): Fetching missing payloads...`);
             // fetch missing certificates
-            var getParameter = "";
-            for (const hash of missingCertificateHashes) {
+            let getParameter = "";
+            for (const hash of missingIDs) {
                 getParameter += base64ToHex(hash);
             }
             let result;
             try {
-                result = await queryMapServerPayloads("http://127.0.0.1:8443", getParameter, { timeout: config.get("proof-fetch-timeout"), requestId: requestId, maxTries: config.get("proof-fetch-max-tries") });
+                result = await queryMapServerPayloads(mapserverDomain, getParameter, { timeout: config.get("proof-fetch-timeout"), requestId: requestId, maxTries: config.get("proof-fetch-max-tries") });
             } catch (error) {
                 throw new FpkiError(errorTypes.MAPSERVER_NETWORK_ERROR, error);
             }
-
-            // add the missing certificates to the cache
-            obj = {
-                certificatesb64: [...result.response]
+            const obj = {
+                certificateIDs: missingCertificateIDs,
+                policyIDs: missingPolicyIDs,
+                payloads: [...result.response]
             };
             json = JSON.stringify(obj);
             jsonBytes = enc.encode(json);
-            const addedCertificates = addCertificatesToCache(jsonBytes, jsonBytes.length);
-            cLog(requestId, `Added ${addedCertificates.length} certificates to the cache`);
 
-            // check if all missing certificates were returned by the map server
-            const addedCertificatesSet = new Set(addedCertificates)
-            let unprovidedCertificates = missingCertificateHashes.filter((value, index) => !addedCertificatesSet.has(value));
+            cLog(requestId, `Adding ${obj.payloads.length} payloads to the cache...`);
+            const { processedCertificateIDs, processedPolicyIDs } = addMissingPayloads(jsonBytes, jsonBytes.length);
+            cLog(requestId, `Added ${processedCertificateIDs.length} certificates and ${processedPolicyIDs.length} policies to the cache`);
+
+            const processedCertificatesSet = new Set(processedCertificateIDs)
+            const unprovidedCertificates = missingCertificateIDs.filter((value, index) => !processedCertificatesSet.has(value));
             if (unprovidedCertificates.length > 0) {
-                console.log(`certs that are not provided by the map server = ${unprovidedCertificates}`);
-                throw new FpkiError(errorTypes.MAPSERVER_NETWORK_ERROR, "certificate hashes not provided");
+                console.log(`The response from map server ${mapserverDomain} is missing ${unprovidedCertificates.length} certificates: ${unprovidedCertificates}`);
+                throw new FpkiError(errorTypes.MAPSERVER_NETWORK_ERROR, "map server did not provide all certificate payloads");
+            }
+            const processedPoliciesSet = new Set(processedPolicyIDs)
+            const unprovidedPolicies = missingPolicyIDs.filter((value, index) => !processedPoliciesSet.has(value));
+            if (unprovidedPolicies.length > 0) {
+                console.log(`The response from map server ${mapserverDomain} is missing ${unprovidedPolicies.length} policies: ${unprovidedPolicies}`);
+                throw new FpkiError(errorTypes.MAPSERVER_NETWORK_ERROR, "map server did not provide all policy payloads");
             }
         }
 
-        // TODO: remove return value once the old map server is not supported anymore
-        return new Map([]); 
     }
 
     let totalCertificatesParsed = 0;
@@ -268,7 +310,7 @@ async function retrieveMissingCertificates(mapResponse, requestId, mapResponseNe
 
     cLog(requestId, `LF-PKI response parsing (${nEntries} entries): raw=${endRawExtraction - startRawExtraction} ms, hash (and parse ${totalCertificatesParsed} certs)=${endParse - startParse} ms, fetch cert from cache=${endFetchCert-startFetchCert} ms`);
 
-    return domainMap;
+    return { certificatesOld: domainMap };
 }
 
 // query map server
@@ -395,6 +437,6 @@ export {
     queryMapServerIdsWithProof,
     queryMapServerPayloads,
     extractPolicy,
-    retrieveMissingCertificates,
+    retrieveMissingCertificatesAndPolicies,
     checkConnection
 }

@@ -1,5 +1,5 @@
 import {errorTypes, FpkiError} from "./errors.js"
-import {queryMapServerHttp, queryMapServerIdsWithProof, queryMapServerPayloads, extractPolicy, retrieveMissingCertificates} from "./FP-PKI-accessor.js"
+import {queryMapServerHttp, queryMapServerIdsWithProof, queryMapServerPayloads, extractPolicy, retrieveMissingCertificatesAndPolicies} from "./FP-PKI-accessor.js"
 import {mapGetList, cLog, printMap} from "./helper.js"
 import {config} from "./config.js"
 import * as verifier from "./verifier.js"
@@ -100,15 +100,15 @@ export class FpkiRequest {
                 case "lfpki-http-get":
                     let result, resultIdsOnly;
                     try {
-                        resultIdsOnly = await queryMapServerIdsWithProof("http://127.0.0.1:8443", this.domain, {timeout: config.get("proof-fetch-timeout"), requestId: this.requestId, maxTries: config.get("proof-fetch-max-tries")});
-                        result = await queryMapServerHttp(this.mapserver.domain, this.domain, {timeout: config.get("proof-fetch-timeout"), requestId: this.requestId, maxTries: config.get("proof-fetch-max-tries")});
+                        resultIdsOnly = await queryMapServerIdsWithProof(this.mapserver.domain, this.domain, {timeout: config.get("proof-fetch-timeout"), requestId: this.requestId, maxTries: config.get("proof-fetch-max-tries")});
+                        // result = await queryMapServerHttp(config.get("mapservers-old")[0].domain, this.domain, {timeout: config.get("proof-fetch-timeout"), requestId: this.requestId, maxTries: config.get("proof-fetch-max-tries")});
                     } catch(error) {
                         throw new FpkiError(errorTypes.MAPSERVER_NETWORK_ERROR, error);
                     }
-                    mapResponse = result.response;
+                    // mapResponse = result.response;
                     mapResponseNew = resultIdsOnly.response;
-                    nRetries = result.nRetries;
-                    performanceResourceEntry = this.#getLatestPerformanceResourceEntry(result.fetchUrl);
+                    nRetries = resultIdsOnly.nRetries;
+                    performanceResourceEntry = this.#getLatestPerformanceResourceEntry(resultIdsOnly.fetchUrl);
                     break;
                 default:
                     throw new FpkiError(errorTypes.INVALID_CONFIG, "Invalid mapserver config: "+this.mapserver.querytype)
@@ -136,16 +136,17 @@ export class FpkiRequest {
                 // console.log(`verify POI: ${new Date()-start}`);
 
                 // TODO: implement extract policy logic in retrieveMissingCertificates
-                const policies = extractPolicy(mapResponse);
+                // const policies = extractPolicy(mapResponse);
+                const policies = new Map();
 
                 // TODO: also return policies
-                const certificates = await retrieveMissingCertificates(mapResponse, this.requestId, mapResponseNew);
+                const { certificatesOld } = await retrieveMissingCertificatesAndPolicies(mapResponse, this.requestId, mapResponseNew, this.mapserver.domain);
                 cLog(this.requestId, "fetch finished for: "+this.domain);
 
                 // add policies to policy cache
-                addMapserverResponse(this.requestInitiated, this.domain, this.mapserver, policies, certificates);
+                addMapserverResponse(this.requestInitiated, this.domain, this.mapserver, policies, certificatesOld);
 
-                return {policies, certificates, metrics};
+                return {policies, certificates: certificatesOld, metrics};
             } catch (error) {
                 throw error;
             } finally {

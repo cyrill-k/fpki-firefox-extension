@@ -39,6 +39,23 @@ export class LegacyTrustDecision {
     }
 }
 
+export class PolicyTrustDecisionGo {
+    constructor(domain, evaluationResult, policyChain, conflictingPolicies, validUntilUnix) {
+        this.type = "policy";
+        this.domain = domain;
+        this.connectionCertificateChain = null;
+
+        this.evaluationResult = evaluationResult;
+
+        // timestamp until which this entry can be cached
+        this.validUntil = new Date(validUntilUnix*1000);
+
+        this.policyChain = policyChain;
+
+        this.conflictingPolicies = conflictingPolicies;
+    }
+}
+
 export class LegacyTrustDecisionGo {
     constructor(domain, connectionTrustLevel, connectionRelevantCASetID, connectionExampleSubject, evaluationResult,
         highestTrustLevel, relevantCASetIDs, exampleSubjects, validUntilUnix) {
@@ -151,6 +168,11 @@ export function getLegacyValidationErrorMessageGo(legacyTrustDecisionGo) {
     }
 
     return errorMessage;
+}
+
+export function getPolicyValidationErrorMessageGo(policyTrustDecisionGo) {
+    // TODO: improve error message formatting
+    return `[policy mode] Detected violated policy ${policyTrustDecisionGo.conflictingPolicies} specified in chain ${policyTrustDecisionGo.policyChain}`;
 }
 
 function getPolicyErrorMessage(trustDecision, trustInfo, evaluation) {

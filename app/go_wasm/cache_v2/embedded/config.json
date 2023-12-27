@@ -46,10 +46,18 @@
             }
         ]
     },
-    "policy-trust-preference": {
+    "policy-trust-preference-old": {
         "*": [
             {
                 "pca": "pca",
+                "level": 1
+            }
+        ]
+    },
+    "policy-trust-preference": {
+        "*": [
+            {
+                "pcaPublicKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4vIr5iyQ6ejTSyRoNZ2GbU2QXx5rauzZJgpxpHHYjEMcFPkKoLMXwDTPcabeddSzrP208WwEF5C4Gu4YwVdvTqjXRmjrZ6qLLUtlwINcBSJggkgeouusyqS6B5n1+deHrRqBsaXQMtQwzRnfWuYxdRtmF5zUGINZSwpVQpKEYa3/dyq3cbm/QhDqJbqCIP2knLm6i7Dny6KiExcALJhpByX3znueIrHqzLAARX8FoEQvvGBg34sdEKbyGUxRhrRThjBK/P7FMixUIbTS31BL96/C73+p7WznEIpmwXFZYpMtAVH3cE/ttWYKfgyPlhzHPh0dwA+p0Ddqvy1PMvPA2QIDAQAB",
                 "level": 1
             }
         ]

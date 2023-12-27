@@ -119,3 +119,12 @@ func CreateCertificate(template *x509.Certificate,
 	pem := EncodePEM(certBytes, CERTIFICATE)
 	return pem, nil
 }
+
+func maxTime(times ...time.Time) (maxTime time.Time) {
+	for i, t := range times {
+		if i == 0 || t.After(maxTime) {
+			maxTime = t
+		}
+	}
+	return
+}

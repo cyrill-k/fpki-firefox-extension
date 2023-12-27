@@ -7,9 +7,12 @@ function defaultConfig() {
     // TODO: remove duplicate local mapserver (only used for testing)
     // use 127.0.0.11 instead of localhost to distinguish the second test server from the first one (although it is the same instance)
     // also, using 127.0.0.11 ensures that the mapserver IPs do not clash with the local test webpage at 127.0.0.1
-    c.set("mapservers", [
+    c.set("mapservers-old", [
         // {"identity": "local-mapserver", "domain": "http://localhost:8080", "querytype": "lfpki-http-get"},
         {"identity": "ETH-mapserver-top-100k", "domain": "http://129.132.55.210:8080", "querytype": "lfpki-http-get"}
+    ]);
+    c.set("mapservers", [
+        {"identity": "local-mapserver", "domain": "http://127.0.0.1:8443", "querytype": "lfpki-http-get"},
     ]);
     // cache timeout in ms
     c.set("cache-timeout", 60*60*1000);
