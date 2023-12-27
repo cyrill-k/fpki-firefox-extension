@@ -75,3 +75,15 @@ After the map server is set up, load the browser extension by visiting ``about:d
 - Policy (issuer) block: https://baidu.com
 - Policy (subcomains) allow: https://netsec.ethz.ch
 - Policy (subcomains) block: https://sellercentral.amazon.com
+
+#### New Structure Idea
+- store per-(P)CA cache on the golang side:
+  - Domain -> (P)CA -> [
+      ts,
+      missingCerts,
+      ]
+  - verify(X) returns:
+    - success (policy and/or legacy validation succeeded)
+    - need more map server responses:
+      - need N responses from the K policy map servers (M0, M1, ..., MK)
+      - need N' responses from the K' legacy map servers (M0, M1, ..., MK')
