@@ -3,6 +3,9 @@
     "version": "1.0",
     "manifest_version": 2,
     "description": "LF-PKI browser extension",
+    "options_ui": {
+        "page": "htmls/options/options.html"
+    },      
     "background": {
         "page": "./background/background.html",
         "persistent": true

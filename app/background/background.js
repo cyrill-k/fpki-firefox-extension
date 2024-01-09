@@ -2,8 +2,8 @@
 
 import { getDomainNameFromURL } from "../js_lib/domain.js"
 import { FpkiRequest } from "../js_lib/fpki-request.js"
-import { printMap, cLog, mapGetList, mapGetMap, mapGetSet, trimString } from "../js_lib/helper.js"
-import { config, downloadConfig, importConfigFromJSON, initializeConfig, saveConfig, resetConfig } from "../js_lib/config.js"
+    import { printMap, cLog, mapGetList, mapGetMap, mapGetSet, trimString } from "../js_lib/helper.js"
+import { config, downloadConfig, importConfigFromJSON, initializeConfig, getConfig, saveConfig, resetConfig, exportConfigToJSON, getJSONConfig, toOldConfig } from "../js_lib/config.js"
 import { LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole, getSerializedLogEntries } from "../js_lib/log.js"
 import { FpkiError, errorTypes } from "../js_lib/errors.js"
 import { policyValidateConnection, legacyValidateConnection, legacyValidateConnectionGo, policyValidateConnectionGo } from "../js_lib/validation.js"
@@ -12,12 +12,16 @@ import "../js_lib/wasm_exec.js"
 import { addCertificateChainToCacheIfNecessary, getCertificateEntryByHash } from "../js_lib/cache.js"
 import { VerifyAndGetMissingIDsResponseGo, AddMissingPayloadsResponseGo } from "../js_lib/FP-PKI-accessor.js"
 
+
 try {
     initializeConfig();
-    window.GOCACHE = config.get("wasm-certificate-parsing");
-    window.GOCACHEV2 = config.get("wasm-certificate-caching");
+    let test = getConfig();
+    console.log("Config-Type: " + typeof test);
+    console.log("Config-Value:" + test);
+    window.GOCACHE = test.get("wasm-certificate-parsing");
+    window.GOCACHEV2 = test.get("wasm-certificate-caching");
 } catch (e) {
-    console.log("initialize: "+e);
+    console.log("initialize: " + e);
 }
 
 // flag whether to use Go cache
@@ -47,33 +51,58 @@ if (window.GOCACHE) {
     }
 }
 
+/** 
+ * Receive one way messages from extension pages
+ */
+browser.runtime.onConnect.addListener( (port) => {
 
-// communication between browser plugin popup and this background script
-browser.runtime.onConnect.addListener(function(port) {
-    port.onMessage.addListener(async function(msg) {
+    port.onMessage.addListener(async (msg) => {
         switch (msg.type) {
         case "acceptCertificate":
             const {domain, certificateFingerprint, tabId, url} = msg;
             trustedCertificates.set(domain, mapGetSet(trustedCertificates, domain).add(certificateFingerprint));
             browser.tabs.update(tabId, {url: url});
             break;
-        case "uploadConfig":
-            console.log("setting new config value...");
-            importConfigFromJSON(msg.value);
-            saveConfig();
-            break;
+        case 'postConfig':
+            try {
+                /**
+                 * Save new format config and converted old format config
+                 */
+                console.log("POSTED CONFIG:");
+                //setNewFormatConfig(msg.value);
+                console.log(msg.value);
+
+                //let converted_json_config = toOldConfig(new_format_config);
+
+                // deep copy
+                importConfigFromJSON(exportConfigToJSON(msg.value));
+
+                //console.log("SAVED CONFIG:");
+                //console.log(JSON.parse(exportConfigToJSON(config)));
+
+                saveConfig();
+                console.log("Updated config saved");
+                break;
+            } catch (e) {
+                console.log(e);
+            }
         default:
             switch (msg) {
             case 'initFinished':
+                console.log("MSG RECV: initFinished");
                 port.postMessage({msgType: "config", value: config});
                 break;
             case 'printConfig':
+                console.log("MSG RECV: printConfig");
                 port.postMessage({msgType: "config", value: config});
                 break;
             case 'downloadConfig':
+                console.log("MSG RECV: downloadConfig");
                 downloadConfig()
                 break;
             case 'resetConfig':
+                exit(1);
+                console.log("MSG RECV: resetConfig");
                 resetConfig()
                 break;
             case 'openConfigWindow':
@@ -91,10 +120,48 @@ browser.runtime.onConnect.addListener(function(port) {
             case 'getLogEntries':
                 port.postMessage({msgType: "logEntries", value: getSerializedLogEntries()});
                 break;
+            case 'requestConfig':
+                port.postMessage("Hi there");
+                break;
             }
         }
     });
 })
+
+/**
+ * Receive messages with possibility of direct response
+ */
+browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    
+    switch(request) {
+        case 'requestConfig':
+            console.log(`MSG RECV: ${request}`);
+            return Promise.resolve({ "config": config });
+        case 'requestJSONConfig':
+            console.log(`MSG RECV: ${request}`);
+            return Promise.resolve({ "config": getJSONConfig() });
+        case 'resetConfig':
+            console.log(`MSG RECV: ${request}`);
+            resetConfig();
+            return Promise.resolve({ "config": config });
+        
+        default:
+            switch (request['type']) {
+                case "uploadConfig":
+                    console.log("setting new config value...");
+                    // expect new format config
+                    console.log(request['value']);
+                    //setNewFormatConfig(JSON.parse(request['value']));
+                    importConfigFromJSON(exportConfigToJSON(request['value']));
+                    saveConfig();
+                    return Promise.resolve({ "config": config });
+                default:
+                    console.log(`Received unknown message: ${request}`);
+                    break;
+            }
+    }
+});
+
 
 // window.addEventListener('unhandledrejection', function(event) {
 //   // the event object has two special properties:

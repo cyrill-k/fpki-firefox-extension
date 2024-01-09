@@ -1,13 +1,25 @@
 // Map helper functions
 
+/**
+ * Get the value for specified key in map OR return a new empty list.
+ * 
+ */
 export function mapGetList(map, key) {
     return map.get(key) || [];
 };
 
+/**
+ * Get the value for specified key in map OR return a new empty Map.
+ * 
+ */
 export function mapGetMap(map, key) {
     return map.get(key) || new Map();
 };
 
+/**
+ * Get the value for specified key in map OR return a new empty Set.
+ * 
+ */
 export function mapGetSet(map, key) {
     return map.get(key) || new Set();
 };
@@ -185,4 +197,21 @@ export function trimString(string, maxLength = 100) {
         string.substring(0, maxLength - 3) + "..." :
         string;
     return trimmedString;
+}
+
+/**
+ * Deep copy of new_format_config
+ */
+export function clone(json_object) {
+    const cloned_config = JSON.parse(JSON.stringify(json_object));
+
+    Object.entries(cloned_config['legacy-trust-preference']).forEach(elem => {
+        const [domain_name, _] = elem;
+        cloned_config['legacy-trust-preference'][domain_name] = new Map(
+            // trying to deep copy maps
+            JSON.parse(JSON.stringify(Array.from(json_object['legacy-trust-preference'][domain_name])))
+        );
+    });
+
+    return cloned_config;
 }

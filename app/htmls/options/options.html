@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>F-PKI Extension Details</title>
+    <link rel="stylesheet" href="./style.css">
+    <link rel="icon" href="./favicon.ico" type="image/x-icon">
+    <style>
+      b {
+        color: rgb(42,42,42);
+      }
+      h3 {
+        margin-top: 30px;
+      }
+    </style>
+  </head>
+  <body style="background-color: white; font-size: 110%;">
+    <main>
+      <!--<p>
+        <a href="../config-page/config-page.html" target="_blank">Konfigurationsseite</a>
+      </p>-->
+      <h1>F-PKI</h1>
+      <p>
+        <!--F-PKI (<b>Flexible</b> Public-Key-Infrastructure) bringt
+        <b>Vertrauensverhältnisse</b> ins Internet.--> 
+        F-PKI (<b>Flexible</b> Public-Key-Infrastructure) brings <b>trust
+        relationships</b> to the internet.
+      </p>
+
+      <!--<h2>Trust Flexibility</h2>-->
+      <p>
+        <!--Vertraust du deinem <b>besten Freund</b> mehr als einem Fremden?-->
+        Do you <b>trust your best friend</b> more than a stranger?
+      </p>
+      <p>
+        <!--<b>Vertrauen ist relativ</b> zum Gegenüber, aber im Internet vertrauen
+        wir allen unsern Gegenübern--> 
+        <b>Trust is relative</b> to the individual. But on the internet we trust
+        everyone (i.e. every
+        <span 
+          class="info-icon"
+          title="Certification Authorities (CAs) stellen Zertifikate für Domains aus und bestätigen dadurch deren Identität für Endnutzer."
+          style="text-decoration: underline;">
+          CA</span>)
+        <!--gleich, ohne zu differenzieren.-->
+        the same, no matter <b>the context</b>.
+      </p>
+      <p>
+        <!--F-PKI ändert das!-->
+        F-PKI changes that!
+      </p>
+
+
+      <h2>Trust Preferences</h2>
+      <p>
+          <!--Konfiguriere deine <b>individuellen Vertrauenspräferenzen</b>!-->
+          Configure your <b>individual trust preferences</b>!
+      </p>
+      <p>
+          <!--Du vertraust amerikanischen-->
+          You trust your national
+          <span 
+            class="info-icon"
+            title="Certification Authorities (CAs) stellen Zertifikate für Domains aus und bestätigen dadurch deren Identität für Endnutzer."
+            style="text-decoration: underline;">
+            CAs</span>
+          <!--für amerikanische Domains mehr als anderen?--> 
+          more than others?  
+          <!--Oder du hast sonstige Vertrauenspräferenzen?-->
+          Any other trust preference?
+      </p>
+      <p>
+        <!--Dann <b>sag es deinem Browser</b> <a href="../config-page/config-page.html">hier</a>!-->
+        Then <b>tell your browser!</b> (<a href="../config-page/config-page.html" target="_blank">Here</a>)
+      </p>
+
+
+      <div style="margin-top: 25px; display: flex; flex-direction: column; align-items: center;">
+        <figure style="width: 62%;">
+          <img 
+            src="user_policies.png" 
+            alt="Schaubild, das User Policies demonstriert"
+            width="100%""
+            style="border: 2px solid black; border-radius: 10px;"
+          >
+          <figcaption>
+            <!--User 1 (U<sub>1</sub>) benutzt Zertifikat 1 (C<sub>1</sub>)
+            anstelle von Zertifikat 2 (C<sub>2</sub>), weil er der
+            Zertifizierungsstelle 1 (CA<sub>2</sub>) mehr vertraut aus
+            Zertifizierungsstelle 2 (CA<sub>2</sub>).-->
+            User 1 (U<sub>1</sub>) accepts Certificate 1 (C<sub>1</sub>)
+            but rejects Certificate 2 (C<sub>2</sub>), because he trusts
+            Certification-Authority 1 (CA<sub>1</sub>) more than
+            CA<sub>2</sub>.
+          </figcaption>
+        </figure>
+      </div>
+
+
+      <h3><i>CA Compromise</i>:</h3>
+      <p>
+        Let <b>security experts</b> decide, which CAs are the <b>most
+        trustworthy</b>:
+      </p>
+      <p>
+        Install preconfigured trust settings, so that less secure <b>CAs cannot
+        override certificates</b> issued by more trusted CAs.
+      </p>
+
+
+      <h3><i>Company CA</i>:</h3>
+      <p>
+        Only your <b>internal CA</b> should be trusted for <b>internal company
+        domains</b>, right?
+      </p>
+      <p>
+        Also, what if your internal <b>CA gets hacked</b>?  
+        Do you trust your internal CA to certificate websites outside of your
+        company network?
+      </p> 
+
+
+      <h3><i>Critical Websites</i>:</h3>
+      <!--If a CA gets compromised, any traffic on the internet can be decrypted.-->   
+      <p>
+        Protect your <b>critical communications</b> by pinning the correct CA
+        for a certain domain, so that <b>no illegitimate CA</b> can issue a valid
+        certificate for that domain.
+      </p>
+      <p>
+        E.g. example.com uses CA xy for its SSL-Certificate.  
+        Then you should <b>only accept certificates from CA xy</b> for
+        example.com, right?  
+      </p>
+      
+
+      
+
+
+      <!--<h2>Domain Policies</h2>
+      <p>
+        Domain Besitzer konfigurieren ihre <b>eigenen
+        Vertrauenspräferenzen</b>!
+      </p>
+      <p>
+        Google stellt sich seine eigenen Zertifikate aus, warum sollte es
+        <b>nicht-Google CAs</b> geben, die <b>Zertifikate für Google.com</b>
+        ausstellen?
+      </p>
+      <h3>Mögliche Policies:</h3>
+      <div style="text-align: center;">
+        <ul style=" display: inline-block;
+                    padding: 15px;
+                    margin: auto;
+                    list-style-type: none;
+                    border: 2px solid black;
+                    border-radius: 10px;">
+          <li style="margin-bottom: 15px; text-align: center;">
+            <b>ISSUERS</b><br>
+            Erlaubte Zertifizierungsstellen (CAs)
+          </li>
+          <li style="margin-bottom: 15px; text-align: center;">
+            <b>SUBDOMAINS</b><br>
+            Zertifizierte Subdomains
+          </li>
+          <li style="margin-bottom: 15px; text-align: center;">
+            <b>WILDCARDS</b><br>
+            Wildcards (*.example.com) in Zertifkaten erlaubt?
+          </li>
+          <li style="text-align: center;">
+            <b>MAX LIFETIME</b><br>
+            Maximale Zertifikat Lebensdauer
+          </li>
+        </ul>
+
+        <p>
+          Mit <b>dieser Extension</b> überprüft dein Browser automatisch, ob
+          empfangene Zertifikate sich an die existierenden <b>Domain
+          Policies</b> des Domainbetreibers halten!
+        </p>
+      </div>-->
+
+
+      <h2 style="margin-top: 30px;"><!--Weitere Informationen-->More information</h2>
+      <p>
+        <!--<a href="">Weitere Informationen</a> zu F-PKI und der F-PKI Browser
+        Extension.-->  
+        <a href="">More information</a> on F-PKI and the F-PKI browser extension.
+      </p>
+    </main>
+  </body>
+</html>
+
+
+

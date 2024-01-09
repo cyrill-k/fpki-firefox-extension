@@ -1,25 +1,651 @@
-<html xmlns="http://www.w3.org/1999/xhtml" dir="ltr" lang="en-US">
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" dir="ltr" lang="en-EN">
   <head>
     <meta name="color-scheme" content="light dark" />
+    <meta charset="UTF-8">
     <link rel="icon" id="favicon" href="../../images/F-D_dark.png" />
-    <title>F-PKI Plugin Configuration</title></head>
+    <link rel="stylesheet" href="./font-awesome.min.css">
+    <link rel="stylesheet" href="./config-page.css" />
+    <link rel="stylesheet" href="./trust-preferences.css" />
+    <link rel="stylesheet" href="./ca-sets.css" />
+    <title>Settings F-PKI Plugin</title>
+  </head>
   <body>
-    <div id="config">
-      <p>Config</p>
-      <button id="printConfig">Print Config</button>
-      <button id="downloadConfig">Download Config</button>
-      <button id="resetConfig">Reset Config to Default</button>
-      <br/>
-      Upload new config:
-      <input type="file" id="file" onchange="handle_files()">
-      <button id="uploadConfig">Upload</button>
-      <br/>
-      <pre>
-        <code id="config-code">
-          { "hello": "world" }
-        </code>
-      </pre>
+    <!-- template for domains trust preferences -->
+    <template id="trust-preference-domain-template">
+      <div class="trust-preference-domain" data-domain="">
+        <div class="trust-preference-domain-header" data-domain="">
+          <select class="trust-preference-domain-header btn" data-domain="">
+
+          </select>
+        </div>
+        <div class="trust-preference-domain-content" data-domain="" hidden>
+          <h4>Domain Preferences <i class="info-icon" info-id="trust-preference-first-match-rule">&#9432;</i></h4>
+          <!--<div class="trust-preference-domain-preferences-legend">
+            <div class="trust-preference-domain-preferences-legend-caset">
+              <span>CA Set</span>
+            </div>
+            <div class="trust-preference-domain-preferences-legend-trustlevel">
+              <span>Trust Level</span>
+            </div>
+          </div>-->
+          <div class="trust-preference-domain-preferences" data-domain="">
+            
+          </div>
+          <div class="trust-preference-domain-add-preference" data-domain="">
+
+          </div>
+          <h4 class="trust-preference-domain-inherited-preferences" data-domain="">Inherited Preferences</h4>
+          <div class="trust-preference-domain-inherited-preferences" data-domain="">
+            
+          </div>
+          <div class="trust-preference-domain-more">
+            <button class="trust-preference-domain-delete" data-domain="">
+              Delete domain preferences.
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- template for one trust preference -->
+    <template id="trust-preference-row-template">
+      <div class="trust-preference-row" data-domain="" data-caset="" data-trustlevel="">
+        <div class="trust-preference-dragndrop" data-domain="" data-caset="" data-trustlevel="">
+          &#8645;
+        </div>
+        <!-- TODO: caset nennen -->
+        <div class="trust-preference-ca" data-domain="" data-caset="" data-trustlevel="">
+          <select class="trust-preference-caset" data-domain="" data-caset="" data-trustlevel="">
+
+          </select>
+        </div>
+        <div class="trust-preference-level" data-domain="" data-caset="" data-trustlevel="">
+          <select class="trust-preference-level" data-domain="" data-caset="" data-trustlevel="">
+
+          </select>
+        </div>
+        <div class="trust-preference-delete" data-domain="" data-caset="" data-trustlevel="">
+          -
+        </div>
+      </div>
+    </template>
+
+    <!-- template for one *inherited* trust preference -->
+    <template id="trust-preference-inherited-row-template">
+      <div class="trust-preference-inherited-row" data-domain="" data-caset="" data-trustlevel="">
+        <div class="trust-preference-inherited-dragndrop">
+          
+        </div>
+        <div class="trust-preference-inherited-caset">
+          <select disabled>
+            <option class="trust-preference-inherited-caset"></option>
+          </select>
+        </div>
+        <div class="trust-preference-inherited-trustlevel">
+          <select disabled>
+            <option class="trust-preference-inherited-trustlevel"></option>
+          </select>
+        </div>
+        <div class="trust-preference-inherited-info">
+          <span class="trust-preference-inherited-info-icon info-icon">&#9432;</span>
+          <div class="trust-preference-inherited-info-box info-box">
+
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- template for add trust preference row-->
+    <template id="add-trust-preference-row-template">
+      <div class="add-trust-preference-row">
+        <div class="add-trust-preference-dragndrop" data-domain="">
+          
+        </div>
+        <div class="add-trust-preference-caset">
+          <select class="add-trust-preference-caset" data-domain="">
+
+          </select>
+        </div>
+        <div class="add-trust-preference-level">
+          <select class="add-trust-preference-level" data-domain="">
+
+          </select>
+        </div>
+        <div class="add-trust-preference-spacer">
+          
+        </div>
+      </div>
+    </template>
+
+
+    <!-- template for editable caset-->
+    <template id="ca-sets-caset-template">
+      <div class="ca-sets-caset" data-caset="">
+        <div class="ca-sets-caset-header" data-caset="">
+          <select class="ca-sets-caset-header btn" data-caset="">
+
+          </select>
+        </div>
+
+        <div class="ca-sets-caset-content" data-caset="" hidden>
+          <!--<h4>CA Set Settings</h4>-->
+          <div class="ca-sets-caset-name" data-caset="">
+            <!-- will ich das bearbeitbar machen?? dann müsste man alle
+          preferences immer ändern auch etc-->
+          </div>
+          <h4 style="margin-bottom: 0;">Description:</h4>
+          <div class="ca-sets-caset-description" data-caset="">
+            <p class="ca-sets-caset-description" data-caset=""></p>
+          </div>
+
+          <div class="ca-sets-caset-cas" data-caset="">
+            <div class="ca-sets-caset-cas-header" data-caset="">
+              <h4 class="ca-sets-caset-cas-header" data-caset="">
+                CAs: <!--<i class="ca-sets-caset-cas-header">&#9881;</i>-->
+              </h4>
+              <!--
+              <select class="ca-sets-caset-cas-header btn" data-caset="">
+                <option>CAs <i>&#9881;</i></option>
+              </select>-->
+            </div>
+            <div class="ca-sets-caset-cas-content" data-caset="">
+              <!-- unterscheiden, nach included/selected und nicht selected,
+              damit der user klar hat uhd nicht darauf vertrauen muss, dass z.B.
+              oben schonalle incldueten angezeigt werden -->
+            </div>
+          </div>
+
+          <div class="ca-sets-caset-more">
+            <button class="ca-sets-caset-delete" data-caset="">
+              Delete CA Set.
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+
+
+    <div id="options" style="margin-bottom: 100px;">
+      <h1>F<span style="font-weight: lighter;">(lexible)</span>-PKI Settings</h1>
+      <p>
+        There will be no changes introduced by the F-PKI extension, unless you
+        modify these settings.
+      </p>
+      <!--<p>
+        Sie finden <b>weiterführende Informationen</b> zu jeder der
+        Einstellungen über die entsprechenden <b>Infoboxen <q>&#9432;</q></b>.
+      </p>
+      <p>
+        Für einen <b>tieferen Einblick</b> in F-PKI empfehlen wir die <a
+        href="#">F-PKI Dokumentation</a> oder das originale Paper <q><a
+        href="https://netsec.ethz.ch/publications/papers/chuat2022fpki.pdf">F-PKI:
+        Enabling Innovation and Trust Flexibility in the HTTPS Public-Key
+        Infrastructure</a></q>.  
+        Even more info here: 
+        <span class="info-icon" info-id="test">&#9432;</span>
+        <div class="info-box" info-id="test">
+          Some more info here.sad ljdf lkadf ökjaf ölkajsdf ökjadfö lkadf kjsödfl k
+        </div>
+      </p>-->
+      <div class="reset-change-div">
+        <!-- TODO: Placement -->
+        <button id="resetConfig" class="btn import-export">Reset Config to Default</button>
+        <!--<button class="reset-changes">Reset Changes</button>
+        <button class="save-changes">Save Changes</button>-->
+      </div>
+
+      <!------------------------------------------------------------------------
+          INFO BOXEN
+      ----------------------------------->
+      <div class="info-box" info-id="trust-level-untrusted">
+        <p>
+          Certificates are rejected.
+        </p>
+      </div>
+
+      <div class="info-box" info-id="trust-level-standard">
+        <p>
+          Default Trust-Level.
+        </p>
+      </div>
+
+      <div class="info-box" info-id="choose-cas">
+        <p>
+          CAs from your browsers <b>Trust Store</b>.
+        </p>
+        <p>
+          <b>Custom CAs</b> will <b>not</b> be displayed here.
+        </p>
+      </div>
+
+      <div class="info-box" info-id="custom-cas">
+        <p>
+          Remember to <b>also</b> add these CAs to your browsers <b>Trust Store</b>.
+        </p>
+      </div>
+
+      <div class="info-box" info-id="trust-level-rank">
+        <p>
+          Certificates of CAs with <b>higher ranked</b> Trust Levels <b>will be
+          preferred</b> over Certificates from less trusted CAs.
+        </p>
+      </div>
+
+      <div class="info-box" info-id="trust-preference-first-match-rule">
+        <p>
+          The <b>first matching preference</b> will be applied <b>!</b>
+        </p>
+      </div>
+      
+      <hr style="margin-top: 50px; margin-bottom: 20px; margin-left: -10%; margin-right: -10%;">
+
+
+      <!------------------------------------------------------------------------
+          T R U S T   P R E F E R E N C E S
+      -------------------------------------->
+      <div class="settings-section" id="user-policies-settings-section">
+        <div class="settings-section-header">
+          <h2 style="display: inline-block; margin-bottom: 5px;">Trust Preferences</h2>
+          <p style="margin-top: 10px;">
+            Set different <b>Trust Levels</b> for different <b>CAs.</b>
+            <i class="info-icon-old" data-info-id="trust-preferences">&#9432;</i>
+          </p>
+          <div class="info-box-old" data-info-id="trust-preferences" hidden>
+            <p>
+              Trust-Preferences allow you <b>specify the individual trust</b>
+              that you place in certain CAs (Certification Authorities) for
+              certain domains.
+            </p>
+            <p>
+              A Trust-Preference has a <b>Scope</b> of one or many domains.
+            </p>
+            <p>
+              Domains can be specified using <b>Wildcards</b>. I.e. <span
+              class="code">*.example.com</span> or <span
+              class="code">*.de</span> are valid inputs to select all subdomains
+              of <q>example.com</q> or all domains with TLD (Top-Level-Domain)
+              <q>de</q> respectively.
+            </p>
+            <p>
+              For every <b>Domain-Scope</b> Trust-Levels can be configured for
+              as many CA-Sets (<a href="#ca-sets-settings-section">configurabe
+              here</a>) as you like.  
+
+              The <b>first matching preference</b> (top-down) will be applied! 
+            </p>
+
+            <ul>
+              <li style="margin-bottom: 5px;">
+                <b>Untrusted:</b> Certificates will be rejected.
+              </li>
+              <li style="margin-bottom: 5px;">
+                <b>Low Trust:</b> Certificates will be accepted unless existing
+                certificates for the domain have been issued by a higher trusted
+                CA (i.e. with configured Trust-Level <span class="code">Standard
+                Trust</span>, <span class="code">High Trust</span> or <span
+                class="code">Perfect Trust</span>). <sup>1</sup>
+              </li>
+              <li style="margin-bottom: 5px;">
+                <b>Standard Trust (Default):</b> Certificates will be accepted
+                unless existing certificates for the domain have been issued by
+                a higher trusted CA (i.e. with configured Trust-Level <span
+                class="code">High Trust</span> or <span class="code">Perfect
+                Trust</span>). <sup>1</sup>
+              </li>
+              <li>
+                <b>High Trust:</b> Certificates will be accepted unless existing
+                certificates for the domain have been issued by a higher trusted
+                CA (i.e. with configured Trust-Level <span class="code">Perfect
+                Trust</span>). <sup>1</sup>
+              </li>
+              <li>
+                <b>Perfect Trust:</b> Certificates will be accepted.
+              </li>
+            </ul>
+
+            <div style="margin-top: 25px; display: flex; flex-direction: column; align-items: center;">
+              <figure style="width: 38%;">
+                <img 
+                  src="user_policies.png" 
+                  alt="Schaubild, das User Policies demonstriert"
+                  width="100%""
+                  style="border: 2px solid black; border-radius: 10px;"
+                >
+                <figcaption style="font-size: small;">
+                  User 1 (U<sub>1</sub>) uses Certificate 1 (C<sub>1</sub>)
+                  instead of Certificate 2 (C<sub>2</sub>), because he trusts
+                  Certification Authority 1 (CA<sub>1</sub>) more than
+                  Certification Authority 2 (CA<sub>2</sub>) for this domain.
+                </figcaption>
+              </figure>
+            </div>
+
+            <p style="margin-left: 25px;">
+              <sup>1</sup> Existing certificates are requested from so-called <a
+              href="#mapservers-settings-section">Mapservers</a>, which are
+              similar to CT-(Certificate Transparency)-Logs.
+            </p>
+          </div>
+        </div>
+
+          <h3>Domains:</h3>
+          <div id="trust-preferences">
+            <div id="trust-preference-domains">
+
+            </div>
+            <div class="trust-preference-add-domain">
+              <input 
+                type="text" 
+                placeholder="__add_domain__"
+                class="trust-preference-add-domain" 
+              />
+            </div>
+          </div>
+
+          <div class="reset-change-div" style="margin-left: auto; margin-top: 20px;">
+            <button class="reset-changes legacy-trust-preference">
+                    Reset Changes
+            </button>
+            <button class="save-changes legacy-trust-preference">
+                    Save Changes
+            </button>
+          </div>
+        <!--</div>-->
+      </div>
+
+
+      <hr style="margin-top: 50px; margin-bottom: 20px; margin-left: -10%; margin-right: -10%;">
+
+
+      <!------------------------------------------------------------------------
+          CA SETS
+      ----------------------------------->
+      <div class="settings-section" id="ca-sets-settings-section">
+        <div class="settings-section-header">
+          <h2 style="display: inline-block; margin-bottom: 0px;">CA Sets</h2>
+          <p style="margin-top: 10px;">
+            Manage <b>Sets of CAs</b> to configure <b>Trust Preferences</b> for.
+            <i class="info-icon-old" data-info-id="ca-sets">&#9432;</i>
+          </p>
+          <div class="info-box-old" data-info-id="ca-sets" hidden>
+            <p>
+              CA-Sets are sets of <b>Root-CAs</b> (Certificate Authorities) that
+              reside in your browsers <b>Trust Store</b>.   
+              You may also put <b>Custom-CAs</b> into your browsers
+              Trust-Store and add them to a CA-Set here.  
+            </p>
+            <p>
+              Use a <b>Set-Name</b> to be able to reference the contained CAs in
+              your <a
+              href="#user-policies-settings-section">Trust-Preferences</a>.  
+            </p>
+          </div>
+        </div>
+
+
+        <!-- NEW -->
+        <h3>Sets:</h3>
+        <div id="ca-sets">
+          <div id="ca-sets-casets">
+
+          </div>
+          <!-- TODO: aktuell noch mit dem "Builder" sets adden...
+          <div class="ca-sets-add-caset">
+            <input 
+              type="text" 
+              placeholder="__add_caset__"
+              class="ca-sets-add-caset" 
+            />
+          </div>-->
+        </div>
+
+        <!-- OLD 
+        <table id="ca-sets-table">
+          <thead>
+              <tr>
+                  <th colspan="1">Set Name</th>
+                  <th colspan="1">Description</th>
+                  <th></th>
+              </tr>
+          </thead>
+          <tbody id="ca-sets-table-body">
+
+          </tbody>
+        </table>-->
+
+        <!-- 
+          CA Set Builder 
+        -->
+        <h3>Add Set:</h3>
+        <div id="ca-sets-builder">
+
+          <input type="text" placeholder="Set Name" id="ca-sets-builder-name" class="full-width"/><br>
+          <input type="text" placeholder="Description" id="ca-sets-builder-description" class="full-width" style="margin-top: 0;"/><br>
+
+          <fieldset style="
+            height: auto; overflow-y:auto; margin-top: 10px;">
+            <legend style="font-weight: 600;">
+              Choose CAs
+              <span class="info-icon" info-id="choose-cas">&#9432;</span>
+            </legend>
+            <input class="filter-cas full-width" type="text" placeholder="Filter..." style="margin-bottom: 10px; width: 62%;"/>
+            <div id="ca-sets-builder-cas" style="height:250px; overflow-y: scroll;">
+              <!-- Javascript-->
+            </div>
+          </fieldset>
+
+          <fieldset style="
+            height: 150px; overflow-y: scroll; margin-top: 20px; padding-top: 10px;">
+            <legend style="font-weight: 600;">
+              Custom CAs
+              <span class="info-icon" info-id="custom-cas">&#9432;</span>
+            </legend>
+            <textarea 
+              id="ca-sets-builder-custom-cas"
+              placeholder="CN=Custom CA 1,O=Internal,C=DE 
+CN=Custom CA 2,O=Internal,L=Milan,C=IT"
+              style="width: 98%; 
+                height: 90%;
+                resize: none;"></textarea>
+          </fieldset>
+
+          <button id="add-ca-set" class="btn"
+            style="font-weight: bolder; color: whitesmoke; height:36px; 
+            background-color:#3D7F6E; font-size: larger;
+            padding: 3pt 10pt; width: 100%; margin-top: 10px;">
+            Add CA Set
+          </button>
+        </div>
+
+        <div class="reset-change-div" style="margin-left: auto; margin-top: 20px;">
+          <button class="reset-changes ca-sets">Reset Changes</button>
+          <button class="save-changes ca-sets">Save Changes</button>
+        </div>
+      </div>
+
+
+      <hr style="margin-top: 50px; margin-bottom: 20px; margin-left: -10%; margin-right: -10%;">
+
+
+      <!------------------------------------------------------------------------
+          EXPORT/IMPORT - JSON
+      ----------------------------------->
+        
+      <div id="output">
+        <h2>Import / Export</h2>
+        <p>
+          <!--
+          Die gesamten Einstellungen auf dieser Seite können im JSON-Format
+          heruntergeladen, bearbeitet sowie hochgeladen werden.-->
+          <button id="downloadConfig" class="btn import-export"> Download </button> 
+          your settings in JSON-format or
+        </p>
+        <p>
+          <label for="file"><button id="uploadConfig" class="btn
+          import-export">Upload</button> a settings file in JSON-format:</label>
+          <input type="file" id="file" onchange="handle_files()">
+        </p>
+        <p style="border:2px solid red; width:fit-content; padding: 4px;">
+          Use only settings files from <b>trustworthy sources!</b> 
+          <!--Nutzen Sie nur Settings-Dateien aus <b>vertrauenswürdigen
+          Quellen</b>!-->
+        </p>
+
+        <!-- DEV 
+        <div style="line-height: 2;">
+          <br/>
+          <button id="printConfig" class="btn import-export">Print Config</button>
+          
+        </div>
+        <pre class="default-border" style="overflow: auto; max-height: 500px;"><code id="config-code">{ "hello": "world" }</code></pre>
+        -->
+      </div>
+      
+      <hr style="margin-top: 50px; margin-bottom: 20px; margin-left: -10%; margin-right: -10%;">
+
+      
+      <!------------------------------------------------------------------------ 
+        ADVANCED SETTINGS 
+      ---------------------------------->
+      <h2 style="display: inline-block;">Advanced Settings</h2>
+      <button 
+        id="advancedButton"
+        style="padding: 6px;
+               margin-left: 10px;
+               position: relative;
+               top: -4px;
+               font-size: large;
+               font-weight: bold;
+               border-width: 3px;
+               border-style: groove;
+               border-radius: 10px;
+               cursor: pointer;">
+        Show
+      </button>
+
+      <div id="advanced-settings" hidden="">
+
+        <!-- Description -->
+        <p>
+          <!--Diese Einstellungen richten sich an <b>fortgeschrittene Benutzer</b>. -->
+          These settings are designed for <b>experienced users</b>.
+        </p>
+        <p>
+          <!--Bitte nimm <b>keine Änderungen</b> an den Einstellungen vor, wenn du dir
+          unsicher bist.--> 
+          Please <b>avoid making any alterations</b> to the settings, if you are
+          in doubt.
+        </p>
+        
+
+
+        <!-- MAPSERVER SETTINGS -->
+        <div class="settings-section" id="mapservers-settings-section">
+          <h2>Mapservers</h2>
+          <table id="mapservers-table">
+            <thead>
+                <tr>
+                    <th colspan="1">Identity</th>
+                    <th colspan="1">Domain</th>
+                    <th colspan="1">Query Type</th>
+                    <th colcpan="1">Action</th>
+                </tr>
+            </thead>
+            <tbody id="mapservers-table-body">
+                <!-- Mapservers will be inserted based on JSON configuration -->
+            </tbody>
+          </table>
+          <div class="reset-change-div" style="margin-left: auto; margin-top: 20px;">
+            <button class="reset-changes mapservers">Undo Changes</button>
+            <button class="save-changes mapservers">Save Changes</button>
+          </div>
+        </div>
+
+
+        <!------------------------------------------------------------------------
+          TRUST LEVELS
+      ----------------------------------->
+
+      <div class="settings-section">
+        <h2>Trust Levels</h2>
+        <table id="trust-levels-table">
+          <thead>
+            <th>Level Name</th>
+            <th>
+              Rank
+              <span class="info-icon" info-id="trust-level-rank">&#9432;</span>
+            </th>
+            <th></th>
+          </thead>
+          <tbody id="trust-levels-table-body">
+            <!-- Javascript-->
+          </tbody>
+        </table>
+        <div class="reset-change-div" style="margin-left: auto; margin-top: 20px;">
+          <button class="reset-changes trust-levels">Reset Changes</button>
+          <button class="save-changes trust-levels">Save Changes</button>
+        </div>
+      </div>
+
+
+        <!-- OTHER SETTINGS -->
+        <div class="settings-section">
+          <h2>Other Settings</h2>
+          <table id="other-table">
+            <thead>
+                <tr>
+                    <th colspan="1">Setting</th>
+                    <th colspan="1">Value</th>
+                </tr>
+            </thead>
+            <tbody id="other-table-body">
+                <tr>
+                  <td>Cache Timeout: </td>
+                  <td><input type="int" class="cache-timeout" /></td>
+                </tr>
+                <tr>
+                  <td>Max Connection Setup Time: </td>
+                  <td><input type="int" class="max-connection-setup-time" /></td>
+                </tr>
+                <tr>
+                  <td>Proof Fetch Timeout: </td>
+                  <td><input type="int" class="proof-fetch-timeout" /></td>
+                </tr>
+                <tr>
+                  <td>Proof Fetch Max Tries: </td>
+                  <td><input type="int" class="proof-fetch-max-tries" /></td>
+                </tr>
+                <tr>
+                  <td>Mapserver Quorum: </td>
+                  <td><input type="int" class="mapserver-quorum" /></td>
+                </tr>
+                <tr>
+                  <td>Mapserver Instances Queried: </td>
+                  <td><input type="int" class="mapserver-instances-queried" /></td>
+                </tr>
+                <tr>
+                  <td>Send Log Entries via Event: </td>
+                  <td><input type="int" class="send-log-entries-via-event" /></td>
+                </tr>
+                <tr>
+                  <td>Wasm Certificate Parsing: </td>
+                  <td><input type="int" class="wasm-certificate-parsing" /></td>
+                </tr>
+            </tbody>
+          </table>
+          <div class="reset-change-div" style="margin-left: auto; margin-top: 20px;">
+            <button class="reset-changes other-settings">Reset Changes</button>
+            <button class="save-changes other-settings">Save Changes</button>
+          </div>
+        </div>
+
+      </div>
     </div>
+
+    
+
+    <script src="./Sortable.min.js"></script>
+    <script type="module" src="./config-page.js"></script>
   </body>
-  <script src="config-page.js" type="module"></script>
 </html>
