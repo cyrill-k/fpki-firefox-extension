@@ -69,12 +69,12 @@ Note that you can also **only** use the local mapserver (and ignore the mapserve
 #### Test browser extension
 After the map server is set up, load the browser extension by visiting ``about:debugging``. And you can visit the following urls to test whether it correctly works:
 
-- Legacy block: https://bing.com
-- Legacy allow: https://microsoft.com
+- Legacy block: https://microsoft.com
+- Legacy allow: https://bing.com
 - Policy (issuer) allow: https://m.media-amazon.com/images/G/01/AmazonStores/Help/assets/img/gallery-img1.png
 - Policy (issuer) block: https://baidu.com
-- Policy (subcomains) allow: https://netsec.ethz.ch
-- Policy (subcomains) block: https://sellercentral.amazon.com
+- Policy (subdomains) allow: https://netsec.ethz.ch
+- Policy (subdomains) block: https://sellercentral.amazon.com
 
 #### New Structure Idea
 - store per-(P)CA cache on the golang side:
