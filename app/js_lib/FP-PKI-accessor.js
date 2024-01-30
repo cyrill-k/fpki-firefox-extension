@@ -402,6 +402,7 @@ async function queryMapServerIdsWithProof(mapServerUrl, domainName, options) {
 // query map server for certificate and policy payloads
 async function queryMapServerPayloads(mapServerUrl, ids, options) {
     const fetchUrl = mapServerUrl + "/getpayloads?ids=" + ids;
+    console.log(`initiating request: ${trimString(fetchUrl)}`);
     const { delay = 0, timeout = 60000, maxTries = 3, requestId } = options;
     const { response, triesLeft } = await fetchRetry(fetchUrl, delay, maxTries, timeout, requestId, 0, { keepalive: true });
     const decodedResponse = await response.json();

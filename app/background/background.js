@@ -386,7 +386,8 @@ async function onCompleted(details) {
         logEntry.finalizeLogEntry(details.requestId);
     }
     if (config.get("send-log-entries-via-event") && details.type === "main_frame") {
-        browser.tabs.executeScript(details.tabId, { file: "../content/sendLogEntries.js" })
+        // uncomment to communicate log entries with puppeteer instance
+        // browser.tabs.executeScript(details.tabId, { file: "../content/sendLogEntries.js" })
     }
 }
 
