@@ -3,9 +3,12 @@ package cache_v2
 import (
 	"crypto"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/pem"
+	"log"
 	"math/big"
 	"math/rand"
 	"time"
@@ -127,4 +130,47 @@ func maxTime(times ...time.Time) (maxTime time.Time) {
 		}
 	}
 	return
+}
+
+func TransformListToInterfaceType[T any](list []T) []interface{} {
+	t := make([]interface{}, len(list))
+	for i, e := range list {
+		t[i] = e
+	}
+	return t
+}
+
+func TransformNestedListsToInterfaceType[T any](list [][]T) []interface{} {
+	t := make([]interface{}, len(list))
+	for i, e := range list {
+		ti := make([]interface{}, len(e))
+		for j, ej := range e {
+			ti[j] = ej
+		}
+		t[i] = ti
+	}
+	return t
+}
+
+func SliceToSet(slice []string) map[string]struct{} {
+	set := make(map[string]struct{})
+	for _, e := range slice {
+		set[e] = struct{}{}
+	}
+	return set
+}
+
+// compute the base64 encoded hash of the base64 encoded payload
+func GetPayloadAndHash(b64payload string) ([]byte, string) {
+	payload, err := base64.StdEncoding.DecodeString(b64payload)
+	if err != nil {
+		log.Fatal(err)
+	}
+	h := sha256.New()
+	_, err = h.Write(payload)
+	if err != nil {
+		log.Fatal(err)
+	}
+	hash := h.Sum(nil)
+	return payload, base64.StdEncoding.EncodeToString(hash)
 }

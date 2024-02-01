@@ -1,13 +1,11 @@
 package main
 
 import (
-	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"go_wasm/cache_v2"
-	"log"
 	"syscall/js"
 	"time"
 
@@ -71,170 +69,6 @@ func initializeGODatastructuresWrapper() js.Func {
 
 }
 
-// wrapper to make GetMissingCertificateHashesList visible from JavaScript
-// param 1: bytes encoding the JSON response of the map server
-// param 2: length of response in bytes
-func getMissingCertificatesListWrapper() js.Func {
-	jsf := js.FuncOf(func(this js.Value, args []js.Value) any {
-		//jsWindow := js.Global().Get("window")
-		inputLength := args[1].Int()
-
-		//tn := time.Now()
-		js.CopyBytesToGo(buffer, args[0])
-		//te := time.Now()
-		//fmt.Printf("[Go] getMissingCertificatesList copying input bytes took %d ms \n", time.Now().Sub(tn).Milliseconds())
-		//jsWindow.Set("GoCopy", te.Sub(tn).Milliseconds())
-
-		/*
-			tn = time.Now()
-			base64DecodedLen, err := base64.StdEncoding.Decode(buffer[inputLength:], buffer[:inputLength])
-			te = time.Now()
-			fmt.Printf("[Go] getMissingCertificatesList base64decode took %d ms \n", time.Now().Sub(tn).Milliseconds())
-			jsWindow.Set("Gob64Decode", te.Sub(tn).Milliseconds())
-			if err != nil {
-				panic(err.Error())
-			}
-
-		*/
-		var mapserverResponse1Raw MapServerResponse1Raw
-		//tn = time.Now()
-		json.Unmarshal(buffer[:inputLength], &mapserverResponse1Raw)
-		//te = time.Now()
-		//jsWindow.Set("GoJSONDecode", te.Sub(tn).Milliseconds())
-		//fmt.Printf("[Go] getMissingCertificatesList unmarshalling JSON took %d ms \n", time.Now().Sub(tn).Milliseconds())
-
-		// TODO (proof): verify Proof (if necessary), allocate proofCache Entry (if necessary), else return
-
-		// call function to determine which certificate hashes are not yet cached
-		missingLeafCertificates := cache_v2.GetMissingCertificateHashesList(mapserverResponse1Raw.Hashesb64)
-
-		// TODO (proof): add an entry in proofCacheEntry.missingCertificateHashes for each missingLeafCertificate
-
-		// copy missing certificate hashes into correct format
-		missingLeafCertificatesOut := make([]interface{}, len(missingLeafCertificates))
-		for i, certificateHash := range missingLeafCertificates {
-			missingLeafCertificatesOut[i] = certificateHash
-		}
-
-		// TODO (proof): include proofCacheEntry key in output, and pass it
-		// in corresponding AddCertificatesToCache call
-		return missingLeafCertificatesOut
-	})
-	return jsf
-}
-
-// wrapper to make addCertificatesToCache visible from JavaScript
-// param 1: length of response in bytes
-// param 2: map server response containing PEM encoded certificates
-// returns: a list of hashes of all certificates provided as input
-func addCertificatesToCacheWrapper() js.Func {
-	jsf := js.FuncOf(func(this js.Value, args []js.Value) any {
-		cache_v2.MSS = 0
-		cache_v2.NCertificatesAdded = 0
-		//jsWindow := js.Global().Get("window")
-
-		inputLength := args[1].Int()
-		//tn := time.Now()
-		js.CopyBytesToGo(buffer, args[0])
-		//te := time.Now()
-		//jsWindow.Set("GoCopy", te.Sub(tn).Milliseconds())
-		//fmt.Printf("[Go] addCertificatesToCache copying input bytes took %d ms \n", te.Sub(tn).Milliseconds())
-
-		/*
-			tn = time.Now()
-			base64DecodedLen, err := base64.StdEncoding.Decode(buffer[inputLength:], buffer[:inputLength])
-					if err != nil {
-					panic(err.Error())
-				}
-
-				te = time.Now()
-				var timeDecodeNS int64 = te.Sub(tn).Nanoseconds()
-
-
-		*/
-		//var timeDecodeNS int64 = 0
-		//var timeParseNS int64 = 0
-
-		var mapserverResponse2Raw MapServerResponse2Raw
-		//tn = time.Now()
-		json.Unmarshal(buffer[:inputLength], &mapserverResponse2Raw)
-		//te = time.Now()
-		//jsWindow.Set("GoJSONDecode", te.Sub(tn).Milliseconds())
-		//fmt.Printf("[Go] addCertificatesToCache unmarshalling JSON took %d ms \n", te.Sub(tn).Milliseconds())
-
-		// parse the certificates
-		nCertificates := len(mapserverResponse2Raw.Certificatesb64)
-		certificatesGo := make([]*x509.Certificate, nCertificates)
-		for i := 0; i < nCertificates; i++ {
-			//tnn := time.Now()
-			certificateDER, err := base64.StdEncoding.DecodeString(mapserverResponse2Raw.Certificatesb64[i])
-			if err != nil {
-				panic(err.Error())
-			}
-			//timeDecodeNS = timeDecodeNS + time.Now().Sub(tnn).Nanoseconds()
-			//tn = time.Now()
-			certificateParsed, err := x509.ParseCertificate(certificateDER)
-			if err != nil {
-				panic("failed to parse certificate: " + err.Error())
-			}
-			//te = time.Now()
-			//timeParseNS = timeParseNS + te.Sub(tn).Nanoseconds()
-
-			// TODO: remove this line after evaluation, it is only used because most
-			// certificates in the log server are expired currently
-			certificateParsed.NotAfter = time.Date(2024, 8, 30, 12, 0, 0, 0, time.UTC)
-			certificatesGo[i] = certificateParsed
-
-			// TODO (proof): check that certificate is in proofCacheEntry.missingCertificateHashes (identified by key passed as input)
-			// and delete it from proofCacheEntry.missingCertificateHashes
-		}
-		//jsWindow.Set("Gob64Decode", timeDecodeNS/1000000)
-		//fmt.Printf("[Go] addCertificatesToCache base64decode took %d ms \n", timeDecodeNS/1000000)
-
-		// TODO (proof): check that len(proofCacheEntry.missingCertificateHashes) == 0, otherwise register a misbehavior
-		// (increase proofCacheEntry.mapserver.nMisbehaviors) AND act accordingly (discuss)
-		//fmt.Printf("[Go] parsing %d certificates took %d ms \n", nCertificates, te.Sub(tn).Milliseconds())
-		//jsWindow.Set("GoParseCertificates", timeParseNS/1000000)
-
-		// add parsed certificates to cache
-		processedCertificates := cache_v2.AddCertificatesToCache(certificatesGo)
-		//jsWindow.Set("GoSignature", cache_v2.MSS)
-		//jsWindow.Set("GoNCertsAdded", cache_v2.NCertificatesAdded)
-
-		// copy processed certificate hashes into correct format
-		processedCertificatesOut := make([]interface{}, len(processedCertificates))
-		for i, certificateHash := range processedCertificates {
-			processedCertificatesOut[i] = certificateHash
-		}
-
-		return processedCertificatesOut
-	})
-	return jsf
-}
-
-func sliceToSet(slice []string) map[string]struct{} {
-	set := make(map[string]struct{})
-	for _, e := range slice {
-		set[e] = struct{}{}
-	}
-	return set
-}
-
-// compute the base64 encoded hash of the base64 encoded payload
-func getPayloadAndHash(b64payload string) ([]byte, string) {
-	payload, err := base64.StdEncoding.DecodeString(b64payload)
-	if err != nil {
-		log.Fatal(err)
-	}
-	h := sha256.New()
-	_, err = h.Write(payload)
-	if err != nil {
-		log.Fatal(err)
-	}
-	hash := h.Sum(nil)
-	return payload, base64.StdEncoding.EncodeToString(hash)
-}
-
 // wrapper to make addMissingPayloads visible from JavaScript
 // param 1: length of response in bytes
 // param 2: map server response containing encoded certificates
@@ -249,9 +83,9 @@ func addMissingPayloadsWrapper() js.Func {
 		json.Unmarshal(buffer[:inputLength], &mapserverResponse)
 
 		// split certificates and policies
-		certificateMissingIDSet := sliceToSet(mapserverResponse.CertificateIDs)
+		certificateMissingIDSet := cache_v2.SliceToSet(mapserverResponse.CertificateIDs)
 		fmt.Printf("[Go] cert missing set: %v\n", certificateMissingIDSet)
-		policyMissingIDSet := sliceToSet(mapserverResponse.PolicyIDs)
+		policyMissingIDSet := cache_v2.SliceToSet(mapserverResponse.PolicyIDs)
 		fmt.Printf("[Go] pol missing set: %v\n", policyMissingIDSet)
 
 		var certificatePayloads []*x509.Certificate
@@ -259,7 +93,7 @@ func addMissingPayloadsWrapper() js.Func {
 		var policyPayloads []*common.PolicyCertificate
 		var policyHashes []string
 		for _, b64payload := range mapserverResponse.Payloads {
-			payload, hash := getPayloadAndHash(b64payload)
+			payload, hash := cache_v2.GetPayloadAndHash(b64payload)
 
 			if _, ok := certificateMissingIDSet[hash]; ok {
 				certificateParsed, err := x509.ParseCertificate(payload)
@@ -283,16 +117,10 @@ func addMissingPayloadsWrapper() js.Func {
 		}
 
 		processedCertificates := cache_v2.AddCertificatesToCache(certificatePayloads)
-		processedCertificatesOut := make([]interface{}, len(processedCertificates))
-		for i, certificateHash := range processedCertificates {
-			processedCertificatesOut[i] = certificateHash
-		}
+		processedCertificatesOut := cache_v2.TransformListToInterfaceType(processedCertificates)
 
 		processedPolicies := cache_v2.AddPoliciesToCache(policyPayloads)
-		processedPoliciesOut := make([]interface{}, len(processedPolicies))
-		for i, policyHash := range processedPolicies {
-			processedPoliciesOut[i] = policyHash
-		}
+		processedPoliciesOut := cache_v2.TransformListToInterfaceType(processedPolicies)
 
 		responseClass := js.Global().Get("AddMissingPayloadsResponseGo")
 		return responseClass.New(processedCertificatesOut, processedPoliciesOut)
@@ -411,20 +239,16 @@ func verifyLegacyWrapper() js.Func {
 		legacyTrustDecisionClass := js.Global().Get("LegacyTrustDecisionGo")
 
 		// parse output to JS compatible types
-		relevantCASetIDs := make([]interface{}, len(legacyTrustInfo.RelevantCASetIDs))
-		for i, caSetID := range legacyTrustInfo.RelevantCASetIDs {
-			relevantCASetIDs[i] = caSetID
-		}
-		exampleSubjects := make([]interface{}, len(legacyTrustInfo.ExampleSubjects))
-		for i, exampleSubject := range legacyTrustInfo.ExampleSubjects {
-			exampleSubjects[i] = exampleSubject
-		}
+		relevantCASetIDs := cache_v2.TransformListToInterfaceType(legacyTrustInfo.HighestTrustLevelCASets)
+		relevantCertificateChainIndices := cache_v2.TransformListToInterfaceType(legacyTrustInfo.HighestTrustLevelChainIndices)
+		relevantChainCertificateHashes := cache_v2.TransformNestedListsToInterfaceType(legacyTrustInfo.HighestTrustLevelChainHashes)
+		relevantChainCertificateSubjects := cache_v2.TransformNestedListsToInterfaceType(legacyTrustInfo.HighestTrustLevelChainSubjects)
 
 		// allocate object to return
 		return legacyTrustDecisionClass.New(dnsName, legacyTrustInfo.ConnectionTrustLevel,
-			legacyTrustInfo.ConnectionRelevantCASetID, legacyTrustInfo.ConnectionExampleSubject,
+			legacyTrustInfo.ConnectionTrustLevelCASet, legacyTrustInfo.ConnectionTrustLevelChainIndex,
 			legacyTrustInfo.EvaluationResult, legacyTrustInfo.HighestTrustLevel, relevantCASetIDs,
-			exampleSubjects, legacyTrustInfo.MaxValidity.Unix())
+			relevantCertificateChainIndices, relevantChainCertificateHashes, relevantChainCertificateSubjects, legacyTrustInfo.MaxValidity.Unix())
 	})
 	return jsf
 }
@@ -495,11 +319,8 @@ func verifyPolicyWrapper() js.Func {
 }
 
 func main() {
-
 	// "publish" the functions in JavaScript
 	js.Global().Set("initializeGODatastructures", initializeGODatastructuresWrapper())
-	js.Global().Set("getMissingCertificatesList", getMissingCertificatesListWrapper())
-	js.Global().Set("addCertificatesToCache", addCertificatesToCacheWrapper())
 	js.Global().Set("verifyAndGetMissingIDs", verifyAndGetMissingIDsWrapper())
 	js.Global().Set("addMissingPayloads", addMissingPayloadsWrapper())
 	js.Global().Set("verifyLegacy", verifyLegacyWrapper())
@@ -507,5 +328,4 @@ func main() {
 
 	// prevent WASM from terminating
 	<-make(chan bool)
-
 }

@@ -57,8 +57,8 @@ export class PolicyTrustDecisionGo {
 }
 
 export class LegacyTrustDecisionGo {
-    constructor(domain, connectionTrustLevel, connectionRelevantCASetID, connectionExampleSubject, evaluationResult,
-        highestTrustLevel, relevantCASetIDs, exampleSubjects, validUntilUnix) {
+    constructor(domain, connectionTrustLevel, connectionTrustLevelCASet, connectionTrustLevelChainIndex, evaluationResult,
+                highestTrustLevel, highestTrustLevelCASets, highestTrustLevelChainIndices, highestTrustLevelChainHashes, highestTrustLevelChainSubjects, validUntilUnix) {
 
         // information describing the certificate obtained in the
         // handshake and its trust level
@@ -66,8 +66,8 @@ export class LegacyTrustDecisionGo {
         this.domain = domain;
         this.connectionCertificateChain = null;
         this.connectionTrustLevel = connectionTrustLevel;
-        this.connectionRelevantCASetID = connectionRelevantCASetID;
-        this.connectionExampleSubject = connectionExampleSubject;
+        this.connectionTrustLevelCASet = connectionTrustLevelCASet;
+        this.connectionTrustLevelChainIndex = connectionTrustLevelChainIndex;
 
         // outcome of the legacy validation
         this.evaluationResult = evaluationResult;
@@ -77,10 +77,12 @@ export class LegacyTrustDecisionGo {
 
         // information describing why legacy validation failed
         // lists consisting of CA Set IDs and corresponding 
-        // subjects found in cached certificates that led to
-        // failure
-        this.relevantCASetIDs = relevantCASetIDs;
-        this.exampleSubjects = exampleSubjects;
+        // chain indices found in cached certificates that led
+        // to the failure
+        this.highestTrustLevelCASets = highestTrustLevelCASets;
+        this.highestTrustLevelChainIndices = highestTrustLevelChainIndices;
+        this.highestTrustLevelChainHashes = highestTrustLevelChainHashes
+        this.highestTrustLevelChainSubjects = highestTrustLevelChainSubjects
 
         // timestamp until which this entry can be cached
         this.validUntil = new Date(validUntilUnix*1000);
@@ -96,6 +98,11 @@ export const AllPolicyAttributes = [
     PolicyAttributes.TRUSTED_CA,
     PolicyAttributes.SUBDOMAINS
 ];
+
+export const PolicyAttributeToJsonKeyDict = {
+    [PolicyAttributes.TRUSTED_CA]: "TrustedCA",
+    [PolicyAttributes.SUBDOMAINS]: "AllowedSubdomains"
+}
 
 export const EvaluationResult = {
     SUCCESS: "success",
@@ -158,21 +165,58 @@ export function getShortErrorMessages(trustDecision) {
 
 export function getLegacyValidationErrorMessageGo(legacyTrustDecisionGo) {
     let errorMessage = "";
-    errorMessage += "[legacy mode] ";
-    errorMessage += "Detected " + legacyTrustDecisionGo.relevantCASetIDs.length +" more highly trusted certificate chains than the chain received in the connection \n";
-    errorMessage += "Connection certificate chain has trust level " + legacyTrustDecisionGo.connectionTrustLevel + " due to subject: ";
-    errorMessage += legacyTrustDecisionGo.connectionExampleSubject + " within CA Set: " + legacyTrustDecisionGo.connectionRelevantCASetID + "\n";
-    for(let i = 0; i < legacyTrustDecisionGo.relevantCASetIDs.length; i++) {
-        errorMessage += "Detected certificate chain with trust level: " + legacyTrustDecisionGo.highestTrustLevel;
-        errorMessage += " due to subject: " + legacyTrustDecisionGo.exampleSubjects[i] + " within CA Set: " + legacyTrustDecisionGo.relevantCASetIDs[i] + "\n"; 
+    errorMessage += "Detected " + legacyTrustDecisionGo.highestTrustLevelCASets.length +" more highly trusted certificate chains than the chain received in the connection.";
+    if (legacyTrustDecisionGo.connectionTrustLevelCASet === "DEFAULT") {
+        errorMessage += " Connection certificate chain has the default trust level " + legacyTrustDecisionGo.connectionTrustLevel + ".";
+    } else {
+        errorMessage += " Connection certificate chain has trust level " + legacyTrustDecisionGo.connectionTrustLevel + " due to certificate \"";
+        errorMessage += legacyTrustDecisionGo.connectionCertificateChain[legacyTrustDecisionGo.connectionTrustLevelChainIndex].subject + "\" within CA Set: " + legacyTrustDecisionGo.connectionTrustLevelCASet + ".";
+    }
+    for(let i = 0; i < legacyTrustDecisionGo.highestTrustLevelCASets.length; i++) {
+        errorMessage += " Detected certificate chain with trust level " + legacyTrustDecisionGo.highestTrustLevel;
+        console.log(legacyTrustDecisionGo.highestTrustLevelChainSubjects);
+        console.log(legacyTrustDecisionGo.relevantCertificateChainIndex);
+        errorMessage += " due to certificate \"" + legacyTrustDecisionGo.highestTrustLevelChainSubjects[i][legacyTrustDecisionGo.highestTrustLevelChainIndices[i]] + "\" within CA Set " + legacyTrustDecisionGo.highestTrustLevelCASets[i] + ".";
     }
 
     return errorMessage;
 }
 
 export function getPolicyValidationErrorMessageGo(policyTrustDecisionGo) {
-    // TODO: improve error message formatting
-    return `[policy mode] Detected violated policy ${policyTrustDecisionGo.conflictingPolicies} specified in chain ${policyTrustDecisionGo.policyChain}`;
+    const policyChainDescriptors = getPolicyChainDescriptors(policyTrustDecisionGo.policyChain);
+    let m = "";
+    m += "Detected violated policies ";
+    m += policyTrustDecisionGo.conflictingPolicies.map(JSON.parse).map(p => `${JSON.stringify(p.Attribute)} [${p.Domain}]`).join(", ");
+    m += " specified in chain ";
+    m += policyChainDescriptors.reverse().map(d => `"${d}"`).join(" => ");
+    return m;
+}
+
+// returns a list of human understandable descriptors of certificates in policy chains
+export function getPolicyChainDescriptors(chain) {
+    let isFirstNonEmptyDomain = true;
+    let certCounter;
+    let descriptors = [];
+    chain.reverse().forEach((pJson, index) => {
+        const p = JSON.parse(pJson).O;
+        let desc = "";
+        if (index === 0) {
+            desc = "PCA root";
+            certCounter = 1;
+        } else if (!("Domain" in p)) {
+            desc = "PCA intermediate " + certCounter;
+            certCounter += 1;
+        } else if (isFirstNonEmptyDomain) {
+            isFirstNonEmptyDomain = false;
+            desc = "Domain root [" + p.Domain + "]";
+            certCounter = 1;
+        } else {
+            desc = "Domain intermediate " + certCounter + " [" + p.Domain + "]";
+            certCounter += 1;
+        }
+        descriptors = [desc, ...descriptors];
+    });
+    return descriptors;
 }
 
 function getPolicyErrorMessage(trustDecision, trustInfo, evaluation) {

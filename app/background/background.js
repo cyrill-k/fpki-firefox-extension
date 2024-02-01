@@ -202,13 +202,8 @@ async function requestInfo(details) {
 }
 
 async function getTlsCertificateChain(securityInfo) {
-    const chain = securityInfo.certificates.map(c => ({pem: window.btoa(String.fromCharCode(...c.rawDER)), fingerprintSha256: c.fingerprint.sha256, serial: c.serialNumber, isBuiltInRoot: c.isBuiltInRoot}));
-    await addCertificateChainToCacheIfNecessary(chain[0].pem, chain.slice(1).map(c => c.pem));
-    chain.forEach((c, index) => {
-        const entry = getCertificateEntryByHash(c.fingerprintSha256);
-        chain[index].subject = entry.subjectStr;
-        chain[index].issuer = entry.issuerStr;
-    });
+    const chain = securityInfo.certificates.map(c => ({pem: window.btoa(String.fromCharCode(...c.rawDER)), fingerprintSha256: c.fingerprint.sha256, serial: c.serialNumber, isBuiltInRoot: c.isBuiltInRoot, subject: c.subject, issuer: c.issuer}));
+    // Note: the string representation of the subject and issuer as presented by the browser may differ from the string representation of the golang library. Only use this information for output and not for making decisions.
     return chain;
 }
 

@@ -31,17 +31,19 @@ type LegacyTrustInfo struct {
 	// on the client's legacy trust preference, with examples
 	// of the CA set ID's and subject that led to this trust level
 	// (might be useful to construct error messages)
-	ConnectionTrustLevel      int
-	ConnectionRelevantCASetID string
-	ConnectionExampleSubject  string
+	ConnectionTrustLevel           int
+	ConnectionTrustLevelCASet      string
+	ConnectionTrustLevelChainIndex int
 
 	// CA set ID's and example subjects, and trust level of the
 	// cached certificate chains that led to a failed
 	// validation
 	// (might be useful to construct error messages)
-	RelevantCASetIDs  []string
-	ExampleSubjects   []string
-	HighestTrustLevel int `default:"0"`
+	HighestTrustLevel              int `default:"0"`
+	HighestTrustLevelCASets        []string
+	HighestTrustLevelChainIndices  []int
+	HighestTrustLevelChainHashes   [][]string
+	HighestTrustLevelChainSubjects [][]string
 
 	// result of legacy validation
 	// a value of 1 indicates that validation
@@ -128,49 +130,46 @@ func ComputeSingleCertificateTrustLevelForDomain(dnsName string, certificate *x5
 
 // compute the trust level of a certificate chain for a given
 // domain name (dnsName)
-// also remember the (example) subject and CA Set ID of a subject that
-// led to this specific trust level
-func ComputeChainTrustLevelForDomain(dnsName string, certificateChain []*x509.Certificate) (int, string, string) {
+// also returns the subject and CA Set ID of a root CA that led to this specific trust level and a list
+func ComputeChainTrustLevelForDomain(dnsName string, certificateChain []*x509.Certificate) (int, string, int) {
 	currentTrustLevel := 0
-	exampleSubject := "DEFAULT"
+	relevantCertificateChainIndex := 0
 	relevantCASetID := "DEFAULT"
-
-	// fmt.Printf("DEBUG: dnsName=%s\n", dnsName)
-	// for _, c := range certificateChain {
-	// fmt.Printf("DEBUG: %s\n", c.Subject.String())
-	// }
 
 	// if there are no legacy trust preferences for the domain,
 	// the default trust level is 0
 	legacyTrustPreferencesForDomain, hasTrustPreference := legacyTrustPreferences[dnsName]
 	if !hasTrustPreference {
-		return currentTrustLevel, relevantCASetID, exampleSubject
+		return currentTrustLevel, relevantCASetID, relevantCertificateChainIndex
 	}
 	// iterate through all non-leaf certificates of the chain and determine
 	// the trust level by taking the maximum trust level of each individual certificate
-	for _, certificate := range certificateChain[1:] {
+	for index, certificate := range certificateChain[1:] {
 		for _, legacyTrustPreference := range legacyTrustPreferencesForDomain {
 			_, subjectInLegacyTrustPreference := legacyTrustPreference.CASubjectNames[certificate.Subject.String()]
 			if subjectInLegacyTrustPreference && legacyTrustPreference.TrustLevel > currentTrustLevel {
 				currentTrustLevel = legacyTrustPreference.TrustLevel
 				relevantCASetID = legacyTrustPreference.CASetIdentifier
-				exampleSubject = certificate.Subject.String()
+				// increment the index since we skip the leaf certificate
+				relevantCertificateChainIndex = index + 1
 			}
 		}
 	}
-	return currentTrustLevel, relevantCASetID, exampleSubject
+	return currentTrustLevel, relevantCASetID, relevantCertificateChainIndex
 }
 
 // get certificate chains with highest trust level from a list of certificate chains
 // also check for how long the legacy validation result based on this set
 // of certificates can be cached
-func GetHighestTrustLevelCertificateChains(dnsName string, certificateChains []*CertificateChainInfo) ([]*CertificateChainInfo, int, []string, []string, time.Time) {
+func GetHighestTrustLevelCertificateChains(dnsName string, certificateChains []*CertificateChainInfo) ([]*CertificateChainInfo, int, []string, []int, [][]string, [][]string, time.Time) {
 	// for each certiicate chain with the highest trust level, also
 	// store why they have this trust level (CA Set ID, and an example subject).
 	// this information is used to create error messages if necessary
 	highestTrustCertificateChains := []*CertificateChainInfo{}
-	var exampleSubjects []string
+	var relevantCertificateChainIndices []int
 	var relevantCASetIDs []string
+	var chainCertificateHashes [][]string
+	var chainCertificateSubjects [][]string
 
 	// determine how long the set of certificate chains with highest
 	// trust level should be cached.
@@ -180,11 +179,24 @@ func GetHighestTrustLevelCertificateChains(dnsName string, certificateChains []*
 	highestTrustLevel := 0
 	// only consider the certificate chains with the highest trust level
 	for _, certificateChainInfo := range certificateChains {
-		currentTrustLevel, relevantCASetID, exampleSubject := ComputeChainTrustLevelForDomain(dnsName, certificateChainInfo.certificateChain)
+		currentTrustLevel, relevantCASetID, relevantCertificateChainIndex := ComputeChainTrustLevelForDomain(dnsName, certificateChainInfo.certificateChain)
 		if currentTrustLevel > highestTrustLevel {
 			highestTrustCertificateChains = []*CertificateChainInfo{certificateChainInfo}
 			relevantCASetIDs = []string{relevantCASetID}
-			exampleSubjects = []string{exampleSubject}
+			relevantCertificateChainIndices = []int{relevantCertificateChainIndex}
+
+			var currentSubjects []string
+			for _, cert := range certificateChainInfo.certificateChain {
+				currentSubjects = append(currentSubjects, cert.Subject.String())
+			}
+			chainCertificateSubjects = [][]string{currentSubjects}
+
+			var currentHashes []string
+			for _, cert := range certificateChainInfo.certificateChain {
+				currentHashes = append(currentHashes, GetRawCertificateHash(cert))
+			}
+			chainCertificateHashes = [][]string{currentHashes}
+
 			highestTrustLevel = currentTrustLevel
 			notAfter := certificateChainInfo.certificateChain[0].NotAfter
 			if notAfter.Before(minNotAfterTsd) {
@@ -193,14 +205,27 @@ func GetHighestTrustLevelCertificateChains(dnsName string, certificateChains []*
 		} else if currentTrustLevel == highestTrustLevel {
 			highestTrustCertificateChains = append(highestTrustCertificateChains, certificateChainInfo)
 			relevantCASetIDs = append(relevantCASetIDs, relevantCASetID)
-			exampleSubjects = append(exampleSubjects, exampleSubject)
+			relevantCertificateChainIndices = append(relevantCertificateChainIndices, relevantCertificateChainIndex)
+
+			var currentSubjects []string
+			for _, cert := range certificateChainInfo.certificateChain {
+				currentSubjects = append(currentSubjects, cert.Subject.String())
+			}
+			chainCertificateSubjects = append(chainCertificateSubjects, currentSubjects)
+
+			var currentHashes []string
+			for _, cert := range certificateChainInfo.certificateChain {
+				currentHashes = append(currentHashes, GetRawCertificateHash(cert))
+			}
+			chainCertificateHashes = append(chainCertificateHashes, currentHashes)
+
 			notAfter := certificateChainInfo.certificateChain[0].NotAfter
 			if notAfter.Before(minNotAfterTsd) {
 				minNotAfterTsd = notAfter
 			}
 		}
 	}
-	return highestTrustCertificateChains, highestTrustLevel, relevantCASetIDs, exampleSubjects, minNotAfterTsd
+	return highestTrustCertificateChains, highestTrustLevel, relevantCASetIDs, relevantCertificateChainIndices, chainCertificateHashes, chainCertificateSubjects, minNotAfterTsd
 }
 
 // check if a certificate contains constraints that must be checked in case
@@ -290,7 +315,7 @@ func verifyLegacyAgainstChains(connectionTrustInfoToVerify *LegacyTrustInfo, cer
 	connectionTrustLevel := connectionTrustInfoToVerify.ConnectionTrustLevel
 
 	// get all cached certificate chains with the highest trust level
-	highestTrustLevelCertificateChainsCached, highestTrustLevelCached, relevantCASetIDs, exampleSubjects, minNotAfterTsd := GetHighestTrustLevelCertificateChains(connectionTrustInfoToVerify.DNSName,
+	highestTrustLevelCertificateChainsCached, highestTrustLevelCached, relevantCASetIDs, relevantCertificateChainIndices, chainCertificateHashes, chainCertificateSubjects, minNotAfterTsd := GetHighestTrustLevelCertificateChains(connectionTrustInfoToVerify.DNSName,
 		certificateChains)
 
 	// if the connection certificate chain has a lower trust level as some cached
@@ -303,8 +328,10 @@ func verifyLegacyAgainstChains(connectionTrustInfoToVerify *LegacyTrustInfo, cer
 			connectionTrustInfoToVerify.EvaluationResult = SUCCESS
 		} else {
 			connectionTrustInfoToVerify.EvaluationResult = FAILURE
-			connectionTrustInfoToVerify.RelevantCASetIDs = relevantCASetIDs
-			connectionTrustInfoToVerify.ExampleSubjects = exampleSubjects
+			connectionTrustInfoToVerify.HighestTrustLevelCASets = relevantCASetIDs
+			connectionTrustInfoToVerify.HighestTrustLevelChainIndices = relevantCertificateChainIndices
+			connectionTrustInfoToVerify.HighestTrustLevelChainHashes = chainCertificateHashes
+			connectionTrustInfoToVerify.HighestTrustLevelChainSubjects = chainCertificateSubjects
 			connectionTrustInfoToVerify.HighestTrustLevel = highestTrustLevelCached
 		}
 	} else {
@@ -370,9 +397,9 @@ func NewLegacyTrustInfo(dnsName string, certificateChain []*x509.Certificate) *L
 		EvaluationResult:     0,
 	}
 
-	trustLevel, relevantCASetID, exampleSubject := ComputeChainTrustLevelForDomain(dnsName, certificateChain)
+	trustLevel, relevantCASetID, relevantCertificateChainIndex := ComputeChainTrustLevelForDomain(dnsName, certificateChain)
 	legacyTrustInfo.ConnectionTrustLevel = trustLevel
-	legacyTrustInfo.ConnectionRelevantCASetID = relevantCASetID
-	legacyTrustInfo.ConnectionExampleSubject = exampleSubject
+	legacyTrustInfo.ConnectionTrustLevelCASet = relevantCASetID
+	legacyTrustInfo.ConnectionTrustLevelChainIndex = relevantCertificateChainIndex
 	return legacyTrustInfo
 }
