@@ -134,7 +134,7 @@ async function updateValidationResult() {
 
     // show the entries in reverse order such that more recently added entries appear on top
     let currentElement = createElementIn("p", {"id": "validation-title"}, "Validation Results", "validation-results");
-    recentTrustDecisions.reverse().forEach((td, index) => {
+    recentTrustDecisions.toReversed().forEach((td, index) => {
         if (td.type === "legacy") {
             currentElement = addLegacyValidationResult(td, currentElement, index);
         } else {
@@ -163,7 +163,7 @@ function addPolicyValidationResult(trustDecision, predecessor, index) {
     let table = "<tr><th>Certificates of this connection</th></tr>";
     table += "<tr><td>"+getSubject(trustDecision.connectionCertificateChain[trustDecision.connectionCertificateChain.length - 1])
     table += "</td></tr>";
-    trustDecision.connectionCertificateChain.reverse().slice(1).forEach(c => {
+    trustDecision.connectionCertificateChain.toReversed().slice(1).forEach(c => {
         table += "<tr><td>"+getSubject(c)+"</td></tr>";
     });
     connTable.innerHTML = table;
@@ -257,7 +257,7 @@ function addLegacyValidationResult(trustDecision, predecessor, index) {
     }
     table += ")</th></tr>";
     table += "<tr><th>Type</th><th>Subject</th><tr>";
-    trustDecision.connectionCertificateChain.reverse().forEach((c, index) => {
+    trustDecision.connectionCertificateChain.toReversed().forEach((c, index) => {
         table += "<tr><td>"
         if (index === 0) {
             table += "Root";

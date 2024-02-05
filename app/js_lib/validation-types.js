@@ -188,7 +188,7 @@ export function getPolicyValidationErrorMessageGo(policyTrustDecisionGo) {
     m += "Detected violated policies ";
     m += policyTrustDecisionGo.conflictingPolicies.map(JSON.parse).map(p => `${JSON.stringify(p.Attribute)} [${p.Domain}]`).join(", ");
     m += " specified in chain ";
-    m += policyChainDescriptors.reverse().map(d => `"${d}"`).join(" => ");
+    m += policyChainDescriptors.toReversed().map(d => `"${d}"`).join(" => ");
     return m;
 }
 
@@ -197,7 +197,7 @@ export function getPolicyChainDescriptors(chain) {
     let isFirstNonEmptyDomain = true;
     let certCounter;
     let descriptors = [];
-    chain.reverse().forEach((pJson, index) => {
+    chain.toReversed().forEach((pJson, index) => {
         const p = JSON.parse(pJson).O;
         let desc = "";
         if (index === 0) {
