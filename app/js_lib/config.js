@@ -12,7 +12,7 @@ function defaultConfig() {
         {"identity": "ETH-mapserver-top-100k", "domain": "http://129.132.55.210:8080", "querytype": "lfpki-http-get"}
     ]);
     c.set("mapservers", [
-        {"identity": "local-mapserver", "domain": "http://127.0.0.1:8443", "querytype": "lfpki-http-get"},
+        {"identity": "local-mapserver", "domain": "http://127.0.0.1:8443", "querytype": "lfpki-http-get", "publicKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArrrQ5MN4mdcp5XouqmcmPG489eRtbkIn9elKOCDLgpA9OFASKM26Vskm0jwR9unrVE8NXXdRbotQfVpL7iAPGOPfoSglBXKmiAdmRG0idw6+xRlpffgHE3CDhNnz1tpVXBTE+U84f48v+sVd1gnK4oA/uT7X7D6vO5cHK1M9rmpo+SiKlcYSHvF19/qgiwF9cc1z3ug6M4SciqEbUNdW1R3BSW+9ulTZluT4Hbml4C8hkktN9zlHUpWdHzH1NlcRqzObBp7ZvB/OrKh8iA0WBXLXNzlBdB9EXSHjqJcI/sKn0Zf/5RO9QYT8wjDDbj8H+4+/wRd2q8Y10yQomIy6WQIDAQAB"},
     ]);
     // cache timeout in ms
     c.set("cache-timeout", 60*60*1000);

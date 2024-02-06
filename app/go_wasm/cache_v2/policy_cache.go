@@ -80,7 +80,7 @@ func InitializePolicyCache(trustStoreDir string) int {
 
 		policy, err := util.PolicyCertificateFromBytes(fileBytes)
 		if err != nil {
-			log.Fatalf("loading policy certificate from trust store (%s): %w", path, err)
+			log.Fatalf("loading policy certificate from trust store (%s): %s", path, err)
 		}
 
 		policyHash := getPolicyHash(policy)

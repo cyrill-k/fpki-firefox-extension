@@ -140,7 +140,7 @@ export class FpkiRequest {
                 const policies = new Map();
 
                 // TODO: also return policies
-                const { certificatesOld } = await retrieveMissingCertificatesAndPolicies(mapResponse, this.requestId, mapResponseNew, this.mapserver.domain);
+                const { certificatesOld } = await retrieveMissingCertificatesAndPolicies(mapResponse, this.requestId, mapResponseNew, this.mapserver.domain, this.mapserver.identity);
                 cLog(this.requestId, "fetch finished for: "+this.domain);
 
                 // add policies to policy cache

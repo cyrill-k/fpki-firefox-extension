@@ -59,6 +59,9 @@ func initializeGODatastructuresWrapper() js.Func {
 		cache_v2.InitializeLegacyTrustPreferences(configFilePath)
 		cache_v2.InitializePolicyTrustPreferences(configFilePath)
 
+		// initialize map server info cache
+		cache_v2.InitializeMapserverInfoCache(configFilePath)
+
 		nCertificatesAdded := make([]interface{}, 2)
 		nCertificatesAdded[0] = nCertificates
 		nCertificatesAdded[1] = nPolicies
@@ -137,14 +140,14 @@ func verifyAndGetMissingIDsWrapper() js.Func {
 		cache_v2.MSS = 0
 		cache_v2.NCertificatesAdded = 0
 
-		inputLength := args[1].Int()
-		js.CopyBytesToGo(buffer, args[0])
+		mapserverID := args[0].String()
+		inputLength := args[2].Int()
+		js.CopyBytesToGo(buffer, args[1])
 
 		var responses []mapCommon.MapServerResponse
 		json.Unmarshal(buffer[:inputLength], &responses)
 
-		// TODO (cyrill): verify proof
-
+		mhtProofVerificationResults := []string{}
 		missingCertificates := make(map[string]struct{})
 		missingPolicies := make(map[string]struct{})
 		for _, response := range responses {
@@ -154,8 +157,36 @@ func verifyAndGetMissingIDsWrapper() js.Func {
 				base64IDs[i] = base64.StdEncoding.EncodeToString(id[:])
 			}
 
-			certificates := cache_v2.GetMissingCertificateHashesList(base64IDs)
+			policyIDs := common.BytesToIDs(response.DomainEntry.PolicyIDs)
+			base64PolicyIDs := make([]string, len(policyIDs))
+			for i, id := range policyIDs {
+				base64PolicyIDs[i] = base64.StdEncoding.EncodeToString(id[:])
+			}
 
+			// verify MHT proof
+			proofCacheKey, err := cache_v2.AddMapServerResponseToCacheIfNecessary(response, certIDs, policyIDs, mapserverID)
+			if err != nil {
+				mhtProofVerificationResults = append(mhtProofVerificationResults, "Failed to add map server response to cache: "+err.Error())
+				continue
+			}
+			proofEntry := cache_v2.VerifyProof(proofCacheKey)
+			var verificationResult string
+			if proofEntry == nil {
+				mhtProofVerificationResults = append(mhtProofVerificationResults, "Failed to add entry to proof cache")
+				continue
+			} else if !proofEntry.Evaluated() || !proofEntry.Result() {
+				verificationResult := fmt.Sprintf("MHT Verification for %s and map server %s failed", response.DomainEntry.DomainName, mapserverID)
+				if proofEntry.LastError() != nil {
+					verificationResult += fmt.Sprintf(": %s", proofEntry.LastError().Error())
+				}
+				mhtProofVerificationResults = append(mhtProofVerificationResults, verificationResult)
+				continue
+			} else {
+				verificationResult = "success"
+				mhtProofVerificationResults = append(mhtProofVerificationResults, verificationResult)
+			}
+
+			certificates := cache_v2.GetMissingCertificateHashesList(base64IDs)
 			uniqueCerts := make(map[string]struct{})
 			for _, id := range certificates {
 				missingCertificates[id] = struct{}{}
@@ -165,16 +196,11 @@ func verifyAndGetMissingIDsWrapper() js.Func {
 				fmt.Printf("[Go] Duplicate certificates detected for %s: %v\n", response.DomainEntry.DomainName, certificates)
 			}
 
-			policyIDs := common.BytesToIDs(response.DomainEntry.PolicyIDs)
-			base64PolicyIDs := make([]string, len(policyIDs))
-			for i, id := range policyIDs {
-				base64PolicyIDs[i] = base64.StdEncoding.EncodeToString(id[:])
-			}
-
-			uniquePolicies := make(map[string]struct{})
 			policies := cache_v2.GetMissingPolicyHashesList(base64PolicyIDs)
+			uniquePolicies := make(map[string]struct{})
 			for _, id := range policies {
 				missingPolicies[id] = struct{}{}
+				uniquePolicies[id] = struct{}{}
 			}
 			if len(uniquePolicies) < len(policies) {
 				fmt.Printf("[Go] Duplicate policies detected for %s: %v\n", response.DomainEntry.DomainName, policies)
@@ -191,8 +217,10 @@ func verifyAndGetMissingIDsWrapper() js.Func {
 			missingPoliciesOut = append(missingPoliciesOut, id)
 		}
 
+		mhtValidationResultsOut := cache_v2.TransformListToInterfaceType(mhtProofVerificationResults)
+
 		responseClass := js.Global().Get("VerifyAndGetMissingIDsResponseGo")
-		return responseClass.New("TODO (MHT VALIDATION)", missingCertificatesOut, missingPoliciesOut)
+		return responseClass.New(mhtValidationResultsOut, missingCertificatesOut, missingPoliciesOut)
 	})
 	return jsf
 }

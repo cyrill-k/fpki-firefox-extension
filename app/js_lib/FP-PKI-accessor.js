@@ -190,8 +190,8 @@ function extractIDsFromMapserverResponse(mapResponse, requestId) {
 }
 
 export class VerifyAndGetMissingIDsResponseGo {
-    constructor(verificationResult, certificateIDs, policyIDs) {
-        this.verificationResult = verificationResult;
+    constructor(verificationResults, certificateIDs, policyIDs) {
+        this.verificationResults = verificationResults;
         this.certificateIDs = certificateIDs;
         this.policyIDs = policyIDs;
     }
@@ -204,7 +204,7 @@ export class AddMissingPayloadsResponseGo {
     }
 }
 
-async function retrieveMissingCertificatesAndPolicies(mapResponse, requestId, mapResponseNew, mapserverDomain) {
+async function retrieveMissingCertificatesAndPolicies(mapResponse, requestId, mapResponseNew, mapserverDomain, mapserverID) {
     const startRawExtraction = performance.now();
     const rawDomainMap = new Map()
     const endRawExtraction = performance.now();
@@ -216,8 +216,11 @@ async function retrieveMissingCertificatesAndPolicies(mapResponse, requestId, ma
         let json = JSON.stringify(mapResponseNew);
         const enc = new TextEncoder();
         let jsonBytes = enc.encode(json);
-        const { verificationResult, certificateIDs: missingCertificateIDs, policyIDs: missingPolicyIDs } = verifyAndGetMissingIDs(jsonBytes, jsonBytes.length);
-        // TODO: check verification result
+        const { verificationResults, certificateIDs: missingCertificateIDs, policyIDs: missingPolicyIDs } = verifyAndGetMissingIDs(mapserverID, jsonBytes, jsonBytes.length);
+        if (verificationResults.some(e => e != "success")) {
+            console.log(verificationResults);
+            throw new FpkiError(errorTypes.MAPSERVER_INVALID_RESPONSE, verificationResults.find(e => e != "success"));
+        }
 
         const missingIDs = missingCertificateIDs.concat(missingPolicyIDs);
         if (missingIDs.length > 0) {
