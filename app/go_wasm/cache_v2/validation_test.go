@@ -78,7 +78,7 @@ func TestSimpleChainTrustLevel(t *testing.T) {
 
 	chain, _ := testSimpleChainCreate(t, nil, nil)
 	chainRev := []*x509.Certificate{chain[2], chain[1], chain[0]}
-	trustLevel, _, _ := ComputeChainTrustLevelForDomain("leaf1", chainRev)
+	trustLevel, _, _, _ := ComputeChainTrustLevelForDomain("leaf1", chainRev)
 	if trustLevel != 1 {
 		log.Fatalf("wanted: %d, got %d", 1, trustLevel)
 
@@ -86,7 +86,7 @@ func TestSimpleChainTrustLevel(t *testing.T) {
 
 	reset(t)
 	InitializeLegacyTrustPreferences("embedded/unit_test/validation/config_simplechain_2.json")
-	trustLevel, _, _ = ComputeChainTrustLevelForDomain("leaf1", chainRev)
+	trustLevel, _, _, _ = ComputeChainTrustLevelForDomain("leaf1", chainRev)
 	if trustLevel != 2 {
 		log.Fatalf("wanted: %d, got %d", 2, trustLevel)
 
@@ -274,7 +274,7 @@ func TestVerifyUncached(t *testing.T) {
 
 	dnsName := "leaf1"
 	legacyTrustInfoToVerify := NewLegacyTrustInfo(dnsName, ccToVerify)
-	trustLevel, _, _ := ComputeChainTrustLevelForDomain("leaf1", ccToVerify)
+	trustLevel, _, _, _ := ComputeChainTrustLevelForDomain("leaf1", ccToVerify)
 	if trustLevel != 0 {
 		log.Fatalf("wanted: %d, got %d", 1, trustLevel)
 

@@ -278,7 +278,14 @@ function loadDomainInheritedPreferences(json_config, domain) {
      * `inherited_prefs` is a real Map() after this.
      */
     function sortInheritedPrefs() {
-        inherited_prefs = new Map([...Object.entries(inherited_prefs)].sort((a, b) => b[0].length - a[0].length));
+        inherited_prefs = new Map([...Object.entries(inherited_prefs)].sort((a, b) => {
+            if (a[0].length === b[0].length) {
+                if (a[0].startsWith("*.") && !b[0].startsWith("*.")) {
+                    return 1;
+                }
+            }
+            return b[0].length - a[0].length
+        }));
     }
 
 

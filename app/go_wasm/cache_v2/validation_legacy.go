@@ -143,13 +143,14 @@ func ComputeChainTrustLevelForDomainAndParents(dnsName string, certificateChain 
 	var relevantCertificateChainIndex int
 	var relevantDomain string
 
-	for idx, domain := range generateWildcardAndParentDomain(dnsName) {
-		currentTrustLevel, currentRelevantCASetID, currentRelevantCertificateChainIndex := ComputeChainTrustLevelForDomain(domain, certificateChain)
-		if idx == 0 || currentTrustLevel > trustLevel {
+	for _, domain := range generateWildcardAndParentDomain(dnsName) {
+		currentTrustLevel, currentRelevantCASetID, currentRelevantCertificateChainIndex, trustPreferenceFound := ComputeChainTrustLevelForDomain(domain, certificateChain)
+		if trustPreferenceFound {
 			trustLevel = currentTrustLevel
 			relevantCASetID = currentRelevantCASetID
 			relevantCertificateChainIndex = currentRelevantCertificateChainIndex
 			relevantDomain = domain
+			break
 		}
 	}
 
@@ -159,7 +160,8 @@ func ComputeChainTrustLevelForDomainAndParents(dnsName string, certificateChain 
 // compute the trust level of a certificate chain for a given
 // (wildcard) domain name or (dnsName)
 // also returns the subject and CA Set ID of a root CA that led to this specific trust level
-func ComputeChainTrustLevelForDomain(dnsName string, certificateChain []*x509.Certificate) (int, string, int) {
+// the last return value indicates whether a trust preference for this domain exists or not
+func ComputeChainTrustLevelForDomain(dnsName string, certificateChain []*x509.Certificate) (int, string, int, bool) {
 	currentTrustLevel := 0
 	relevantCertificateChainIndex := 0
 	relevantCASetID := "DEFAULT"
@@ -168,11 +170,12 @@ func ComputeChainTrustLevelForDomain(dnsName string, certificateChain []*x509.Ce
 	// the default trust level is 0
 	legacyTrustPreferencesForDomain, hasTrustPreference := legacyTrustPreferences[dnsName]
 	if !hasTrustPreference {
-		return currentTrustLevel, relevantCASetID, relevantCertificateChainIndex
+		return currentTrustLevel, relevantCASetID, relevantCertificateChainIndex, false
 	}
 	// iterate through all non-leaf certificates of the chain and determine
 	// the trust level by taking the maximum trust level of each individual certificate
 	// Since the preferences for a specific domain are applied using a first-match approach, we must iterate through the preferences in order
+	applicablePolicyFound := false
 	for _, legacyTrustPreference := range legacyTrustPreferencesForDomain {
 		for index, certificate := range certificateChain[1:] {
 			_, subjectInLegacyTrustPreference := legacyTrustPreference.CASubjectNames[certificate.Subject.String()]
@@ -181,10 +184,11 @@ func ComputeChainTrustLevelForDomain(dnsName string, certificateChain []*x509.Ce
 				relevantCASetID = legacyTrustPreference.CASetIdentifier
 				// increment the index since we skip the leaf certificate
 				relevantCertificateChainIndex = index + 1
+				applicablePolicyFound = true
 			}
 		}
 	}
-	return currentTrustLevel, relevantCASetID, relevantCertificateChainIndex
+	return currentTrustLevel, relevantCASetID, relevantCertificateChainIndex, applicablePolicyFound
 }
 
 // get certificate chains with highest trust level from a list of certificate chains
