@@ -46,7 +46,7 @@ func initializeGODatastructuresWrapper() js.Func {
 
 		trustStoreDir := args[0].String()
 		policyTrustStoreDir := args[1].String()
-		configFilePath := args[2].String()
+		configJSON := args[2].String()
 
 		// initialize certificate cache with root certificates
 		// located in trustStoreDir
@@ -55,12 +55,16 @@ func initializeGODatastructuresWrapper() js.Func {
 		// same for policies
 		nPolicies := cache_v2.InitializePolicyCache(policyTrustStoreDir)
 
+		// decode JSON config
+		var configMap map[string]interface{}
+		json.Unmarshal([]byte(configJSON), &configMap)
+
 		// initialize validation data structures
-		cache_v2.InitializeLegacyTrustPreferences(configFilePath)
-		cache_v2.InitializePolicyTrustPreferences(configFilePath)
+		cache_v2.InitializeLegacyTrustPreferences(configMap)
+		cache_v2.InitializePolicyTrustPreferences(configMap)
 
 		// initialize map server info cache
-		cache_v2.InitializeMapserverInfoCache(configFilePath)
+		cache_v2.InitializeMapserverInfoCache(configMap)
 
 		nCertificatesAdded := make([]interface{}, 2)
 		nCertificatesAdded[0] = nCertificates

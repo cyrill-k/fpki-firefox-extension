@@ -2,8 +2,7 @@ package cache_v2
 
 import (
 	"crypto/x509"
-	"encoding/json"
-	"log"
+	"strings"
 	"time"
 )
 
@@ -60,36 +59,32 @@ type LegacyTrustInfo struct {
 // to be used to compute certificate chain trust levels
 var legacyTrustPreferences = map[string][]*LegacyTrustPreference{}
 
-// initialize legacyTrustPreferences from config file
-func InitializeLegacyTrustPreferences(configFilePath string) {
-	bytes, err := validationFileSystem.ReadFile(configFilePath)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var jsonMap map[string]interface{}
-	json.Unmarshal([]byte(bytes), &jsonMap)
+// initialize legacyTrustPreferences  with a config
+func InitializeLegacyTrustPreferences(configMap map[string]interface{}) {
 
 	// parse CA sets
 	caSetsMap := map[string][]string{}
-	caSets := jsonMap["ca-sets"].(map[string]interface{})
+	caSets := configMap["ca-sets"].(map[string]interface{})
 	for ca, values := range caSets {
 		caSetsMap[ca] = []string{}
-		v := values.([]interface{})
-		for _, value := range v {
+		v := values.(map[string]interface{})
+		for _, value := range v["cas"].([]interface{}) {
 			caSetsMap[ca] = append(caSetsMap[ca], value.(string))
 		}
 	}
 
+	// get trust level map
+	trustLevelMap := configMap["trust-levels"].(map[string]interface{})
+
 	// parse legacy trust preferences
-	legacyTrustPreferencesJSON := jsonMap["legacy-trust-preference"].(map[string]interface{})
+	legacyTrustPreferencesJSON := configMap["legacy-trust-preference"].(map[string]interface{})
 	for domain, keys := range legacyTrustPreferencesJSON {
 		domainTrustPreferences := []*LegacyTrustPreference{}
 		objects := keys.([]interface{})
 		for _, object := range objects {
 			objectMap := object.(map[string]interface{})
-			caSetStr := objectMap["caSet"].(string)
-			trustLevel := int(objectMap["level"].(float64))
+			caSetStr := objectMap["ca-set"].(string)
+			trustLevel := int(trustLevelMap[objectMap["level"].(string)].(float64))
 			caSubjectNames := map[string]struct{}{}
 			for _, caSubjectName := range caSetsMap[caSetStr] {
 				caSubjectNames[caSubjectName] = struct{}{}
@@ -128,9 +123,42 @@ func ComputeSingleCertificateTrustLevelForDomain(dnsName string, certificate *x5
 	return trustLevel
 }
 
+func generateWildcardAndParentDomain(dnsName string) []string {
+	dnsNameNormalized := strings.TrimSuffix(dnsName, ".")
+	components := strings.Split(dnsNameNormalized, ".")
+	orderedParentDomains := make([]string, 2*len(components))
+	for from := range components {
+		orderedParentDomains = append(orderedParentDomains, strings.Join(components[from:], "."))
+		orderedParentDomains = append(orderedParentDomains, strings.Join(append([]string{"*"}, components[from+1:]...), "."))
+	}
+	return orderedParentDomains
+}
+
 // compute the trust level of a certificate chain for a given
 // domain name (dnsName)
-// also returns the subject and CA Set ID of a root CA that led to this specific trust level and a list
+// also returns the subject and CA Set ID of a root CA that led to this specific trust level and the domain for which the trust preference was set
+func ComputeChainTrustLevelForDomainAndParents(dnsName string, certificateChain []*x509.Certificate) (int, string, int, string) {
+	var trustLevel int
+	var relevantCASetID string
+	var relevantCertificateChainIndex int
+	var relevantDomain string
+
+	for idx, domain := range generateWildcardAndParentDomain(dnsName) {
+		currentTrustLevel, currentRelevantCASetID, currentRelevantCertificateChainIndex := ComputeChainTrustLevelForDomain(domain, certificateChain)
+		if idx == 0 || currentTrustLevel > trustLevel {
+			trustLevel = currentTrustLevel
+			relevantCASetID = currentRelevantCASetID
+			relevantCertificateChainIndex = currentRelevantCertificateChainIndex
+			relevantDomain = domain
+		}
+	}
+
+	return trustLevel, relevantCASetID, relevantCertificateChainIndex, relevantDomain
+}
+
+// compute the trust level of a certificate chain for a given
+// (wildcard) domain name or (dnsName)
+// also returns the subject and CA Set ID of a root CA that led to this specific trust level
 func ComputeChainTrustLevelForDomain(dnsName string, certificateChain []*x509.Certificate) (int, string, int) {
 	currentTrustLevel := 0
 	relevantCertificateChainIndex := 0
@@ -144,8 +172,9 @@ func ComputeChainTrustLevelForDomain(dnsName string, certificateChain []*x509.Ce
 	}
 	// iterate through all non-leaf certificates of the chain and determine
 	// the trust level by taking the maximum trust level of each individual certificate
-	for index, certificate := range certificateChain[1:] {
-		for _, legacyTrustPreference := range legacyTrustPreferencesForDomain {
+	// Since the preferences for a specific domain are applied using a first-match approach, we must iterate through the preferences in order
+	for _, legacyTrustPreference := range legacyTrustPreferencesForDomain {
+		for index, certificate := range certificateChain[1:] {
 			_, subjectInLegacyTrustPreference := legacyTrustPreference.CASubjectNames[certificate.Subject.String()]
 			if subjectInLegacyTrustPreference && legacyTrustPreference.TrustLevel > currentTrustLevel {
 				currentTrustLevel = legacyTrustPreference.TrustLevel
@@ -179,7 +208,7 @@ func GetHighestTrustLevelCertificateChains(dnsName string, certificateChains []*
 	highestTrustLevel := 0
 	// only consider the certificate chains with the highest trust level
 	for _, certificateChainInfo := range certificateChains {
-		currentTrustLevel, relevantCASetID, relevantCertificateChainIndex := ComputeChainTrustLevelForDomain(dnsName, certificateChainInfo.certificateChain)
+		currentTrustLevel, relevantCASetID, relevantCertificateChainIndex, _ := ComputeChainTrustLevelForDomainAndParents(dnsName, certificateChainInfo.certificateChain)
 		if currentTrustLevel > highestTrustLevel {
 			highestTrustCertificateChains = []*CertificateChainInfo{certificateChainInfo}
 			relevantCASetIDs = []string{relevantCASetID}
@@ -397,7 +426,7 @@ func NewLegacyTrustInfo(dnsName string, certificateChain []*x509.Certificate) *L
 		EvaluationResult:     0,
 	}
 
-	trustLevel, relevantCASetID, relevantCertificateChainIndex := ComputeChainTrustLevelForDomain(dnsName, certificateChain)
+	trustLevel, relevantCASetID, relevantCertificateChainIndex, _ := ComputeChainTrustLevelForDomainAndParents(dnsName, certificateChain)
 	legacyTrustInfo.ConnectionTrustLevel = trustLevel
 	legacyTrustInfo.ConnectionTrustLevelCASet = relevantCASetID
 	legacyTrustInfo.ConnectionTrustLevelChainIndex = relevantCertificateChainIndex

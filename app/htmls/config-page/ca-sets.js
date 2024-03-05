@@ -241,7 +241,7 @@ function isUsedByPreference(json_config, caset_name) {
 
     Object.entries(json_config['legacy-trust-preference']).forEach(elem => {
         const [_, prefs] = elem;
-        prefs.forEach((_, pref_caset) => {
+        prefs.forEach(({"ca-set": pref_caset}) => {
             console.log("compargin '" + caset_name + "' and '" + pref_caset + "'")
             if (pref_caset === caset_name) {
                 is_used = true;

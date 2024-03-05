@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log"
 	"slices"
 	"strings"
 	"time"
@@ -124,30 +123,46 @@ func NewPolicyCertificateChain() *PolicyCertificateChain {
 	}
 }
 
-// initialize legacyTrustPreferences from config file
-func InitializePolicyTrustPreferences(configFilePath string) {
-	bytes, err := validationFileSystem.ReadFile(configFilePath)
-	if err != nil {
-		log.Fatal(err)
+// initialize legacyTrustPreferences with a config
+func InitializePolicyTrustPreferences(configMap map[string]interface{}) {
+	// parse policy CA sets
+	pcaSetsMap := map[string][]string{}
+	pcaSets := configMap["policy-ca-sets"].(map[string]interface{})
+	for pcaSetID, values := range pcaSets {
+		pcaSetsMap[pcaSetID] = []string{}
+		v := values.(map[string]interface{})
+		for _, value := range v["pcas"].([]interface{}) {
+			pcaSetsMap[pcaSetID] = append(pcaSetsMap[pcaSetID], value.(string))
+		}
 	}
 
-	var jsonMap map[string]interface{}
-	json.Unmarshal([]byte(bytes), &jsonMap)
+	// parse policy CAs
+	pcasPublicKeyMap := map[string]string{}
+	pcas := configMap["policy-cas"].(map[string]interface{})
+	for pcaID, values := range pcas {
+		v := values.(map[string]interface{})
+		pcasPublicKeyMap[pcaID] = v["publickey"].(string)
+	}
+
+	// get trust level map
+	trustLevelMap := configMap["trust-levels"].(map[string]interface{})
 
 	// parse policy trust preferences
-	policyTrustPreferencesJSON := jsonMap["policy-trust-preference"].(map[string]interface{})
+	policyTrustPreferencesJSON := configMap["policy-trust-preference"].(map[string]interface{})
 	for domain, entry := range policyTrustPreferencesJSON {
 		domainTrustPreferences := []*PolicyTrustPreference{}
 		objects := entry.([]interface{})
 		for _, object := range objects {
 			objectMap := object.(map[string]interface{})
-			pcaPublicKey := objectMap["pcaPublicKey"].(string)
-			trustLevel := int(objectMap["level"].(float64))
-			policyTrustPreference := &PolicyTrustPreference{
-				PCAPublicKey: pcaPublicKey,
-				TrustLevel:   trustLevel,
+			trustLevel := int(trustLevelMap[objectMap["level"].(string)].(float64))
+			pcaSetID := objectMap["policy-ca-set"].(string)
+			for _, pca := range pcaSetsMap[pcaSetID] {
+				policyTrustPreference := &PolicyTrustPreference{
+					PCAPublicKey: pcasPublicKeyMap[pca],
+					TrustLevel:   trustLevel,
+				}
+				domainTrustPreferences = append(domainTrustPreferences, policyTrustPreference)
 			}
-			domainTrustPreferences = append(domainTrustPreferences, policyTrustPreference)
 		}
 		policyTrustPreferences[domain] = domainTrustPreferences
 	}

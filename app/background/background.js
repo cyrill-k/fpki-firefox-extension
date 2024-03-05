@@ -3,7 +3,7 @@
 import { getDomainNameFromURL } from "../js_lib/domain.js"
 import { FpkiRequest } from "../js_lib/fpki-request.js"
     import { printMap, cLog, mapGetList, mapGetMap, mapGetSet, trimString } from "../js_lib/helper.js"
-import { config, downloadConfig, importConfigFromJSON, initializeConfig, getConfig, saveConfig, resetConfig, exportConfigToJSON, getJSONConfig, toOldConfig } from "../js_lib/config.js"
+import { config, downloadConfig, initializeConfig, getConfig, saveConfig, resetConfig, setConfig, exportConfigToJSON } from "../js_lib/config.js"
 import { LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole, getSerializedLogEntries } from "../js_lib/log.js"
 import { FpkiError, errorTypes } from "../js_lib/errors.js"
 import { policyValidateConnection, legacyValidateConnection, legacyValidateConnectionGo, policyValidateConnectionGo } from "../js_lib/validation.js"
@@ -15,11 +15,8 @@ import { VerifyAndGetMissingIDsResponseGo, AddMissingPayloadsResponseGo } from "
 
 try {
     initializeConfig();
-    let test = getConfig();
-    console.log("Config-Type: " + typeof test);
-    console.log("Config-Value:" + test);
-    window.GOCACHE = test.get("wasm-certificate-parsing");
-    window.GOCACHEV2 = test.get("wasm-certificate-caching");
+    window.GOCACHE = getConfig("wasm-certificate-parsing");
+    window.GOCACHEV2 = getConfig("wasm-certificate-caching");
 } catch (e) {
     console.log("initialize: " + e);
 }
@@ -36,7 +33,7 @@ if (window.GOCACHE) {
         const go = new Go();
         WebAssembly.instantiateStreaming(fetch("../go_wasm/gocachev2.wasm"), go.importObject).then((result) => {
             go.run(result.instance);
-            const nCertificatesAdded = initializeGODatastructures("embedded/ca-certificates", "embedded/pca-certificates", "embedded/config.json");
+            const nCertificatesAdded = initializeGODatastructures("embedded/ca-certificates", "embedded/pca-certificates", exportConfigToJSON(getConfig()));
             console.log(`[Go] Initialize cache with trust roots: #certificates = ${nCertificatesAdded[0]}, #policies = ${nCertificatesAdded[1]}`);
 
             // make js classes for encapsulating return values available to WASM
@@ -65,23 +62,8 @@ browser.runtime.onConnect.addListener( (port) => {
             break;
         case 'postConfig':
             try {
-                /**
-                 * Save new format config and converted old format config
-                 */
-                console.log("POSTED CONFIG:");
-                //setNewFormatConfig(msg.value);
-                console.log(msg.value);
-
-                //let converted_json_config = toOldConfig(new_format_config);
-
-                // deep copy
-                importConfigFromJSON(exportConfigToJSON(msg.value));
-
-                //console.log("SAVED CONFIG:");
-                //console.log(JSON.parse(exportConfigToJSON(config)));
-
+                setConfig(msg.value);
                 saveConfig();
-                console.log("Updated config saved");
                 break;
             } catch (e) {
                 console.log(e);
@@ -135,24 +117,17 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     
     switch(request) {
         case 'requestConfig':
-            console.log(`MSG RECV: ${request}`);
             return Promise.resolve({ "config": config });
-        case 'requestJSONConfig':
-            console.log(`MSG RECV: ${request}`);
-            return Promise.resolve({ "config": getJSONConfig() });
         case 'resetConfig':
-            console.log(`MSG RECV: ${request}`);
             resetConfig();
+            saveConfig();
             return Promise.resolve({ "config": config });
         
         default:
             switch (request['type']) {
                 case "uploadConfig":
-                    console.log("setting new config value...");
-                    // expect new format config
-                    console.log(request['value']);
-                    //setNewFormatConfig(JSON.parse(request['value']));
-                    importConfigFromJSON(exportConfigToJSON(request['value']));
+                    console.log("uploading new config value...");
+                    setConfig(request['value']);
                     saveConfig();
                     return Promise.resolve({ "config": config });
                 default:

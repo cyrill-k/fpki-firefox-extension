@@ -3,7 +3,7 @@ import * as ca_sets from "./ca-sets.js"
 import * as trust_levels from "./trust-levels.js"
 import * as misc from "./misc.js"
 import { clone } from "../../js_lib/helper.js";
-import { toOldConfig, toNewConfig, convertJSONConfigToMap} from "../../js_lib/config.js";
+import {convertMapsToObjects, convertObjectsToMaps} from "../../js_lib/config.js";
 
 
 /*
@@ -34,19 +34,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             await resetConfig();
             reloadSettings();
         });
-        
+
         document.getElementById('uploadConfig').addEventListener('click', async () => {
             let file = document.getElementById("file").files[0];
             let reader = new FileReader();
             
             reader.onload = async function(e){
                 //port.postMessage({type: "uploadConfig", value: e.target.result});
-                const response = await browser.runtime.sendMessage({type: "uploadConfig", value: convertJSONConfigToMap(e.target.result)});
+                const response = await browser.runtime.sendMessage({type: "uploadConfig", value: convertObjectsToMaps(JSON.parse(e.target.result))});
                 //setConfig(response.config);
                 console.log("RESONSE:");
                 console.log(response.config);
                 // Update json config without changing the reference
-                const new_json_config = toNewConfig(response.config); 
+                const new_json_config = convertMapsToObjects(response.config);
                 Object.entries(new_json_config).forEach(entry => {
                     const [key, new_value] = entry
                     json_config[key] = new_value
@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.log("Trust-Level deleted. Reloading Trust Preferences..")
             trust_preferences.updateTrustPreferences(json_config)
         })
-            
+
         // Initialize config
         await initConfig();
         // Initially load settings
@@ -140,7 +140,7 @@ async function resetConfig() {
     );
     if (answer == "Yes") {
         const response = await browser.runtime.sendMessage("resetConfig");
-        const new_json_config = toNewConfig(response.config);
+        const new_json_config = convertMapsToObjects(response.config);
         Object.entries(new_json_config).forEach(entry => {
             const [key, new_value] = entry
             json_config[key] = new_value
@@ -155,7 +155,7 @@ async function resetConfig() {
  */
 async function initConfig() {
     const response = await browser.runtime.sendMessage("requestConfig");
-    json_config = toNewConfig(response.config);
+    json_config = convertMapsToObjects(response.config);
 }
 
 
@@ -163,7 +163,7 @@ async function initConfig() {
  * Post configuration changes to live config in background script
  */
 async function postConfig() {
-   port.postMessage({ "type": "postConfig", "value": toOldConfig(json_config) });
+    port.postMessage({ "type": "postConfig", "value": convertObjectsToMaps(json_config) });
 }
 
 
@@ -192,38 +192,34 @@ export async function reloadSettings() {
     document.querySelector("input.mapserver-instances-queried").value = json_config['mapserver-instances-queried'];
     document.querySelector("input.send-log-entries-via-event").value = json_config['send-log-entries-via-event'];
     document.querySelector("input.wasm-certificate-parsing").value = json_config['wasm-certificate-parsing'];
+    document.querySelector("input.wasm-certificate-caching").value = json_config['wasm-certificate-caching'];
 
     document.querySelector('input.cache-timeout').addEventListener("input", () => {
         json_config['cache-timeout'] = document.querySelector("input.cache-timeout").value;
-        
     });
     document.querySelector('input.max-connection-setup-time').addEventListener("input", () => {
         json_config['max-connection-setup-time'] = document.querySelector("input.max-connection-setup-time").value;
-        
     });
     document.querySelector('input.proof-fetch-timeout').addEventListener("input", () => {
         json_config['proof-fetch-timeout'] = document.querySelector("input.proof-fetch-timeout").value;
-        
     });
     document.querySelector('input.proof-fetch-max-tries').addEventListener("input", () => {
         json_config['proof-fetch-max-tries'] = document.querySelector("input.proof-fetch-max-tries").value;
-        
     });
     document.querySelector('input.mapserver-quorum').addEventListener("input", () => {
         json_config['mapserver-quorum'] = document.querySelector("input.mapserver-quorum").value;
-        
     });
     document.querySelector('input.mapserver-instances-queried').addEventListener("input", () => {
         json_config['mapserver-instances-queried'] = document.querySelector("input.mapserver-instances-queried").value;
-        
     });
     document.querySelector('input.send-log-entries-via-event').addEventListener("input", () => {
         json_config['send-log-entries-via-event'] = document.querySelector("input.send-log-entries-via-event").value;
-        
     });
     document.querySelector('input.wasm-certificate-parsing').addEventListener("input", () => {
         json_config['wasm-certificate-parsing'] = document.querySelector("input.wasm-certificate-parsing").value;
-        
+    });
+    document.querySelector('input.wasm-certificate-caching').addEventListener("input", () => {
+        json_config['wasm-certificate-caching'] = document.querySelector("input.wasm-certificate-caching").value;
     });
 
 
@@ -512,7 +508,7 @@ async function resetChanges(e) {
         return;
     }
 
-    const live_config = toNewConfig((await browser.runtime.sendMessage("requestConfig")).config);
+    const live_config = convertMapsToObjects((await browser.runtime.sendMessage("requestConfig")).config);
 
     // Mapservers
     if (e.target.classList.contains('mapservers')) {
@@ -552,6 +548,7 @@ async function resetChanges(e) {
         json_config['mapserver-instances-queried'] = live_config['mapserver-instances-queried'];
         json_config['send-log-entries-via-event'] = live_config['send-log-entries-via-event'];
         json_config['wasm-certificate-parsing'] = live_config['wasm-certificate-parsing'];
+        json_config['wasm-certificate-caching'] = live_config['wasm-certificate-caching'];
         //
         reloadSettings();
     }

@@ -5,7 +5,6 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"log"
 	"sort"
@@ -76,28 +75,22 @@ var mapserverInfoCache = map[string]*MapServerInfo{}
 // cache mapping base64 encoded (leaf hash + map server identifier) to a ProofCacheEntry
 var proofCache = map[string]*ProofCacheEntry{}
 
-func InitializeMapserverInfoCache(configFilePath string) bool {
-	bytes, err := validationFileSystem.ReadFile(configFilePath)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var jsonMap map[string]interface{}
-	json.Unmarshal([]byte(bytes), &jsonMap)
-
+func InitializeMapserverInfoCache(configMap map[string]interface{}) bool {
 	identities := []string{}
-	mapserversJSON := jsonMap["mapservers"].([]interface{})
+	mapserversJSON := configMap["mapservers"].([]interface{})
 	for _, entryInterface := range mapserversJSON {
 		entry := entryInterface.(map[string]interface{})
 		id := entry["identity"].(string)
-		identities = append(identities, id)
-		publicKeyDERBase64, ok := entry["publicKey"]
+		publicKeyDERBase64, ok := entry["publickey"]
 		if ok {
 			publicKey, err := util.DERBase64ToRSAPublic(publicKeyDERBase64.(string))
 			if err != nil {
 				log.Panicf("Cannot extract RSA public key from DER: %s", err)
 			}
 			mapserverInfoCache[id] = &MapServerInfo{identifier: id, publicKey: publicKey}
+			identities = append(identities, id)
+		} else {
+			fmt.Printf("Ignoring map server without public key: %s\n", id)
 		}
 	}
 	fmt.Printf("Added %d map servers: %s\n", len(identities), identities)
