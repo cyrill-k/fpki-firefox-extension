@@ -56,7 +56,7 @@ export const defaultConfig = {
     },
     "policy-cas": {
         "Netsec Test PCA": {
-            "publickey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxmlqMQhGhyz2H3GOR0Kfx4wA/g4v6+u3dSHWvVeMZZjcJIuH2N3kBjx+NydcUBNzelE+VkIkMn8aE5u7945yJC3Qo8QBcJnYcnbPCJQd40OtZgVYGRKp4k0qyDpxWJACqh1Ttd4K3ZePDzYgtqpAOjLcncw4KA/bXKGkDP0qZkfMLLUxOcvklbe/zISsxdsw4q3LdUY2+oNXfmC32Tv3if1DjNYVgW1TbNPMxyiNnH1YBslPFRCUPDwqKSIXabzOqA3pK6edYv2J/6xV4wTVp7+VjHHt52kBeCnDroa8UUf3ulbmD5ZZiOk7MzBxnhIEGoNrLy2b/tkjA/eMvbfSpQIDAQAB"
+            "publickey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA65AWEcZeMaq7iBTL//Si/bfCMdNWkp69QiBRUPMMcDdN8bjg+YXKL8cx1q/wVn5YLyih/DhGQcg8nT3gFeWCa6N5xsP7RmAEwhUKfEBB83bx4AssEk9pf+RP6ehQjepM+JVhQH78fQvi6/hioBnzoYwmiI8sAxVKRb5Ce8sGyR08PX3bsBCjKr5wbUqgy1t1ttaVhN/T8kmlGNfcOGiAIet91YtyY4huCJWhGiILzrReB+qruj/BrONIv97qz6YRpv4Srz+tNkazQgjdsbEYlRzr/KZvLmEnFwSHh4jrvDLUSQ5MVldHInXgGteHbLD4nKL8ERlhLzNM83YI3Zwu7wIDAQAB",
         }
     },
     "mapservers": [

@@ -344,7 +344,7 @@ func verifyPolicyWrapper() js.Func {
 		}
 
 		// allocate object to return
-		return policyTrustDecisionClass.New(dnsName, policyTrustInfo.EvaluationResult, policyChain, conflictingPolicies, policyTrustInfo.MaxValidity.Unix())
+		return policyTrustDecisionClass.New(dnsName, policyTrustInfo.EvaluationResult, policyChain, conflictingPolicies, policyTrustInfo.MaxValidity.Unix(), policyTrustInfo.DomainExcluded)
 	})
 	return jsf
 }

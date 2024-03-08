@@ -23,6 +23,7 @@ func NewPolicyTrustInfo(dnsName string, certificateChain []*x509.Certificate) *P
 		PolicyChainTrustLevel:       0,
 		EvaluationResult:            0,
 		MaxValidity:                 time.Unix(0, 0),
+		DomainExcluded:              false,
 	}
 	return policyTrustInfo
 }
@@ -70,6 +71,10 @@ type PolicyTrustInfo struct {
 	// timestamp indicating how long this
 	// legacy validation outcome can be cached
 	MaxValidity time.Time
+
+	// true if the most specific policy (i.e., highest number of subdomains) added DNSName (or a
+	// parent of DNSName) as an excluded subdomain where no policy attributes are applied
+	DomainExcluded bool
 }
 
 // maps a domain name to a set of legacy trust preferences
@@ -379,36 +384,37 @@ func VerifyPolicy(trustInfo *PolicyTrustInfo) error {
 
 	// extract policies and validate certificate based on extracted policies
 	rootCertificate := trustInfo.CertificateChain[len(trustInfo.CertificateChain)-1].Subject.ToRDNSequence().String()
-	for _, policyCert := range applicableChain.PolicyCertificates {
-
-		// check for allowed CAs
-		if len(policyCert.PolicyAttributes.TrustedCA) > 0 {
-			if !slices.Contains(policyCert.PolicyAttributes.TrustedCA, rootCertificate) {
-				attr := &common.PolicyAttributes{TrustedCA: policyCert.PolicyAttributes.TrustedCA}
-				confAttr := &ConflictingPolicyAttribute{Domain: policyCert.Domain(), Attribute: attr}
-				trustInfo.ConflictingPolicyAttributes = append(trustInfo.ConflictingPolicyAttributes, confAttr)
-			}
+	for idx, policyCert := range applicableChain.PolicyCertificates {
+		err := policyCert.PolicyAttributes.ValidateAttributes()
+		if err != nil {
+			return fmt.Errorf("Failed to validate attributes for domain %s: %s", policyCert.Domain(), err)
 		}
 
-		// check for allowed subdomains
+		// check for the status of the subdomains
 		policyCertDomain := normalizeDomain(policyCert.Domain())
-		// don't perform subdomain checks if the requested domain is identical to the policy's domain
-		if trustInfo.DNSName != policyCertDomain {
-			coversDomain := func(subdomain string) bool {
-				var allowedSubdomain string
-				if subdomain != "" && policyCertDomain != "" {
-					allowedSubdomain = subdomain + "." + policyCertDomain
-				} else {
-					allowedSubdomain = subdomain + policyCertDomain
-				}
-				return isSameOrSubdomain(trustInfo.DNSName, allowedSubdomain)
-			}
-			if len(policyCert.PolicyAttributes.AllowedSubdomains) > 0 {
-				if !slices.ContainsFunc(policyCert.PolicyAttributes.AllowedSubdomains, coversDomain) {
-					attr := &common.PolicyAttributes{AllowedSubdomains: policyCert.PolicyAttributes.AllowedSubdomains}
-					confAttr := &ConflictingPolicyAttribute{Domain: policyCert.Domain(), Attribute: attr}
-					trustInfo.ConflictingPolicyAttributes = append(trustInfo.ConflictingPolicyAttributes, confAttr)
-				}
+		domainValidity := policyCert.PolicyAttributes.CheckDomainValidity(policyCertDomain, trustInfo.DNSName)
+
+		// check if the domain should not consider policies
+		if idx == 0 && domainValidity == common.PolicyAttributeDomainExcluded {
+			trustInfo.DomainExcluded = true
+		}
+
+		// check if the domain is allowed or not
+		if domainValidity == common.PolicyAttributeDomainAllowed {
+			// no conflicting domain attribute
+		} else if domainValidity == common.PolicyAttributeDomainDisallowed {
+			attr := &common.PolicyAttributes{AllowedSubdomains: policyCert.PolicyAttributes.AllowedSubdomains, DisallowedSubdomains: policyCert.PolicyAttributes.DisallowedSubdomains}
+			confAttr := &ConflictingPolicyAttribute{Domain: policyCert.Domain(), Attribute: attr}
+			trustInfo.ConflictingPolicyAttributes = append(trustInfo.ConflictingPolicyAttributes, confAttr)
+		}
+
+		// check for allowed CAs
+		if len(policyCert.PolicyAttributes.AllowedCAs) > 0 {
+			fmt.Printf("Checking if %s is contained in %+v\n", rootCertificate, policyCert.PolicyAttributes.AllowedCAs)
+			if !slices.Contains(policyCert.PolicyAttributes.AllowedCAs, rootCertificate) {
+				attr := &common.PolicyAttributes{AllowedCAs: policyCert.PolicyAttributes.AllowedCAs}
+				confAttr := &ConflictingPolicyAttribute{Domain: policyCert.Domain(), Attribute: attr}
+				trustInfo.ConflictingPolicyAttributes = append(trustInfo.ConflictingPolicyAttributes, confAttr)
 			}
 		}
 	}

@@ -320,15 +320,17 @@ async function checkInfo(details) {
                 var currentTime = new Date();
                 if (trustDecision === undefined || currentTime > trustDecision.validUntil) {
                     trustDecision = policyValidateConnectionGo(certificateChain, domain);
-                    if (trustDecision.policyChain.length > 0) {
+                    if (trustDecision.policyChain.length > 0 && !trustDecision.domainExcluded) {
                         policyChecksPerformed = true;
                     }
                     policyTrustDecisionCache.set(key, trustDecision)
 
                 }
-                addTrustDecision(details, trustDecision);
-                if (trustDecision.evaluationResult !== 1) {
-                    throw new FpkiError(errorTypes.POLICY_MODE_VALIDATION_ERROR, getPolicyValidationErrorMessageGo(trustDecision));
+                if (!trustDecision.domainExcluded) {
+                    addTrustDecision(details, trustDecision);
+                    if (trustDecision.evaluationResult !== 1) {
+                        throw new FpkiError(errorTypes.POLICY_MODE_VALIDATION_ERROR, getPolicyValidationErrorMessageGo(trustDecision));
+                    }
                 }
             } else {
                 // check each policy and throw an error if one of the verifications fails

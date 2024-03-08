@@ -40,7 +40,7 @@ export class LegacyTrustDecision {
 }
 
 export class PolicyTrustDecisionGo {
-    constructor(domain, evaluationResult, policyChain, conflictingPolicies, validUntilUnix) {
+    constructor(domain, evaluationResult, policyChain, conflictingPolicies, validUntilUnix, domainExcluded) {
         this.type = "policy";
         this.domain = domain;
         this.connectionCertificateChain = null;
@@ -53,6 +53,8 @@ export class PolicyTrustDecisionGo {
         this.policyChain = policyChain;
 
         this.conflictingPolicies = conflictingPolicies;
+
+        this.domainExcluded = domainExcluded;
     }
 }
 
