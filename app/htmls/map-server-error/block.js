@@ -7,7 +7,7 @@ var port = browser.runtime.connect({
 document.addEventListener('DOMContentLoaded', function() {
     try {
         document.getElementById('acceptCertificateButton').addEventListener('click', async function() {
-            // send domain and certificate fingerprint to add this certificate to the accepted certificates for this domain despite the F-PKIwarning
+            // send domain and certificate fingerprint to add this certificate to the accepted certificates for this domain despite the F-PKI warning
             const domain = getUrlParameter("domain");
             const certificateFingerprint = getUrlParameter("fingerprint");
 

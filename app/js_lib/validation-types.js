@@ -1,3 +1,4 @@
+import {getConfig} from "./config.js";
 import {errorTypes, FpkiError} from "./errors.js"
 import {mapGetList} from "./helper.js"
 import {getSubject} from "./x509utils.js"
@@ -92,23 +93,26 @@ export class LegacyTrustDecisionGo {
 }
 
 export const PolicyAttributes = {
-    TRUSTED_CA: "Trusted CA",
-    SUBDOMAINS: "Subdomains"
+    ALLOWED_CAS: "Allowed CAs",
+    ALLOWED_SUBDOMAINS: "Allowed Subdomains",
+    DISALLOWED_SUBDOMAINS: "Disallowed Subdomains",
 };
 
 export const AllPolicyAttributes = [
-    PolicyAttributes.TRUSTED_CA,
-    PolicyAttributes.SUBDOMAINS
+    PolicyAttributes.ALLOWED_CAS,
+    PolicyAttributes.ALLOWED_SUBDOMAINS,
+    PolicyAttributes.DISALLOWED_SUBDOMAINS,
 ];
 
 export const PolicyAttributeToJsonKeyDict = {
-    [PolicyAttributes.TRUSTED_CA]: "TrustedCA",
-    [PolicyAttributes.SUBDOMAINS]: "AllowedSubdomains"
+    [PolicyAttributes.ALLOWED_CAS]: "AllowedCAs",
+    [PolicyAttributes.ALLOWED_SUBDOMAINS]: "AllowedSubdomains",
+    [PolicyAttributes.DISALLOWED_SUBDOMAINS]: "DisallowedSubdomains",
 }
 
 export const EvaluationResult = {
     SUCCESS: "success",
-    FAILURE: "failure"
+    FAILURE: "failure",
 };
 
 // contains an evaluation result for a certain policy evaluated over a specific domain (i.e., the domain that was queried or one of its ancestor domains)
@@ -131,6 +135,10 @@ export class PolicyTrustInfo {
         this.policyAttributes = policyAttributes;
         this.evaluations = evaluations;
     }
+}
+
+function convertTrustLevelToLabel(trustLevel) {
+    return getConfig("trust-levels-rev").get(trustLevel.toString());
 }
 
 export function hasApplicablePolicy(policyTrustDecision) {
@@ -171,13 +179,11 @@ export function getLegacyValidationErrorMessageGo(legacyTrustDecisionGo) {
     if (legacyTrustDecisionGo.connectionTrustLevelCASet === "DEFAULT") {
         errorMessage += " Connection certificate chain has the default trust level " + legacyTrustDecisionGo.connectionTrustLevel + ".";
     } else {
-        errorMessage += " Connection certificate chain has trust level " + legacyTrustDecisionGo.connectionTrustLevel + " due to certificate \"";
+        errorMessage += " Connection certificate chain has trust level " + legacyTrustDecisionGo.connectionTrustLevel + " (" + convertTrustLevelToLabel(legacyTrustDecisionGo.connectionTrustLevel) + ")" + " due to certificate \"";
         errorMessage += legacyTrustDecisionGo.connectionCertificateChain[legacyTrustDecisionGo.connectionTrustLevelChainIndex].subject + "\" within CA Set: " + legacyTrustDecisionGo.connectionTrustLevelCASet + ".";
     }
     for(let i = 0; i < legacyTrustDecisionGo.highestTrustLevelCASets.length; i++) {
-        errorMessage += " Detected certificate chain with trust level " + legacyTrustDecisionGo.highestTrustLevel;
-        console.log(legacyTrustDecisionGo.highestTrustLevelChainSubjects);
-        console.log(legacyTrustDecisionGo.relevantCertificateChainIndex);
+        errorMessage += " Detected certificate chain with trust level " + legacyTrustDecisionGo.highestTrustLevel + " (" + convertTrustLevelToLabel(legacyTrustDecisionGo.highestTrustLevel) + ")";
         errorMessage += " due to certificate \"" + legacyTrustDecisionGo.highestTrustLevelChainSubjects[i][legacyTrustDecisionGo.highestTrustLevelChainIndices[i]] + "\" within CA Set " + legacyTrustDecisionGo.highestTrustLevelCASets[i] + ".";
     }
 
@@ -224,9 +230,9 @@ export function getPolicyChainDescriptors(chain) {
 function getPolicyErrorMessage(trustDecision, trustInfo, evaluation) {
     let errorMessage = "";
     errorMessage += "[policy mode] ";
-    if (evaluation.attribute === PolicyAttributes.TRUSTED_CA) {
+    if (evaluation.attribute === PolicyAttributes.ALLOWED_CAS) {
         errorMessage += "Detected certificate issued by an invalid CA: "+getSubject(trustDecision.connectionCertChain[trustDecision.connectionCertChain.length-1]);
-    } else if (evaluation.attribute === PolicyAttributes.SUBDOMAINS) {
+    } else if (evaluation.attribute === PolicyAttributes.ALLOWED_SUBDOMAINS) {
         errorMessage += "Detected certificate issued for a domain that is not allowed: "+trustDecision.domain;
     }
     errorMessage += " [policy issued by PCA: ";

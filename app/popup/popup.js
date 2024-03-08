@@ -38,6 +38,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
+function convertTrustLevelToLabel(trustLevel) {
+    console.log(`trust-levels-rev = ${synchronizedConfig.get("trust-levels-rev").get("0")}`);
+    return synchronizedConfig.get("trust-levels-rev").get(trustLevel.toString());
+}
+
 function getElement(nameOrElement) {
     if (typeof nameOrElement === "string") {
         return document.getElementById(nameOrElement);
@@ -202,8 +207,8 @@ function addPolicyValidationResult(trustDecision, predecessor, index) {
 
         // create table with conflicting policy attributes in this policy chain
         if (trustDecision.conflictingPolicies.length > 0) {
-            table = "<tr><th colspan=\"3\">Applicable Policy</th><th colspan=\"" + AllPolicyAttributes.length + "\">Evaluation Result</th></tr>";
-            table += "<tr><th>Policy Certificate</th><th>Domain</th><th>Relevant Attributes</th>";
+            table = "<tr><th colspan=\"2\">Applicable Policy</th><th colspan=\"" + AllPolicyAttributes.length + "\">Evaluation Result</th></tr>";
+            table += "<tr><th>Policy Certificate</th><th>Relevant Attributes</th>";
             table += AllPolicyAttributes.map(a => "<th>" + a + "</th>");
             table += "</tr>";
             const confTable = createElementAfter("table", { "id": "policy-conflicts-certs-" + index }, "", policyCertTable);
@@ -211,7 +216,6 @@ function addPolicyValidationResult(trustDecision, predecessor, index) {
                 const pol = JSON.parse(polJson);
                 table += "<tr>";
                 table += "<td>" + policyChainDescriptors[index] + "</td>"
-                table += "<td>" + pol.Domain + "</td>"
                 table += "<td>" + JSON.stringify(pol.Attribute) + "</td>"
                 table += AllPolicyAttributes.map(attribute => {
                     const hasAttribute = PolicyAttributeToJsonKeyDict[attribute] in pol.Attribute;
@@ -251,7 +255,7 @@ function addLegacyValidationResult(trustDecision, predecessor, index) {
 
     // fill in information about the current TLS connection
     let table = "<tr><th colspan=\"2\">Connection Certificate ("
-    table += "trust level = "+trustDecision.connectionTrustLevel;
+    table += convertTrustLevelToLabel(trustDecision.connectionTrustLevel);
     if (trustDecision.connectionTrustLevelCASet === "DEFAULT") {
         table += " [default] ";
     }
@@ -277,7 +281,7 @@ function addLegacyValidationResult(trustDecision, predecessor, index) {
         confTitle = createElementAfter("p", {"id": "legacy-conflicts-title-"+index, "class": "validation-success"}, "No Conflicting Certificates for "+trustDecision.domain+" reported", connTable);
     } else {
         confTitle = createElementAfter("p", {"id": "legacy-conflicts-title-"+index, "class": "validation-warning"}, "Conflicting Certificates for "+trustDecision.domain+" reported", connTable);
-        table = "<tr><th colspan=\"3\">Conflicting Certificates (trust level "+trustDecision.highestTrustLevel+")</th></tr>";
+        table = "<tr><th colspan=\"3\">Conflicting Certificates ("+convertTrustLevelToLabel(trustDecision.highestTrustLevel)+")</th></tr>";
         table += "<tr><th colspan=\"2\">CA Certificate</th><th>Leaf Certificate</th></tr>";
         table += "<tr><th>CA Set</th><th>Subject</th><th>Subject</th></tr>";
         const confTable = createElementAfter("table", {"id": "legacy-conflicts-certs-"+index}, "", confTitle);

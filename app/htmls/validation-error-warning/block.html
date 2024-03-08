@@ -30,17 +30,9 @@
           <p id="errorShortDescErrorMessage">FILL IN</p>
         </div>
       </div>
+          <p id="learn_more">Learn more about how the flexible web security plugin protects you here: <a href="https://github.com/cyrill-k/fpki-firefox-extension/wiki">F-PKI Firefox Extension Wiki</a>.</p>
             <div id="advancedPanelContainer">
                 <div id="badCertAdvancedPanel" class="advanced-panel">
-                    <p id="badCertTechnicalInfo"><label ><br>https://example.com</label>
-            
-            <!-- <label >The server returned a certificate signed by <i>CA1</i>, but there exists a more highly trusted certificate from <i>CA2</i> that should be preferred.<br><br>This rule is defined in your imported preference: <b>Centre for Cyber Trust</b></label> -->
-            
-            <label >Error code: <a id="errorCode" data-l10n-name="error-code-link" data-telemetry-id="error_code_link" href="#certificateErrorDebugInformation">E201</a></label>
-            <label ><br>Learn more about how the flexible web security plugin protects you here:</label>
-            </p>
-
-                    <a id="viewCertificate" href="javascript:void(0)">https://wiki.f-pki.ethz.ch</a>
                     <div id="advancedPanelButtonContainer" class="button-container">
                         <button id="goBackButton" class="primary" data-telemetry-id="return_button_adv">Go Back (Recommended)</button>
                         <div class="exceptionDialogButtonContainer">
@@ -48,6 +40,15 @@
                           </div>
           </div>
         </div>
+
+      <button id="downloadErrorReport">Show error report</button>
+      <div id="errorReportDiv" class="content">
+      <pre>
+        <code id="errorReport">
+          FILL IN
+        </code>
+      </pre>
+      </div>
 </body>
 <script src="block.js" type="module"></script>
 </html>
