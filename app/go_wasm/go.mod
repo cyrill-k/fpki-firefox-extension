@@ -3,7 +3,7 @@ module go_wasm
 go 1.21
 
 require (
-	github.com/netsec-ethz/fpki v0.0.0-20231009152505-367679106c8f
+	github.com/netsec-ethz/fpki v0.0.0-20240308163621-d950bc061ac9
 	github.com/stretchr/testify v1.7.4
 	golang.org/x/net v0.17.0
 )
@@ -26,5 +26,3 @@ require (
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/netsec-ethz/fpki => /home/cyrill/github/fpki
