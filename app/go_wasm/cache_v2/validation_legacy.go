@@ -61,6 +61,7 @@ var legacyTrustPreferences = map[string][]*LegacyTrustPreference{}
 
 // initialize legacyTrustPreferences  with a config
 func InitializeLegacyTrustPreferences(configMap map[string]interface{}) {
+	legacyTrustPreferences = map[string][]*LegacyTrustPreference{}
 
 	// parse CA sets
 	caSetsMap := map[string][]string{}

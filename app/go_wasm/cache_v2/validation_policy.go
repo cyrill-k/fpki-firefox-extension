@@ -130,6 +130,8 @@ func NewPolicyCertificateChain() *PolicyCertificateChain {
 
 // initialize legacyTrustPreferences with a config
 func InitializePolicyTrustPreferences(configMap map[string]interface{}) {
+	policyTrustPreferences = map[string][]*PolicyTrustPreference{}
+
 	// parse policy CA sets
 	pcaSetsMap := map[string][]string{}
 	pcaSets := configMap["policy-ca-sets"].(map[string]interface{})
@@ -241,7 +243,6 @@ func getPolicyCertificateChainWithLatestTimestamp(immutableHash string, rootChai
 	if !isDomainRootCertificate && !isDomainRootCertificateParent {
 		domainLatestMinMaxTimestamp = maxTime(domainLatestMinMaxTimestamp, minMaxTimestamp)
 	}
-
 
 	return &PolicyCertificateChain{
 		PolicyCertificates:                       append([]*common.PolicyCertificate{minMaxTimestampPcEntry}, parentChain.PolicyCertificates...),

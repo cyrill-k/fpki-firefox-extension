@@ -59,6 +59,11 @@ var policyDnsNameCache = map[string][]string{}
 // initialize the caches based on the (root) policy certificates in
 // the PCA trust store (trust store location: trustStoreDir)
 func InitializePolicyCache(trustStoreDir string) int {
+	policyCache = map[string]*PolicyCacheEntry{}
+	immutablePolicyCache = map[string]*ImmutablePolicyCacheEntry{}
+	ignoredPolicyHashes = map[string]struct{}{}
+	policyDnsNameCache = map[string][]string{}
+
 	files, err := cacheFileSystem.ReadDir(trustStoreDir)
 	if err != nil {
 		log.Fatal(err)

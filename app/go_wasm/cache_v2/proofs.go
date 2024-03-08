@@ -76,6 +76,9 @@ var mapserverInfoCache = map[string]*MapServerInfo{}
 var proofCache = map[string]*ProofCacheEntry{}
 
 func InitializeMapserverInfoCache(configMap map[string]interface{}) bool {
+	mapserverInfoCache = map[string]*MapServerInfo{}
+	proofCache = map[string]*ProofCacheEntry{}
+
 	identities := []string{}
 	mapserversJSON := configMap["mapservers"].([]interface{})
 	for _, entryInterface := range mapserversJSON {

@@ -61,13 +61,10 @@ browser.runtime.onConnect.addListener( (port) => {
             browser.tabs.update(tabId, {url: url});
             break;
         case 'postConfig':
-            try {
-                setConfig(msg.value);
-                saveConfig();
-                break;
-            } catch (e) {
-                console.log(e);
-            }
+            setConfig(msg.value);
+            saveConfig();
+            clearCaches();
+            break;
         default:
             switch (msg) {
             case 'initFinished':
@@ -121,6 +118,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
         case 'resetConfig':
             resetConfig();
             saveConfig();
+            clearCaches();
             return Promise.resolve({ "config": config });
         
         default:
@@ -129,6 +127,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     console.log("uploading new config value...");
                     setConfig(request['value']);
                     saveConfig();
+                    clearCaches();
                     return Promise.resolve({ "config": config });
                 default:
                     console.log(`Received unknown message: ${request}`);
@@ -137,6 +136,13 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
+function clearCaches() {
+    console.log("Clearing js and golang (WASM) caches...");
+    trustDecisions = new Map();
+    legacyTrustDecisionCache = new Map();
+    policyTrustDecisionCache = new Map();
+    initializeGODatastructures("embedded/ca-certificates", "embedded/pca-certificates", exportConfigToJSON(getConfig()));
+}
 
 // window.addEventListener('unhandledrejection', function(event) {
 //   // the event object has two special properties:
@@ -145,13 +151,13 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // });
 
 
-const trustDecisions = new Map();
+let trustDecisions = new Map();
 
 // cache mapping (domain, leaf certificate fingerprint) tuples to legacy trust decisions.
-const legacyTrustDecisionCache = new Map();
+let legacyTrustDecisionCache = new Map();
 
 // cache mapping (domain, leaf certificate fingerprint) tuples to policy trust decisions.
-const policyTrustDecisionCache = new Map();
+let policyTrustDecisionCache = new Map();
 
 // contains certificates that are trusted even if legacy (and policy) validation fails
 // data structure is a map [domain] => [x509 fingerprint]

@@ -167,6 +167,10 @@ func GetRawCertificateIssuerAKIHash(certificate *x509.Certificate) string {
 // initialize the caches based on the certificates in
 // the trust store (trust store location: trustStoreDir)
 func InitializeCache(trustStoreDir string) int {
+	subjectSKICache = map[string]*SubjectSKICacheEntry{}
+	certificateCache = map[string]*CertificateCacheEntry{}
+	dnsNameCache = map[string][]string{}
+	ignoredCertificateHashes = map[string]struct{}{}
 
 	files, err := cacheFileSystem.ReadDir(trustStoreDir)
 	if err != nil {
