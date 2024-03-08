@@ -73,7 +73,6 @@ func initializeGODatastructuresWrapper() js.Func {
 		return nCertificatesAdded
 	})
 	return jsf
-
 }
 
 // wrapper to make addMissingPayloads visible from JavaScript

@@ -81,7 +81,7 @@ type PolicyCertificateChain struct {
 	DomainRootIssuanceTimestamp              time.Time
 	DomainRootMinMaxTimestamp                time.Time
 	RootAndIntermediateLatestMinMaxTimestamp time.Time
-	LeafMaxIssuanceTimestamp                 time.Time
+	DomainLatestMinMaxTimestamp              time.Time
 	TrustLevel                               int
 
 	// DisseminationTime  time.Time
@@ -118,7 +118,7 @@ func NewPolicyCertificateChain() *PolicyCertificateChain {
 		DomainRootIssuanceTimestamp:              time.Unix(0, 0),
 		DomainRootMinMaxTimestamp:                time.Unix(0, 0),
 		RootAndIntermediateLatestMinMaxTimestamp: time.Unix(0, 0),
-		LeafMaxIssuanceTimestamp:                 time.Unix(0, 0),
+		DomainLatestMinMaxTimestamp:              time.Unix(0, 0),
 		TrustLevel:                               0,
 	}
 }
@@ -175,8 +175,6 @@ func getPolicyCertificateChainWithLatestTimestamp(immutableHash string, rootChai
 	if rootChain != nil {
 		if immutableHash == getImmutablePolicyHash(rootChain.PolicyCertificates[0]) {
 			return rootChain, nil
-		} else {
-			return nil, nil
 		}
 	} else {
 		if immutableHash == base64.StdEncoding.EncodeToString(nil) {
@@ -234,16 +232,21 @@ func getPolicyCertificateChainWithLatestTimestamp(immutableHash string, rootChai
 	if isDomainRootCertificateParent {
 		rootAndIntermediateLatestMinMaxTimestamp = maxTime(rootAndIntermediateLatestMinMaxTimestamp, minMaxTimestamp)
 	}
+	domainLatestMinMaxTimestamp := parentChain.DomainLatestMinMaxTimestamp
+	if !isDomainRootCertificate && !isDomainRootCertificateParent {
+		domainLatestMinMaxTimestamp = maxTime(domainLatestMinMaxTimestamp, minMaxTimestamp)
+	}
+
 
 	return &PolicyCertificateChain{
 		PolicyCertificates:                       append([]*common.PolicyCertificate{minMaxTimestampPcEntry}, parentChain.PolicyCertificates...),
 		DomainRootIssuanceTimestamp:              domainRootIssuanceTimestamp,
 		DomainRootMinMaxTimestamp:                domainRootMinMaxTimestamp,
 		RootAndIntermediateLatestMinMaxTimestamp: rootAndIntermediateLatestMinMaxTimestamp,
+		DomainLatestMinMaxTimestamp:              domainLatestMinMaxTimestamp,
 		// todo: find trust level
 		TrustLevel: max(parentChain.TrustLevel, 0),
 	}, nil
-	// immutablePolicyCache[immutableHash].immutableIssuerHash
 }
 
 func findPolicyCertificateChainsForE2LD(domain string) ([]*PolicyCertificateChain, error) {
@@ -294,7 +297,7 @@ func findPolicyCertificateChainForDomain(domain string, domainRootPolicyCertific
 					return nil, fmt.Errorf("Failed to get policy cert chain with latest timestamp: %s", err)
 				}
 				if chain != nil {
-					if finalChain == nil || chain.LeafMaxIssuanceTimestamp.After(finalChain.LeafMaxIssuanceTimestamp) {
+					if finalChain == nil || chain.DomainLatestMinMaxTimestamp.After(finalChain.DomainLatestMinMaxTimestamp) {
 						finalChain = chain
 					}
 				}
