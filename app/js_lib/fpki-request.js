@@ -1,7 +1,8 @@
 import {errorTypes, FpkiError} from "./errors.js"
-import {queryMapServerHttp, extractPolicy, extractCertificates} from "./LF-PKI-accessor.js"
+import {queryMapServerHttp, queryMapServerIdsWithProof, queryMapServerPayloads, extractPolicy, retrieveMissingCertificatesAndPolicies} from "./FP-PKI-accessor.js"
 import {mapGetList, cLog, printMap} from "./helper.js"
 import {config} from "./config.js"
+import * as verifier from "./verifier.js"
 
 var fpkiRequests = new Map();
 
@@ -93,19 +94,21 @@ export class FpkiRequest {
 
             // execute the fetching and response parsing in a try block to ensure that the active request is dropped whether the operations succeed or fail
             try {
-                let mapResponse, performanceResourceEntry, nRetries;
+                let mapResponse, performanceResourceEntry, nRetries, mapResponseNew;
                 // fetch policy for the mapserver over the configured channel (e.g., http get)
                 switch (this.mapserver.querytype) {
                 case "lfpki-http-get":
-                    let result;
+                    let result, resultIdsOnly;
                     try {
-                        result = await queryMapServerHttp(this.mapserver.domain, this.domain, {timeout: config.get("proof-fetch-timeout"), requestId: this.requestId, maxTries: config.get("proof-fetch-max-tries")});
+                        resultIdsOnly = await queryMapServerIdsWithProof(this.mapserver.domain, this.domain, {timeout: config.get("proof-fetch-timeout"), requestId: this.requestId, maxTries: config.get("proof-fetch-max-tries")});
+                        // result = await queryMapServerHttp(config.get("mapservers-old")[0].domain, this.domain, {timeout: config.get("proof-fetch-timeout"), requestId: this.requestId, maxTries: config.get("proof-fetch-max-tries")});
                     } catch(error) {
                         throw new FpkiError(errorTypes.MAPSERVER_NETWORK_ERROR, error);
                     }
-                    mapResponse = result.response;
-                    nRetries = result.nRetries;
-                    performanceResourceEntry = this.#getLatestPerformanceResourceEntry(result.fetchUrl);
+                    // mapResponse = result.response;
+                    mapResponseNew = resultIdsOnly.response;
+                    nRetries = resultIdsOnly.nRetries;
+                    performanceResourceEntry = this.#getLatestPerformanceResourceEntry(resultIdsOnly.fetchUrl);
                     break;
                 default:
                     throw new FpkiError(errorTypes.INVALID_CONFIG, "Invalid mapserver config: "+this.mapserver.querytype)
@@ -127,14 +130,23 @@ export class FpkiRequest {
                 }
 
                 // extract policies from payload
-                const policies = extractPolicy(mapResponse);
-                const certificates = await extractCertificates(mapResponse, this.requestId);
-                cLog(this.requestId, "fetch finished for: "+this);
+                // const start = new Date();
+                // TODO: implement proof verification
+                // await verifier.verifyProofs(mapResponse);
+                // console.log(`verify POI: ${new Date()-start}`);
+
+                // TODO: implement extract policy logic in retrieveMissingCertificates
+                // const policies = extractPolicy(mapResponse);
+                const policies = new Map();
+
+                // TODO: also return policies
+                const { certificatesOld } = await retrieveMissingCertificatesAndPolicies(mapResponse, this.requestId, mapResponseNew, this.mapserver.domain, this.mapserver.identity);
+                cLog(this.requestId, "fetch finished for: "+this.domain);
 
                 // add policies to policy cache
-                addMapserverResponse(this.requestInitiated, this.domain, this.mapserver, policies, certificates);
+                addMapserverResponse(this.requestInitiated, this.domain, this.mapserver, policies, certificatesOld);
 
-                return {policies, certificates, metrics};
+                return {policies, certificates: certificatesOld, metrics};
             } catch (error) {
                 throw error;
             } finally {

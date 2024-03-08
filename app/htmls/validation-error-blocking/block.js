@@ -7,7 +7,7 @@ var port = browser.runtime.connect({
 document.addEventListener('DOMContentLoaded', function() {
     try {
         document.getElementById('acceptCertificateButton').addEventListener('click', async function() {
-            // send domain and certificate fingerprint to add this certificate to the accepted certificates for this domain despite the F-PKIwarning
+            // send domain and certificate fingerprint to add this certificate to the accepted certificates for this domain despite the F-PKI warning
             const domain = getUrlParameter("domain");
             const certificateFingerprint = getUrlParameter("fingerprint");
 
@@ -18,6 +18,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         document.getElementById('goBackButton').addEventListener('click', function() {
             window.history.go(-1);
+        });
+        document.getElementById('downloadErrorReport').addEventListener('click', function() {
+            this.classList.toggle("active");
+            var content = this.nextElementSibling;
+            if (content.style.display === "block") {
+                content.style.display = "none";
+            } else {
+                content.style.display = "block";
+            }
         });
     } catch (e) {
         console.log("block page button setup: "+e);
@@ -39,3 +48,18 @@ fillIn.forEach((param, id) => {
     var reasonElement = document.getElementById(id);
     reasonElement.innerHTML = getUrlParameter(param);
 });
+
+function addErrorReport() {
+    const errorReportElement = document.getElementById("errorReport");
+    let report = `
+Time: ${new Date()}
+URL: ${getUrlParameter("url")}
+Requested domain: ${getUrlParameter("domain")}
+Error: ${getUrlParameter("reason")}
+Leaf Certificate Fingerprint: ${getUrlParameter("fingerprint")}
+`;
+    errorReportElement.innerHTML = report;
+    const errorReportDiv = document.getElementById("errorReportDiv");
+    errorReportDiv.style.display = "none";
+}
+addErrorReport();

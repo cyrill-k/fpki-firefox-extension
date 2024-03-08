@@ -2,57 +2,86 @@
 
 import { getDomainNameFromURL } from "../js_lib/domain.js"
 import { FpkiRequest } from "../js_lib/fpki-request.js"
-import { printMap, cLog, mapGetList, mapGetMap, mapGetSet } from "../js_lib/helper.js"
-import { config, downloadConfig, importConfigFromJSON, initializeConfig, saveConfig, resetConfig } from "../js_lib/config.js"
+    import { printMap, cLog, mapGetList, mapGetMap, mapGetSet, trimString } from "../js_lib/helper.js"
+import { config, downloadConfig, initializeConfig, getConfig, saveConfig, resetConfig, setConfig, exportConfigToJSON } from "../js_lib/config.js"
 import { LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole, getSerializedLogEntries } from "../js_lib/log.js"
 import { FpkiError, errorTypes } from "../js_lib/errors.js"
-import { policyValidateConnection, legacyValidateConnection } from "../js_lib/validation.js"
-import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations } from "../js_lib/validation-types.js"
+import { policyValidateConnection, legacyValidateConnection, legacyValidateConnectionGo, policyValidateConnectionGo } from "../js_lib/validation.js"
+import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations, LegacyTrustDecisionGo, PolicyTrustDecisionGo, getLegacyValidationErrorMessageGo, getPolicyValidationErrorMessageGo} from "../js_lib/validation-types.js"
 import "../js_lib/wasm_exec.js"
 import { addCertificateChainToCacheIfNecessary, getCertificateEntryByHash } from "../js_lib/cache.js"
+import { VerifyAndGetMissingIDsResponseGo, AddMissingPayloadsResponseGo } from "../js_lib/FP-PKI-accessor.js"
+
 
 try {
     initializeConfig();
-    window.GOCACHE = config.get("wasm-certificate-parsing");
+    window.GOCACHE = getConfig("wasm-certificate-parsing");
+    window.GOCACHEV2 = getConfig("wasm-certificate-caching");
 } catch (e) {
-    console.log("initialize: "+e);
+    console.log("initialize: " + e);
 }
 
 // flag whether to use Go cache
-
 // instance to call Go Webassembly functions
-const go = new Go();
-WebAssembly.instantiateStreaming(fetch("../js_lib/wasm/parsePEMCertificates.wasm"), go.importObject).then((result) => {
-    go.run(result.instance);
-});
+if (window.GOCACHE) {
+    const go = new Go();
+    WebAssembly.instantiateStreaming(fetch("../js_lib/wasm/parsePEMCertificates.wasm"), go.importObject).then((result) => {
+        go.run(result.instance);
+    });
+} else if (window.GOCACHEV2) {
+    try {
+        const go = new Go();
+        WebAssembly.instantiateStreaming(fetch("../go_wasm/gocachev2.wasm"), go.importObject).then((result) => {
+            go.run(result.instance);
+            const nCertificatesAdded = initializeGODatastructures("embedded/ca-certificates", "embedded/pca-certificates", exportConfigToJSON(getConfig()));
+            console.log(`[Go] Initialize cache with trust roots: #certificates = ${nCertificatesAdded[0]}, #policies = ${nCertificatesAdded[1]}`);
 
+            // make js classes for encapsulating return values available to WASM
+            window.LegacyTrustDecisionGo = LegacyTrustDecisionGo;
+            window.PolicyTrustDecisionGo = PolicyTrustDecisionGo;
+            window.VerifyAndGetMissingIDsResponseGo = VerifyAndGetMissingIDsResponseGo;
+            window.AddMissingPayloadsResponseGo = AddMissingPayloadsResponseGo;
 
-// communication between browser plugin popup and this background script
-browser.runtime.onConnect.addListener(function(port) {
-    port.onMessage.addListener(async function(msg) {
+        });
+    } catch (error) {
+        console.log(`failed to initiate wasm context: ${error}`);
+    }
+}
+
+/** 
+ * Receive one way messages from extension pages
+ */
+browser.runtime.onConnect.addListener( (port) => {
+
+    port.onMessage.addListener(async (msg) => {
         switch (msg.type) {
         case "acceptCertificate":
             const {domain, certificateFingerprint, tabId, url} = msg;
             trustedCertificates.set(domain, mapGetSet(trustedCertificates, domain).add(certificateFingerprint));
             browser.tabs.update(tabId, {url: url});
             break;
-        case "uploadConfig":
-            console.log("setting new config value...");
-            importConfigFromJSON(msg.value);
+        case 'postConfig':
+            setConfig(msg.value);
             saveConfig();
+            clearCaches();
             break;
         default:
             switch (msg) {
             case 'initFinished':
+                console.log("MSG RECV: initFinished");
                 port.postMessage({msgType: "config", value: config});
                 break;
             case 'printConfig':
+                console.log("MSG RECV: printConfig");
                 port.postMessage({msgType: "config", value: config});
                 break;
             case 'downloadConfig':
+                console.log("MSG RECV: downloadConfig");
                 downloadConfig()
                 break;
             case 'resetConfig':
+                exit(1);
+                console.log("MSG RECV: resetConfig");
                 resetConfig()
                 break;
             case 'openConfigWindow':
@@ -70,10 +99,50 @@ browser.runtime.onConnect.addListener(function(port) {
             case 'getLogEntries':
                 port.postMessage({msgType: "logEntries", value: getSerializedLogEntries()});
                 break;
+            case 'requestConfig':
+                port.postMessage("Hi there");
+                break;
             }
         }
     });
 })
+
+/**
+ * Receive messages with possibility of direct response
+ */
+browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    
+    switch(request) {
+        case 'requestConfig':
+            return Promise.resolve({ "config": config });
+        case 'resetConfig':
+            resetConfig();
+            saveConfig();
+            clearCaches();
+            return Promise.resolve({ "config": config });
+        
+        default:
+            switch (request['type']) {
+                case "uploadConfig":
+                    console.log("uploading new config value...");
+                    setConfig(request['value']);
+                    saveConfig();
+                    clearCaches();
+                    return Promise.resolve({ "config": config });
+                default:
+                    console.log(`Received unknown message: ${request}`);
+                    break;
+            }
+    }
+});
+
+function clearCaches() {
+    console.log("Clearing js and golang (WASM) caches...");
+    trustDecisions = new Map();
+    legacyTrustDecisionCache = new Map();
+    policyTrustDecisionCache = new Map();
+    initializeGODatastructures("embedded/ca-certificates", "embedded/pca-certificates", exportConfigToJSON(getConfig()));
+}
 
 // window.addEventListener('unhandledrejection', function(event) {
 //   // the event object has two special properties:
@@ -82,7 +151,13 @@ browser.runtime.onConnect.addListener(function(port) {
 // });
 
 
-const trustDecisions = new Map();
+let trustDecisions = new Map();
+
+// cache mapping (domain, leaf certificate fingerprint) tuples to legacy trust decisions.
+let legacyTrustDecisionCache = new Map();
+
+// cache mapping (domain, leaf certificate fingerprint) tuples to policy trust decisions.
+let policyTrustDecisionCache = new Map();
 
 // contains certificates that are trusted even if legacy (and policy) validation fails
 // data structure is a map [domain] => [x509 fingerprint]
@@ -145,7 +220,7 @@ function addTrustDecision(details, trustDecision) {
 async function requestInfo(details) {
     const perfStart = performance.now();
     const startTimestamp = new Date();
-    cLog(details.requestId, "requestInfo ["+details.url+"]");
+    cLog(details.requestId, "requestInfo ["+trimString(details.url)+"]");
 
     const domain = getDomainNameFromURL(details.url);
     if (!shouldValidateDomain(domain)) {
@@ -175,20 +250,15 @@ async function requestInfo(details) {
 }
 
 async function getTlsCertificateChain(securityInfo) {
-    const chain = securityInfo.certificates.map(c => ({pem: window.btoa(String.fromCharCode(...c.rawDER)), fingerprintSha256: c.fingerprint.sha256, serial: c.serialNumber, isBuiltInRoot: c.isBuiltInRoot}));
-    await addCertificateChainToCacheIfNecessary(chain[0].pem, chain.slice(1).map(c => c.pem));
-    chain.forEach((c, index) => {
-        const entry = getCertificateEntryByHash(c.fingerprintSha256);
-        chain[index].subject = entry.subjectStr;
-        chain[index].issuer = entry.issuerStr;
-    });
+    const chain = securityInfo.certificates.map(c => ({pem: window.btoa(String.fromCharCode(...c.rawDER)), fingerprintSha256: c.fingerprint.sha256, serial: c.serialNumber, isBuiltInRoot: c.isBuiltInRoot, subject: c.subject, issuer: c.issuer}));
+    // Note: the string representation of the subject and issuer as presented by the browser may differ from the string representation of the golang library. Only use this information for output and not for making decisions.
     return chain;
 }
 
 async function checkInfo(details) {
     const onHeadersReceived = performance.now();
     const logEntry = getLogEntryForRequest(details.requestId);
-    cLog(details.requestId, "checkInfo ["+details.url+"]");
+    cLog(details.requestId, "checkInfo ["+trimString(details.url)+"]");
     const domain = getDomainNameFromURL(details.url);
     if (!shouldValidateDomain(domain)) {
         // cLog(details.requestId, "ignoring (no checkInfo): " + domain);
@@ -247,32 +317,72 @@ async function checkInfo(details) {
 
             // remember if policy validations has been performed
             let policyChecksPerformed = false;
-            // check each policy and throw an error if one of the verifications fails
-            policiesMap.forEach((p, m) => {
-                // cLog(details.requestId, "starting policy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
 
-                const {trustDecision} = policyValidateConnection(certificateChain, config, domain, p, m);
-                addTrustDecision(details, trustDecision);
+            if (window.GOCACHEV2) {
+                // check if have a cached trust decision for this domain+leaf certificate
+                const key = domain + certificateChain[0].fingerprintSha256;
+                var trustDecision = null;
+                trustDecision = policyTrustDecisionCache.get(key);
+                var currentTime = new Date();
+                if (trustDecision === undefined || currentTime > trustDecision.validUntil) {
+                    trustDecision = policyValidateConnectionGo(certificateChain, domain);
+                    if (trustDecision.policyChain.length > 0 && !trustDecision.domainExcluded) {
+                        policyChecksPerformed = true;
+                    }
+                    policyTrustDecisionCache.set(key, trustDecision)
 
-                if (hasApplicablePolicy(trustDecision)) {
-                    policyChecksPerformed = true;
                 }
-                if (hasFailedValidations(trustDecision)) {
-                    throw new FpkiError(errorTypes.POLICY_MODE_VALIDATION_ERROR, getShortErrorMessages(trustDecision)[0]);
+                if (!trustDecision.domainExcluded) {
+                    addTrustDecision(details, trustDecision);
+                    if (trustDecision.evaluationResult !== 1) {
+                        throw new FpkiError(errorTypes.POLICY_MODE_VALIDATION_ERROR, getPolicyValidationErrorMessageGo(trustDecision));
+                    }
                 }
-            });
+            } else {
+                // check each policy and throw an error if one of the verifications fails
+                policiesMap.forEach((p, m) => {
+                    // cLog(details.requestId, "starting policy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(p));
+
+                    const { trustDecision } = policyValidateConnection(certificateChain, config, domain, p, m);
+                    addTrustDecision(details, trustDecision);
+
+                    if (hasApplicablePolicy(trustDecision)) {
+                        policyChecksPerformed = true;
+                    }
+                    if (hasFailedValidations(trustDecision)) {
+                        throw new FpkiError(errorTypes.POLICY_MODE_VALIDATION_ERROR, getShortErrorMessages(trustDecision)[0]);
+                    }
+                });
+            }
 
             // don't perform legacy validation if policy validation has already taken place
             if (!policyChecksPerformed) {
-                // check each policy and throw an error if one of the verifications fails
-                certificatesMap.forEach((c, m) => {
-                    cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c));
-                    const {trustDecision} = legacyValidateConnection(certificateChain, config, domain, c, m);
-                    addTrustDecision(details, trustDecision);
-                    if (hasFailedValidations(trustDecision)) {
-                        throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, getShortErrorMessages(trustDecision)[0]);
+                if(window.GOCACHEV2) {
+                    // check if have a cached trust decision for this domain+leaf certificate
+                    const key = domain+certificateChain[0].fingerprintSha256;
+                    var trustDecision = null;
+                    trustDecision = legacyTrustDecisionCache.get(key);
+                    var currentTime = new Date();
+                    if (trustDecision === undefined || currentTime > trustDecision.validUntil) {
+                        trustDecision = legacyValidateConnectionGo(certificateChain, domain);
+                        legacyTrustDecisionCache.set(key, trustDecision)
+
                     }
-                });
+                    addTrustDecision(details, trustDecision);
+                    if (trustDecision.evaluationResult !== 1) {
+                        throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, getLegacyValidationErrorMessageGo(trustDecision));
+                    }
+                } else {
+                    // check each policy and throw an error if one of the verifications fails
+                    certificatesMap.forEach((c, m) => {
+                        cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c));
+                        const {trustDecision} = legacyValidateConnection(certificateChain, config, domain, c, m);
+                        addTrustDecision(details, trustDecision);
+                        if (hasFailedValidations(trustDecision)) {
+                            throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, getShortErrorMessages(trustDecision)[0]);
+                        }
+                    });
+                }
             }
 
             // TODO: legacy (i.e., certificate-based) validation
@@ -312,7 +422,7 @@ async function onCompleted(details) {
         // cLog(details.requestId, "ignoring (no requestInfo): " + domain);
         return;
     }
-    cLog(details.requestId, "onCompleted ["+details.url+"]");
+    cLog(details.requestId, "onCompleted ["+trimString(details.url)+"]");
     // cLog(details.requestId, printLogEntriesToConsole());
     const logEntry = getLogEntryForRequest(details.requestId);
     if (logEntry !== null) {
@@ -321,7 +431,8 @@ async function onCompleted(details) {
         logEntry.finalizeLogEntry(details.requestId);
     }
     if (config.get("send-log-entries-via-event") && details.type === "main_frame") {
-        browser.tabs.executeScript(details.tabId, { file: "../content/sendLogEntries.js" })
+        // uncomment to communicate log entries with puppeteer instance
+        // browser.tabs.executeScript(details.tabId, { file: "../content/sendLogEntries.js" })
     }
 }
 

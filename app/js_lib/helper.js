@@ -1,13 +1,25 @@
 // Map helper functions
 
+/**
+ * Get the value for specified key in map OR return a new empty list.
+ * 
+ */
 export function mapGetList(map, key) {
     return map.get(key) || [];
 };
 
+/**
+ * Get the value for specified key in map OR return a new empty Map.
+ * 
+ */
 export function mapGetMap(map, key) {
     return map.get(key) || new Map();
 };
 
+/**
+ * Get the value for specified key in map OR return a new empty Set.
+ * 
+ */
 export function mapGetSet(map, key) {
     return map.get(key) || new Set();
 };
@@ -164,4 +176,42 @@ export function intToHexString(intValue, separator = "") {
         components.push(hex.substring(i * 2, (i + 1) * 2));
     }
     return components.join(separator);
+}
+
+
+export function base64ToHex(base64Value, separator = "") {
+    const raw = atob(base64Value);
+    let result = '';
+    for (let i = 0; i < raw.length; i++) {
+        const hex = raw.charCodeAt(i).toString(16);
+        if (i > 0) {
+            result += separator;
+        }
+        result += (hex.length === 2 ? hex : '0' + hex);
+    }
+    return result.toUpperCase();
+}
+
+export function trimString(string, maxLength = 100) {
+    const trimmedString = string.length > maxLength ?
+        string.substring(0, maxLength - 3) + "..." :
+        string;
+    return trimmedString;
+}
+
+/**
+ * Deep copy of new_format_config
+ */
+export function clone(json_object) {
+    const cloned_config = JSON.parse(JSON.stringify(json_object));
+
+    Object.entries(cloned_config['legacy-trust-preference']).forEach(elem => {
+        const [domain_name, _] = elem;
+        cloned_config['legacy-trust-preference'][domain_name] = new Map(
+            // trying to deep copy maps
+            JSON.parse(JSON.stringify(Array.from(json_object['legacy-trust-preference'][domain_name])))
+        );
+    });
+
+    return cloned_config;
 }

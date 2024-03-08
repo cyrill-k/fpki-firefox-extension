@@ -6,6 +6,15 @@ The [app](./app) folder contains the browser extension
 
 The [mapserver](./mapserver) folder contains the HTTP version of the map server and the tools to generate testing RPC and SP
 
+## Test browser extension
+First, load the browser extension by visiting `about:debugging` -> `This Firefox`, and then clicking `Load Temporary add-on...` and select the `manifest.json` file in the `app` folder. To test whether the extension works as expected, you can visit the following test urls for both the legacy mode and the policy mode:
+
+- Legacy mode warning: https://legacy-warn.fpki.netsec.ethz.ch
+- Legacy mode valid: https://legacy-valid.fpki.netsec.ethz.ch
+- Policy mode valid: https://policy-valid.fpki.netsec.ethz.ch
+- Policy mode block (issuer): https://policy-wrong-issuer.fpki.netsec.ethz.ch
+- Policy mode block (subdomains): https://policy-wrong-domain.fpki.netsec.ethz.ch
+
 ## How to run
 There are two ways to try out the extension: a quick and easy setup using an existing map server and a more involved setup including locally running your own map server.
 
@@ -66,12 +75,14 @@ To fetch mapserver proofs from the local mapserver, you have to add it in the [c
 
 Note that you can also **only** use the local mapserver (and ignore the mapserver running at ETH) by uncommenting the line with `ETH-mapserver-top-100k` and setting the values `mapserver-quorum` and `mapserver-instances-queried` to 1.
 
-#### Test browser extension
-After the map server is set up, load the browser extension by visiting ``about:debugging``. And you can visit the following urls to test whether it correctly works:
-
-- Legacy allow: https://bing.com
-- Legacy block: https://microsoft.com
-- Policy (issuer) allow: https://m.media-amazon.com/images/G/01/AmazonStores/Help/assets/img/gallery-img1.png
-- Policy (issuer) block: https://baidu.com
-- Policy (subcomains) allow: https://netsec.ethz.ch
-- Policy (subcomains) block: https://sellercentral.amazon.com
+#### New Structure Idea
+- store per-(P)CA cache on the golang side:
+  - Domain -> (P)CA -> [
+      ts,
+      missingCerts,
+      ]
+  - verify(X) returns:
+    - success (policy and/or legacy validation succeeded)
+    - need more map server responses:
+      - need N responses from the K policy map servers (M0, M1, ..., MK)
+      - need N' responses from the K' legacy map servers (M0, M1, ..., MK')

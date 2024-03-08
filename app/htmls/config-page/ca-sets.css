@@ -1,0 +1,97 @@
+.ca-sets-add-caset {
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+    font-size: large;
+}
+input.ca-sets-add-caset {
+    background-color: whitesmoke;
+    border: 1px solid grey;
+    border-radius: 3px;
+    height: 33px;
+    padding: 2px;
+}
+
+/*
+    CA Set Level
+*/
+
+div.ca-sets-caset {
+    margin-bottom: 10px;
+    box-sizing: border-box;
+}
+
+select.ca-sets-caset-header {
+    width: 100%;
+    font-size: larger;
+}
+
+div.ca-sets-caset-content {
+    padding: 20px;
+    margin-bottom: 10px;
+    border: 1px solid grey;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
+div.ca-sets-caset-description {
+    color: dimgray;
+}
+
+
+div.ca-sets-caset-more {
+    padding-top: 10px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+}
+
+button.ca-sets-caset-delete {
+    padding: 3px 10px;
+    font-size:medium ;
+    background-color: #8b0000c0;
+    cursor: pointer;
+    border-radius: 5px;
+    color: whitesmoke;
+    font-weight: bold;
+}
+
+/*
+    CAs Level
+*/
+
+div.ca-sets-caset-cas {
+    margin-top: 30px;
+}
+
+select.ca-sets-caset-cas-header {
+    padding-right: 5px;
+    font-size: 1em;
+    font-weight: 600;
+
+    border: none;
+    background-color: whitesmoke;
+}
+
+h4.ca-sets-caset-cas-header {
+    margin-bottom: 0;
+}
+
+div.ca-sets-caset-cas-content {
+    margin: 16px 0;
+    color: dimgray;
+
+    max-height: 200px;
+    overflow-y: scroll;
+
+    ul {
+        box-sizing: border-box;
+        padding-left: 20px;
+        margin-top: 0;
+    }
+}
+
+.ca-sets-caset-cas-header {
+    text-align: left;
+}

@@ -1,0 +1,150 @@
+table#user-policies-table {
+    border: none;
+}
+
+.trust-preference-add-domain {
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+    font-size: large;
+}
+input.trust-preference-add-domain {
+    background-color: whitesmoke;
+    border: 1px solid grey;
+    border-radius: 3px;
+    height: 33px;
+    padding: 2px;
+}
+
+/*
+    domain level
+*/
+div.trust-preference-domain {
+    margin-bottom: 10px;
+    box-sizing: border-box;
+}
+select.trust-preference-domain-header {
+    width: 100%;
+    font-size: larger;
+}
+
+div.trust-preference-domain-content {
+    padding: 20px;
+    margin-bottom: 10px;
+    border: 1px solid grey;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+}
+
+div.trust-preference-domain-more {
+    padding-top: 30px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+}
+
+button.trust-preference-domain-delete,
+button#resetConfig {
+    padding: 3px 10px;
+    font-size:medium ;
+    background-color: #8b0000c0;
+    cursor: pointer;
+    border-radius: 5px;
+    color: whitesmoke;
+    font-weight: bold;
+}
+
+div.trust-preference-domain-preferences-legend {
+    display: flex;
+    flex-direction: row;
+
+    div {
+        width: 50%
+    }
+}
+
+
+/*
+    preference level
+*/
+
+div.trust-preference-row, 
+div.add-trust-preference-row,
+div.trust-preference-inherited-row {
+    display: flex;
+    flex-direction: row;
+    gap: 5px;
+    width: 100%;
+    margin-bottom: 5px;
+    box-sizing: border-box;
+}
+
+div.trust-preference-row {
+    cursor:move;
+}
+
+div.add-trust-preference-row {
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+div.trust-preference-dragndrop,
+div.add-trust-preference-dragndrop,
+div.trust-preference-inherited-dragndrop {
+    min-width: 25px;
+    font-weight: 500;
+    text-align: center;
+}
+
+select.add-trust-preference-caset, select.add-trust-preference-level {
+    font-weight: bolder;
+}
+
+/* TODO: Benennung ist völlig durcheinander.. */
+div.trust-preference-ca, div.trust-preference-level, 
+div.add-trust-preference-caset, div.add-trust-preference-level,
+div.trust-preference-inherited-caset, div.trust-preference-inherited-trustlevel
+{
+    width: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+
+    select {
+        width: 100%;
+    }
+}
+
+div.trust-preference-delete {
+    background-color: #8b0000c0;
+    cursor: pointer;
+    min-width: 25px;
+    text-align: center;
+    border-radius: 3px;
+    color: whitesmoke;
+    font-weight:900;
+}
+div.trust-preference-delete:hover {
+    background-image: linear-gradient(rgb(0 0 0/30%) 0 0);
+}
+
+div.trust-preference-inherited-info,
+div.add-trust-preference-spacer {
+    min-width: 25px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+span.trust-preference-inherited-info-icon {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    margin: 0;
+    height: 24px;
+    line-height: 1;
+}

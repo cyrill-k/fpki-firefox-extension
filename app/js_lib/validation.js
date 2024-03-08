@@ -36,7 +36,7 @@ function policyFilterHighestTrustLevelPolicies(trustPreferenceEntries, domainPol
 function policyValidateActualDomain(tlsCertificateChain, config, actualDomain, domainPolicies) {
     const caSets = config.get("ca-sets");
 
-    const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("policy-trust-preference"), actualDomain);
+    const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("policy-trust-preference-old"), actualDomain);
     
     // get policies whose PCAs have the highest trust level (II)
     const {highestTrustLevel, highestTrustLevelPolicies} = policyFilterHighestTrustLevelPolicies(filteredTrustPreferenceEntries, domainPolicies);
@@ -65,7 +65,7 @@ function policyValidateActualDomain(tlsCertificateChain, config, actualDomain, d
 
 function policyValidateParentDomain(tlsCertificateChain, config, actualDomain, parentDomain, domainPolicies) {
     // only consider trust preference entries for the parent domain
-    const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("policy-trust-preference"), parentDomain);
+    const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("policy-trust-preference-old"), parentDomain);
 
     // get policies whose PCAs have the highest trust level (II)
     const {highestTrustLevel, highestTrustLevelPolicies} = policyFilterHighestTrustLevelPolicies(filteredTrustPreferenceEntries, domainPolicies);
@@ -199,6 +199,64 @@ function legacyValidateActualDomain(connectionTrustInfo, config, actualDomain, d
         });
     }
     return {trustInfos};
+}
+
+// validate a connection against the cached certificate chains and the 
+// user-defined preferences 
+export function legacyValidateConnectionGo(tlsCertificateChain, domainName) {
+    
+    // encode connection certificate chain as JSON
+    var enc = new TextEncoder(); 
+    var connectionChainArray = [];
+    for (var i in tlsCertificateChain) {
+        connectionChainArray.push(tlsCertificateChain[i].pem);
+    }
+    
+    var obj = {
+        connectionCertificateChainb64: connectionChainArray
+    };
+    var json = JSON.stringify(obj);
+    connectionChainArray = enc.encode(json);
+
+    // perform validation
+    const verifyLegacyStart = performance.now();
+    var legacyTrustDecision = verifyLegacy(domainName, connectionChainArray, connectionChainArray.length);
+    legacyTrustDecision.connectionCertificateChain = tlsCertificateChain;
+
+    const verifyLegacyEnd = performance.now();
+    window.verifyLegacyTime = verifyLegacyEnd - verifyLegacyStart;
+    console.log("[Go] verifyLegacy took ", window.verifyLegacyTime, " ms", domainName);
+    console.log("[Go] evaluation result = ", legacyTrustDecision.evaluationResult);
+    //window.GoVerifyLegacyTime.push({"domain": domainName, "time" : window.verifyLegacyTime});
+
+    return legacyTrustDecision;
+}
+
+// validate a connection against the cached policies and the user-defined preferences using the WASM validation function
+export function policyValidateConnectionGo(tlsCertificateChain, domainName) {
+    // encode connection certificate chain as JSON
+    var enc = new TextEncoder();
+    var connectionChainArray = [];
+    for (var i in tlsCertificateChain) {
+        connectionChainArray.push(tlsCertificateChain[i].pem);
+    }
+
+    var obj = {
+        connectionCertificateChainb64: connectionChainArray
+    };
+    var json = JSON.stringify(obj);
+    connectionChainArray = enc.encode(json);
+
+    // perform validation
+    const verifyPolicyStart = performance.now();
+    var policyTrustDecision = verifyPolicy(domainName, connectionChainArray, connectionChainArray.length);
+    policyTrustDecision.connectionCertificateChain = tlsCertificateChain;
+
+    const verifyPolicyEnd = performance.now();
+    window.verifyPolicyTime = verifyPolicyEnd - verifyPolicyStart;
+    console.log(`Policy Verification [${window.verifyPolicyTime} ms] result=${policyTrustDecision.evaluationResult}, conflicts=${policyTrustDecision.conflictingPolicies}`);
+
+    return policyTrustDecision;
 }
 
 // check connection using the policies retrieved from a single mapserver

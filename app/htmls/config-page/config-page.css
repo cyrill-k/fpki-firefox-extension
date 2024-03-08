@@ -1,0 +1,271 @@
+html {
+    font-size: 1rem;
+    font-family: sans-serif;
+}
+
+body {
+    width: 62%;
+    max-width: 800px;
+    margin: auto;
+    background-color:whitesmoke;
+    color:rgb(50, 50, 50);
+}
+
+p {
+    line-height: 1.5;
+}
+
+table,
+td {
+    border: 1px solid #333;
+}
+
+thead,
+tfoot {
+    background-color: #333;
+    color: #fff;
+}
+
+table input,table select,table button {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 0 10pt;
+}
+
+table.inner-table {
+    border-collapse: collapse;
+    border: none;
+    width: 100%;
+}
+
+table.inner-table tr{
+    border: none;
+}
+
+td {
+    padding: 3pt 10pt;
+}
+
+th {
+    padding: 10pt;
+}
+
+div.settings-section {
+    display: flex;
+    flex-direction: column;
+    width: auto;
+}
+div.settings-section > button {
+    margin-top: 1rem;
+    float: right;
+}
+
+div.settings-section-header {
+    display: block;
+}
+
+div.settings-section-content {
+    padding-left: 40px;
+    display: flex;
+    flex-direction: column;
+    width: auto;
+}
+
+span.info-icon-old {
+    color: grey;
+    font-weight: bolder;
+    font-size: x-large;
+    cursor: pointer;
+    margin-left: 5px;
+}
+
+i.info-icon-old {
+    font-weight:800;
+    font-size: large;
+    font-style: normal;
+    cursor: pointer;
+    margin-left: 5px;
+    color: rgb(211, 149, 23);
+}
+
+div.info-box-old {
+    border: 2px solid grey;
+    border-radius: 10px;
+    background-color: rgba(104, 169, 223, 0.3);
+    margin-bottom: 0.75em;
+    padding: 10px;
+    line-height: 1.5;
+}
+
+span.keyword {
+    border: 2px dotted black;
+    padding: 0px 4px;
+    cursor: pointer;
+}
+
+span.code {
+    border-radius: 5px;
+    background-color: lightgrey;
+    padding: 1px 8px;
+}
+
+button {
+    border: 1px solid grey;
+    border-radius: 3px;
+}
+
+button:hover {
+    background-image: linear-gradient(rgb(0 0 0/30%) 0 0);
+}
+
+button.delete {
+    background-color: lightcoral;
+}
+
+
+button.reset-changes,
+button.save-changes {
+    padding: 3px 10px;
+    font-size:medium ;
+    cursor: pointer;
+    border-radius: 5px;
+    font-weight: bold;
+}
+
+button.reset-changes {
+    margin-left: auto;
+    background-color: dimgray;
+    color: whitesmoke;
+}
+
+button.save-changes {
+    margin-left: auto;
+    background-color: green;
+    color: whitesmoke;
+}
+
+div.reset-change-div {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: fit-content;
+
+    button {
+        width: 100%;
+    }
+}
+
+.default-border {
+    border: 2px solid black;
+    border-radius: 10px;
+    padding: 10px;
+}
+
+.btn {
+    border: 1px solid grey;
+    border-radius: 3px;
+    font-size: small;
+    font-family: sans-serif;
+    padding: 2px;
+    background-color: rgb(231, 231, 231);
+    text-align: center;
+}
+
+.btn:hover {
+    background-image: linear-gradient(rgb(0 0 0/30%) 0 0);
+    cursor: pointer;
+}
+
+div.todo {
+    border: 2px solid darkred;
+    border-radius: 10px;
+    background-image: linear-gradient(rgba(224, 30, 30, 0.3) 0 0);
+    padding: 10px;
+}
+
+tr.spacing {
+    height: 10px;
+    background-color: #333;
+}
+
+.policy-header {
+    font-size: larger; 
+    /*background-color: #F2D995; */
+    background-color:rgb(231, 231, 231);
+    height: 30px; 
+    text-align: center; 
+    font-weight:bolder;
+}
+
+.hidden {
+    display: none;
+}
+
+td.user-policy-dropdown {
+    padding: 0; 
+    border: none;
+}
+
+select.user-policy-dropdown {
+    height: 30px;
+    background-color: whitesmoke; 
+    font-weight:600;
+}
+
+span.info-icon,
+i.info-icon {
+    color: rgb(211, 149, 23);
+    font-weight: bolder;
+    font-size: large;
+    cursor: pointer;
+    margin-left: 5px;
+    font-style: normal;
+}
+
+div.info-box {
+    border: 2px solid grey;
+    border-radius: 10px;
+    background-color: rgb(173, 237, 248);
+    padding: 10px;
+    line-height: 1.5;
+    position:absolute;
+    z-index: 999;
+    display: none;
+    left: 100px;
+    top: 200px;
+    cursor: pointer;
+    max-width: 200px;
+}
+
+input.full-width {
+    box-sizing: border-box;
+    width: 100%;
+    margin: 10px 0;
+    padding: 5px 10px;
+}
+
+button.import-export {
+    padding: 5px;
+    font-weight: 500;
+    font-size: 14px;
+    letter-spacing: 0px;
+}
+
+
+/* Stil für das Modal-Popup */
+.modal {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+.modal-content {
+    background-color: #fff;
+    width: 300px;
+    margin: 100px auto;
+    padding: 20px;
+    text-align: center;
+}

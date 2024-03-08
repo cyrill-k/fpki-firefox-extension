@@ -22,20 +22,21 @@
           <p id="errorShortDescText" >The flexible web security plugin blocked this page (<span id="errorShortDescDomain">FILL IN</span>) because it detected a violation of this domain's policy. This could be a sign of an active attack, please do not proceed.</p>
           <p id="errorShortDescErrorMessage">FILL IN</p>
         </div>
+          <p id="learn_more">Learn more about how the flexible web security plugin protects you here: <a href="https://github.com/cyrill-k/fpki-firefox-extension/wiki">F-PKI Firefox Extension Wiki</a>.</p>
 
         <!-- Action buttons -->
         <div id="buttons" class="button-container">
           <!-- Commands handled in browser.js -->
           <button id="goBackButton" class="primary" >Go back</button>
-          <button id="seeDetailsButton" >See details</button>
           <button id="acceptCertificateButton" data-telemetry-id="exception_button">Accept the Risk and Continue</button>
-        </div>
+          <button id="downloadErrorReport">Show error report</button>
+      <div id="errorReportDiv" class="content">
+      <pre>
+        <code id="errorReport">
+          FILL IN
+        </code>
+      </pre>
       </div>
-      <div id="errorDescriptionContainer">
-        <!-- Error Descriptions Handled in blockedSite.js -->
-        <div class="error-description" id="errorLongDesc">
-          <p id="errorInnerDescription"  data-l10n-args="{&quot;sitename&quot;:&quot;malware.wicar.org&quot;}"><span id="error_desc_sitename" data-l10n-name="sitename" class="sitename">The policy for example.ethz.ch was violated. This indicates an active attack, you must not proceed to this site! </span><a id="error_desc_link" data-l10n-name="error_desc_link" href="TODO:insert Wiki Link">Error 104.</a> The returned certificate was signed by an untrusted CA. </p>
-          <p id="learn_more" >Learn more about how the flexible web security plugin protects you here: <a id="firefox_support" data-l10n-name="firefox_support" href="https://support.mozilla.org/1/firefox/105.0.3/WINNT/en-US/phishing-malware">https://wiki.f-pki.ethz.ch</a>.</p>
         </div>
       </div>
     </div>

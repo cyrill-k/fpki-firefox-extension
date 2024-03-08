@@ -36,8 +36,8 @@ var queryCounterChannel = make(chan int)
 
 // ugly version.... I will refactor it later.
 func main() {
-	replaceDbFlag := flag.Bool("replace-db", false, "replace the content of the database with test data")
-	includeCertificatesFlag := flag.Bool("include-certificates", false, "include some example certificates")
+	replaceDbFlag := flag.Bool("replace-db", true, "replace the content of the database with test data")
+	includeCertificatesFlag := flag.Bool("include-certificates", true, "include some example certificates")
 	includePoliciesFlag := flag.Bool("include-policies", true, "include some example policies")
 	rootFlag := flag.String("root", "", "hexadecimal form of root value without leading '0x'")
 	rootFileFlag := flag.String("rootfile", "", "path to the file storing the root in hexadecimal form without leading '0x'")
