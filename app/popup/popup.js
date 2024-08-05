@@ -1,9 +1,12 @@
 import {getSubject} from "../js_lib/x509utils.js"
 import {AllPolicyAttributes, PolicyAttributeToJsonKeyDict, getPolicyChainDescriptors} from "../js_lib/validation-types.js"
+import { log } from "../js_lib/console_log.js";
+import { cLog, download } from "../js_lib/helper.js";
+import { convertObjectsToMaps, serializableObjectToMaps } from "../js_lib/config.js";
 
 var validationResults = null;
 var synchronizedConfig = null;
-var port = browser.runtime.connect({
+var port = chrome.runtime.connect({
     name: "popup to background communication"
 });
 
@@ -115,7 +118,8 @@ async function removeCurrentResult() {
 
 async function updateValidationResult() {
     // remove existing validation results
-    removeCurrentResult();
+    console.log("Removed current result")
+    await removeCurrentResult();
 
     if (validationResults === null) {
         getElement("legacy-connection-title").innerHTML = "No connection initiated yet";
@@ -124,11 +128,16 @@ async function updateValidationResult() {
     }
 
     // get current tab
-    const tabId = (await browser.tabs.query({currentWindow: true, active: true}))[0].id;
-    // get current DOM url
-    const {domUrl} = await browser.tabs.sendMessage(tabId, {request: 'get_dom_url'});
-    const validationResult = validationResults.get(tabId).get(domUrl);
-
+    const tabId = (await chrome.tabs.query({currentWindow: true, active: true}))[0].id;
+    console.log("Got tab id", tabId)
+    // get current DOM url 
+    // TODO dom url message is not sent to content js
+    //const {domUrl} = chrome.tabs.sendMessage(tabId, {request: 'get_dom_url'}).then(response => console.log("RESPONSE", response));
+    //console.log("Got dom url", domUrl)
+    console.log("validationResults inside", validationResults)
+    const tabValidationResult = validationResults.get(tabId.toString());
+    const validationResult = tabValidationResult.entries().next().value;
+    console.log("vaLIDATION RESULT", validationResult)
     // get last result for each domain/mapserver
     const lastIndexMap = new Map();
     validationResult.forEach((td, index) => {
@@ -136,8 +145,8 @@ async function updateValidationResult() {
     });
 
     const recentTrustDecisions = Array.from(lastIndexMap.values()).map(index => validationResult[index]);
-
     // show the entries in reverse order such that more recently added entries appear on top
+    // TODO not being rendered
     let currentElement = createElementIn("p", {"id": "validation-title"}, "Validation Results", "validation-results");
     recentTrustDecisions.toReversed().forEach((td, index) => {
         if (td.type === "legacy") {
@@ -302,16 +311,26 @@ function addLegacyValidationResult(trustDecision, predecessor, index) {
 }
 
 // communication from background script to popup
-port.onMessage.addListener(async function(msg) {
+port.onMessage.addListener(async function(msg, sender, sendResponse) {
     const {msgType, value, config} = msg;
+    console.log("Message received validation");
     if (msgType === "validationResults") {
-        validationResults = value;
-
-        // config is necessary to enable/disable web assembly support
-        synchronizedConfig = config;
-        window.GOCACHE = config.get("wasm-certificate-parsing");
-
-        await updateValidationResult();
+        console.log("Trust decisions received", ((value)))
+        validationResults = serializableObjectToMaps(value);
+        console.log("Validation results", validationResults)
+        if (!config) {
+            console.error("Received undefined config");
+        }
+        (async () => {
+            const variablePromise = await (1)
+            console.log("await variable", variablePromise)
+           })();
+        // Deserialize config back to a Map
+        synchronizedConfig = new Map(Object.entries(config));
+        console.log("synchronized confg", synchronizedConfig)
+        globalThis.GOCACHE = synchronizedConfig.get("wasm-certificate-parsing");
+        console.log("Got global cache", synchronizedConfig.get("wasm-certificate-parsing"))
+        await updateValidationResult(); 
     }
     console.log("message received: " + JSON.stringify(msg));
 });

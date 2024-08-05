@@ -357,6 +357,5 @@ func main() {
 	js.Global().Set("verifyLegacy", verifyLegacyWrapper())
 	js.Global().Set("verifyPolicy", verifyPolicyWrapper())
 
-	// prevent WASM from terminating
-	<-make(chan bool)
+	select {}
 }

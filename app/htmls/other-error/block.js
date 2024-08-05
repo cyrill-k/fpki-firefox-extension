@@ -3,7 +3,7 @@ import { getUrlParameter } from "../../js_lib/helper.js"
 document.addEventListener('DOMContentLoaded', function() {
     try {
         document.getElementById('goBackButton').addEventListener('click', function() {
-            window.history.go(-1);
+            globalThis.history.go(-1);
         });
         document.getElementById('downloadErrorReport').addEventListener('click', function() {
             this.classList.toggle("active");
@@ -20,7 +20,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // allow popup script to fetch document url of the blocked webpage
-browser.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+chrome.runtime.onMessage.addListener(function(msg, sender, sendResponse) {
+    cLog('content.js', 'chrome.runtime.onMessage.addListener', msg);
+    console.log("content.js: chrome.runtime.onMessage.addListener");
     if (msg.request === 'get_dom_url') {
         return Promise.resolve({ domUrl: getUrlParameter("url") });
     }

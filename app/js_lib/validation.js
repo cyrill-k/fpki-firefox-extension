@@ -224,10 +224,10 @@ export function legacyValidateConnectionGo(tlsCertificateChain, domainName) {
     legacyTrustDecision.connectionCertificateChain = tlsCertificateChain;
 
     const verifyLegacyEnd = performance.now();
-    window.verifyLegacyTime = verifyLegacyEnd - verifyLegacyStart;
-    console.log("[Go] verifyLegacy took ", window.verifyLegacyTime, " ms", domainName);
+    globalThis.verifyLegacyTime = verifyLegacyEnd - verifyLegacyStart;
+    console.log("[Go] verifyLegacy took ", globalThis.verifyLegacyTime, " ms", domainName);
     console.log("[Go] evaluation result = ", legacyTrustDecision.evaluationResult);
-    //window.GoVerifyLegacyTime.push({"domain": domainName, "time" : window.verifyLegacyTime});
+    //window.GoVerifyLegacyTime.push({"domain": domainName, "time" : globalThis.verifyLegacyTime});
 
     return legacyTrustDecision;
 }
@@ -253,8 +253,8 @@ export function policyValidateConnectionGo(tlsCertificateChain, domainName) {
     policyTrustDecision.connectionCertificateChain = tlsCertificateChain;
 
     const verifyPolicyEnd = performance.now();
-    window.verifyPolicyTime = verifyPolicyEnd - verifyPolicyStart;
-    console.log(`Policy Verification [${window.verifyPolicyTime} ms] result=${policyTrustDecision.evaluationResult}, conflicts=${policyTrustDecision.conflictingPolicies}`);
+    globalThis.verifyPolicyTime = verifyPolicyEnd - verifyPolicyStart;
+    console.log(`Policy Verification [${globalThis.verifyPolicyTime} ms] result=${policyTrustDecision.evaluationResult}, conflicts=${policyTrustDecision.conflictingPolicies}`);
 
     return policyTrustDecision;
 }

@@ -44,7 +44,7 @@ class DomainToCertificateCacheEntry {
 }
 
 export function getCertificateEntryByHash(certificateHash) {
-    if (window.GOCACHE) {
+    if (globalThis.GOCACHE) {
         if (certificateCacheGO.has(certificateHash)) {
             return certificateCacheGO.get(certificateHash);
         }
@@ -59,7 +59,7 @@ export function getCertificateEntryByHash(certificateHash) {
 
 // returns the certificate stored in the cache for a specific key
 export function getCertificateFromCacheByHash(certificateHash) {
-    if(window.GOCACHE) {
+    if(globalThis.GOCACHE) {
         if (certificateCacheGO.has(certificateHash)) {
             return certificateCacheGO.get(certificateHash).certificateBase64;
         }
@@ -74,7 +74,7 @@ export function getCertificateFromCacheByHash(certificateHash) {
 
 // returns the certificate and the corresponding certificate chain stored in the cache for a specific key
 export function getCertificateChainFromCacheByHash(leafCertificateHash) {
-    if (window.GOCACHE) {
+    if (globalThis.GOCACHE) {
         return getCertificateChainFromCacheByHashGO(leafCertificateHash);
     } else {
         return getCertificateChainFromCacheByHashJS(leafCertificateHash);
@@ -124,13 +124,13 @@ export async function addCertificateChainToCacheIfNecessary(pemCertificateWithou
     const fullChainHashes = await Promise.all(fullChain.map(async c => arrayToHexString(await hashPemCertificateWithoutHeader(c), ":")));
     let nCertificatesParsed = 0;
 
-    if(window.GOCACHE) {
+    if(globalThis.GOCACHE) {
         //var startParsing = performance.now();
 
         // decide which certificates should be parsed
         // append certificates to parse and their hashes in
         // single strings
-        window.CertificateCacheEntryGo = CertificateCacheEntryGo;
+        globalThis.CertificateCacheEntryGo = CertificateCacheEntryGo;
         var pemCertificatesToAddStr = "";
         var hashesOfCertificatesToAddStr = "";
         var parentHashesOfCertificatesToAddStr = "";

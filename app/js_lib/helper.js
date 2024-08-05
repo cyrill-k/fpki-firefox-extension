@@ -72,27 +72,27 @@ export function download(filename, text) {
 // Hashing
 
 export async function sha256Hash_arrayBuffer_1(input) {
-    let output = await window.crypto.subtle.digest('SHA-256', input);
+    let output = await globalThis.crypto.subtle.digest('SHA-256', input);
     return output;
 }
 
 export async function sha256Hash_1(input) {
-    let output = await window.crypto.subtle.digest('SHA-256', stringToArrayBuf(input))
+    let output = await globalThis.crypto.subtle.digest('SHA-256', stringToArrayBuf(input))
     return output
 }
 
 export async function sha256Hash_2(input1, input2) {
-    let output = await window.crypto.subtle.digest('SHA-256', appendTwoArrayBuf(input1, input2))
+    let output = await globalThis.crypto.subtle.digest('SHA-256', appendTwoArrayBuf(input1, input2))
     return output
 }
 
 export async function sha256Hash_3(input1, input2, input3) {
-    let output = await window.crypto.subtle.digest('SHA-256', appendThreeArrayBuf(input1, input2, input3))
+    let output = await globalThis.crypto.subtle.digest('SHA-256', appendThreeArrayBuf(input1, input2, input3))
     return output
 }
 
 export async function hashPemCertificateWithoutHeader(c) {
-    return new Uint8Array(await sha256Hash_arrayBuffer_1(stringToArrayBufNoEncoding(window.atob(c))));
+    return new Uint8Array(await sha256Hash_arrayBuffer_1(stringToArrayBufNoEncoding(globalThis.atob(c))));
 }
 
 
@@ -100,7 +100,7 @@ export async function hashPemCertificateWithoutHeader(c) {
 
 export function convertArrayBufferToBase64(input) {
     const inputAsString = String.fromCharCode(...new Uint8Array(input));
-    return window.btoa(inputAsString);
+    return globalThis.btoa(inputAsString);
 }
 
 function encode_utf8(s) {

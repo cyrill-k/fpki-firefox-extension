@@ -1,6 +1,6 @@
 var reasonElement = document.getElementById("reason")
 
-const queryString = window.location.search;
+const queryString = globalThis.location.search;
 
 const urlParams = new URLSearchParams(queryString);
 

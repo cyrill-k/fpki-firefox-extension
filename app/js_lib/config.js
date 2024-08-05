@@ -20,10 +20,12 @@ export let config = null;  // Map Object
 /**
  * Returns config and initializes it first if neccessary
  */
-export function getConfig(key = "") {
+export async function getConfig(key = "") {
+    console.log('Getting config for key:', config, key)
     if (config === null) {
-        initializeConfig();
+        await initializeConfig();
     }
+    console.log("Config", config)
     if (key === "") {
         return config;
     } else {
@@ -34,42 +36,58 @@ export function getConfig(key = "") {
 /**
  * Manually Set a new config value
  */
-export function setConfig(newConfig) {
-    config = newConfig;
-    console.log("setting config to:");
-    console.log(config);
+export async function setConfig(newConfig) {
+    if (isJSONString(newConfig)) {
+        newConfig = convertObjectsToMaps(JSON.parse(newConfig));
+        return;
+    } else if (isMap(newConfig)) {
+        config = newConfig;
+        await saveConfig();
+        return;
+    }
+    console.log('Error while setting config, received config: ', newConfig)
 }
 
 /**
  * Loads config from local storage (across browser sessions) OR 
  * initializes live config object with default config settings
  */
-export function initializeConfig() {
-    let storedConfig = localStorage.getItem("config");
-    if (storedConfig === null) {
-        console.log("initializing using default config:");
-        config = convertObjectsToMaps(defaultConfig);
-    } else {
-        console.log("initializing using stored config:");
-        config = importConfigFromJSON(storedConfig);
+export async function initializeConfig() {
+    if (config !== null) {
+        return;
     }
-    console.log(config);
-}
 
+    const storedConfig = await chrome.storage.local.get(["config"]);
+    console.log({storedConfig})
+    if (storedConfig.config) {
+        console.log("initializing config using storage:", storedConfig.config);
+        config = importConfigFromJSON(storedConfig.config);
+    } else {
+        console.log("initializing config using default settings:", defaultConfig);
+        config = convertObjectsToMaps(defaultConfig);
+    }
+    await saveConfig();
+}
 
 /**
  * Saves config
  */
-export function saveConfig() {
+export async function saveConfig() {
     /*
         Makes live config object persistent across browser sessions using the 
         local storage of the browser
     */
-    console.log("saving config:");
-    console.log(config);
-    localStorage.setItem("config", exportConfigToJSON(config));
+    console.log("saving config:", config);
+    await chrome.storage.local.set({config: exportConfigToJSON(config)});
 }
 
+
+export async function getConfigRequest() {
+    const config = await getConfig();
+    console.log("GOT CONFIG", config);
+    const jsonConfig = convertMapsToObjects(config);
+    return jsonConfig;
+}
 
 /**
  * Returns a JSON string of the passed config
@@ -127,6 +145,47 @@ export function convertMapsToObjects(jsonConfig) {
     return objectsConfig;
 }
 
+export function convertMapsToSerializableObject(map) {
+    const obj = {};
+    for (let [key, value] of map.entries()) {
+        if (value instanceof Map) {
+            obj[key] = convertMapsToSerializableObject(value);
+        } else {
+            obj[key] = value;
+        }
+    }
+    return obj;
+}
+
+export function serializableObjectToMaps(obj) {
+    const map = new Map();
+    for (let key in obj) {
+        if (obj[key] && typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+            map.set(key, serializableObjectToMaps(obj[key]));
+        } else {
+            map.set(key, obj[key]);
+        }
+    }
+    return map;
+}
+
+
+function isJSONString(str) {
+    if (typeof str !== 'string') {
+        return false;
+    }
+    try {
+        JSON.parse(str);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+function isMap(val) {
+    return val instanceof Map;
+}
+
 /**
  * Lets user export config in shareable json format.
  */
@@ -137,8 +196,9 @@ export function downloadConfig() {
 /**
  * Reset config to default settings
  */
-export function resetConfig() {
+export async function resetConfig() {
     config = convertObjectsToMaps(defaultConfig);
     console.log("reseting config to:");
     console.log(config);
+    await saveConfig();
 }

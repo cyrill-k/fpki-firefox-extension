@@ -1,80 +1,148 @@
 'use strict'
 
-import { getDomainNameFromURL } from "../js_lib/domain.js"
-import { FpkiRequest } from "../js_lib/fpki-request.js"
-    import { printMap, cLog, mapGetList, mapGetMap, mapGetSet, trimString } from "../js_lib/helper.js"
-import { config, downloadConfig, initializeConfig, getConfig, saveConfig, resetConfig, setConfig, exportConfigToJSON } from "../js_lib/config.js"
-import { LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole, getSerializedLogEntries } from "../js_lib/log.js"
-import { FpkiError, errorTypes } from "../js_lib/errors.js"
-import { policyValidateConnection, legacyValidateConnection, legacyValidateConnectionGo, policyValidateConnectionGo } from "../js_lib/validation.js"
-import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations, LegacyTrustDecisionGo, PolicyTrustDecisionGo, getLegacyValidationErrorMessageGo, getPolicyValidationErrorMessageGo} from "../js_lib/validation-types.js"
-import "../js_lib/wasm_exec.js"
+import { getDomainNameFromURL } from "../js_lib/domain.js";
+import { FpkiRequest } from "../js_lib/fpki-request.js";
+import { printMap, cLog, mapGetList, mapGetMap, mapGetSet, trimString } from "../js_lib/helper.js";
+import { config, downloadConfig, initializeConfig, getConfig, saveConfig, resetConfig, setConfig, exportConfigToJSON, getConfigRequest, convertMapsToObjects, convertMapsToSerializableObject } from "../js_lib/config.js";
+import { LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole, getSerializedLogEntries } from "../js_lib/log.js";
+import { FpkiError, errorTypes } from "../js_lib/errors.js";
+import { policyValidateConnection, legacyValidateConnection, legacyValidateConnectionGo, policyValidateConnectionGo } from "../js_lib/validation.js";
+import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations, LegacyTrustDecisionGo, PolicyTrustDecisionGo, getLegacyValidationErrorMessageGo, getPolicyValidationErrorMessageGo } from "../js_lib/validation-types.js";
+import "../js_lib/wasm_exec.js";
 import { addCertificateChainToCacheIfNecessary, getCertificateEntryByHash } from "../js_lib/cache.js"
-import { VerifyAndGetMissingIDsResponseGo, AddMissingPayloadsResponseGo } from "../js_lib/FP-PKI-accessor.js"
+import { VerifyAndGetMissingIDsResponseGo, AddMissingPayloadsResponseGo } from "../js_lib/FP-PKI-accessor.js";
 
 
-try {
-    initializeConfig();
-    window.GOCACHE = getConfig("wasm-certificate-parsing");
-    window.GOCACHEV2 = getConfig("wasm-certificate-caching");
-} catch (e) {
-    console.log("initialize: " + e);
-}
+// let wasmInitialized = false;
 
-// flag whether to use Go cache
-// instance to call Go Webassembly functions
-if (window.GOCACHE) {
-    const go = new Go();
-    WebAssembly.instantiateStreaming(fetch("../js_lib/wasm/parsePEMCertificates.wasm"), go.importObject).then((result) => {
-        go.run(result.instance);
-    });
-} else if (window.GOCACHEV2) {
-    try {
-        const go = new Go();
-        WebAssembly.instantiateStreaming(fetch("../go_wasm/gocachev2.wasm"), go.importObject).then((result) => {
-            go.run(result.instance);
-            const nCertificatesAdded = initializeGODatastructures("embedded/ca-certificates", "embedded/pca-certificates", exportConfigToJSON(getConfig()));
+// // Function to load the WASM module
+// async function loadWasm() {
+//     if (wasmInitialized) {
+//         return;
+//     }
+
+//     const go = new Go(); // Assuming Go is defined in wasm_exec.js
+//     const wasmModule = await fetch(chrome.runtime.getURL("go_wasm/gocachev2.wasm"));
+//     const wasmBytes = await wasmModule.arrayBuffer();
+//     const wasmInstance = await WebAssembly.instantiate(wasmBytes, go.importObject);
+//     go.run(wasmInstance.instance);
+
+//     wasmInitialized = true;
+// }
+
+// // Ensure WASM is loaded and then initialize caches
+// loadWasm().then(() => {
+//     console.log("WASM module loaded.");
+// }).catch(error => {
+//     console.error("Error loading WASM:", error);
+// });
+
+// // Reinitialize WASM before calling Go functions
+// async function ensureWasm() {
+//     if (!wasmInitialized) {
+//         await loadWasm();
+//     }
+// }
+
+async function initialize() {
+    try { 
+        await initializeConfig();
+        globalThis.GOCACHE = await getConfig("wasm-certificate-parsing");
+        globalThis.GOCACHEV2 = await getConfig("wasm-certificate-caching");
+
+        // add listener to header-received.
+        chrome.webRequest.onBeforeRequest.addListener(
+            requestInfo, { urls: ["*:/\/*\/*"] },[]
+        );
+
+        // add listener to header-received. 
+        chrome.webRequest.onHeadersReceived.addListener(
+            checkInfo, {urls: ["*:/\/*\/*"]}, ['responseHeaders']
+        );
+
+        chrome.webRequest.onCompleted.addListener(
+            onCompleted, { urls: ["*:/\/*\/*"] }
+        )
+
+        // flag whether to use Go cache
+        // instance to call Go Webassembly functions
+        if (globalThis.GOCACHE) {
+            const go = new Go();
+            const parsePemCertificateWasm = await fetch(chrome.runtime.getURL("js_lib/wasm/parsePEMCertificate.wasm"));
+            const parsePemCertificateBytes = await parsePemCertificateWasm.arrayBuffer();
+            const parsePemCertificateResult = await WebAssembly.instantiate(parsePemCertificateBytes, go.importObject);
+            go.run(parsePemCertificateResult.instance);
+        } else if (globalThis.GOCACHEV2) {
+            const go = new Go();
+            const gocachev2Wasm = await fetch(chrome.runtime.getURL("go_wasm/gocachev2.wasm"));
+            const gocachev2Bytes = await gocachev2Wasm.arrayBuffer();
+            const gocachev2Result = await WebAssembly.instantiate(gocachev2Bytes, go.importObject);
+            go.run(gocachev2Result.instance);
+            const nCertificatesAdded = initializeGODatastructures("embedded/ca-certificates", "embedded/pca-certificates", exportConfigToJSON(await getConfig()));
             console.log(`[Go] Initialize cache with trust roots: #certificates = ${nCertificatesAdded[0]}, #policies = ${nCertificatesAdded[1]}`);
-
             // make js classes for encapsulating return values available to WASM
-            window.LegacyTrustDecisionGo = LegacyTrustDecisionGo;
-            window.PolicyTrustDecisionGo = PolicyTrustDecisionGo;
-            window.VerifyAndGetMissingIDsResponseGo = VerifyAndGetMissingIDsResponseGo;
-            window.AddMissingPayloadsResponseGo = AddMissingPayloadsResponseGo;
-
-        });
-    } catch (error) {
-        console.log(`failed to initiate wasm context: ${error}`);
+            globalThis.LegacyTrustDecisionGo = LegacyTrustDecisionGo;
+            globalThis.PolicyTrustDecisionGo = PolicyTrustDecisionGo;
+            globalThis.VerifyAndGetMissingIDsResponseGo = VerifyAndGetMissingIDsResponseGo;
+            globalThis.AddMissingPayloadsResponseGo = AddMissingPayloadsResponseGo;
+            //globalThis.verifyAndGetMissingIDs = result.instance.exports.verifyAndGetMissingIDs;
+            console.log('verifyAndGetMissingIDs is assigned to global scope:', globalThis.verifyAndGetMissingIDs !== undefined);
+        }
+    } catch (e) {
+        console.log("Error during initialization: " + e);
     }
 }
 
+chrome.runtime.onInstalled.addListener(async () => {
+    await initialize();
+    console.log("Extension installed");
+});
 /** 
  * Receive one way messages from extension pages
  */
-browser.runtime.onConnect.addListener( (port) => {
-
-    port.onMessage.addListener(async (msg) => {
+chrome.runtime.onConnect.addListener((port) => {
+    console.log("Connected to port: " + port.name);
+    port.onMessage.addListener((msg, sender, sendResponse) => {
+        console.log("Received message", msg);
         switch (msg.type) {
         case "acceptCertificate":
             const {domain, certificateFingerprint, tabId, url} = msg;
             trustedCertificates.set(domain, mapGetSet(trustedCertificates, domain).add(certificateFingerprint));
-            browser.tabs.update(tabId, {url: url});
+            chrome.tabs.update(tabId, {url: url});
             break;
         case 'postConfig':
-            setConfig(msg.value);
-            saveConfig();
-            clearCaches();
-            break;
+            (async () => { 
+                await setConfig(msg.value);
+                console.log("SAVE NEW CONFIG", msg.value)
+                await saveConfig();
+                await clearCaches();
+            })()
+            getConfigRequest().then(sendResponse);
+            return true;
         default:
             switch (msg) {
             case 'initFinished':
-                console.log("MSG RECV: initFinished");
-                port.postMessage({msgType: "config", value: config});
-                break;
+                (async () => {
+                    const cfg = await getConfig();
+                    if (!cfg) {
+                        console.error("Config is undefined");
+                    } else {
+                        port.postMessage({ msgType: "config", value: JSON.stringify(cfg) });
+                        sendResponse({});
+                    }
+                })()
+                return true;
             case 'printConfig':
-                console.log("MSG RECV: printConfig");
-                port.postMessage({msgType: "config", value: config});
-                break;
+                (async () => {
+                    const cfg = await getConfig();
+                    if (!cfg) {
+                        console.error("Config is undefined");
+                    } else {
+                        port.postMessage({ msgType: "config", value: JSON.stringify(cfg) });
+                        sendResponse({});
+                    }
+                })()
+                return true;
             case 'downloadConfig':
                 console.log("MSG RECV: downloadConfig");
                 downloadConfig()
@@ -82,14 +150,23 @@ browser.runtime.onConnect.addListener( (port) => {
             case 'resetConfig':
                 exit(1);
                 console.log("MSG RECV: resetConfig");
-                resetConfig()
-                break;
+                (async () => {
+                    await resetConfig();
+                })()
+                sendResponse({});
+                return true;
             case 'openConfigWindow':
-                browser.tabs.create({url: "../htmls/config-page/config-page.html"});
+                chrome.tabs.create({url: "../htmls/config-page/config-page.html"});
                 break;
             case 'showValidationResult':
-                port.postMessage({msgType: "validationResults", value: trustDecisions, config});
-                break;
+                getConfigRequest().then((cfg) => {
+                    if (!cfg) {
+                        console.error("Config is undefined");
+                    } else {
+                        port.postMessage({ msgType: "validationResults", value: convertMapsToSerializableObject(trustDecisions), config: cfg });
+                    }
+                }).then(sendResponse);
+                return true;
             case 'printLog':
                 printLogEntriesToConsole();
                 break;
@@ -100,6 +177,7 @@ browser.runtime.onConnect.addListener( (port) => {
                 port.postMessage({msgType: "logEntries", value: getSerializedLogEntries()});
                 break;
             case 'requestConfig':
+                console.log("DUMMT REQUEST CONFIG")
                 port.postMessage("Hi there");
                 break;
             }
@@ -110,38 +188,55 @@ browser.runtime.onConnect.addListener( (port) => {
 /**
  * Receive messages with possibility of direct response
  */
-browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    console.log(request)
+    if (request.type === 'log') {
+        console.log(request.data);
+        sendResponse({});
+        return true;
+    };
+
     switch(request) {
         case 'requestConfig':
-            return Promise.resolve({ "config": config });
+            getConfigRequest().then(sendResponse);
+            return true;
         case 'resetConfig':
-            resetConfig();
-            saveConfig();
-            clearCaches();
-            return Promise.resolve({ "config": config });
+            (async () => { 
+                await resetConfig();
+                await saveConfig();
+                await clearCaches();
+            })()
+            getConfigRequest().then(sendResponse);
+            return true;
         
         default:
             switch (request['type']) {
                 case "uploadConfig":
                     console.log("uploading new config value...");
-                    setConfig(request['value']);
-                    saveConfig();
-                    clearCaches();
-                    return Promise.resolve({ "config": config });
+                    (async () => {
+                    await setConfig(request['value']);
+                    await saveConfig();
+                    await clearCaches();
+                    })()
+                    return true;
                 default:
-                    console.log(`Received unknown message: ${request}`);
+                    console.log(`Received unknown message: ${request} ${JSON.stringify(request)}`);
                     break;
+                    
             }
     }
+
+    return true;
 });
 
-function clearCaches() {
+async function clearCaches() {
     console.log("Clearing js and golang (WASM) caches...");
     trustDecisions = new Map();
     legacyTrustDecisionCache = new Map();
     policyTrustDecisionCache = new Map();
-    initializeGODatastructures("embedded/ca-certificates", "embedded/pca-certificates", exportConfigToJSON(getConfig()));
+    const config = await getConfig();
+    const jsonStringConfig = exportConfigToJSON(config);
+    initializeGODatastructures("embedded/ca-certificates", "embedded/pca-certificates", jsonStringConfig);
 }
 
 // window.addEventListener('unhandledrejection', function(event) {
@@ -182,7 +277,7 @@ function redirect(details, error, certificateChain=null) {
         stacktrace = error.stack;
     }
 
-    let url = browser.runtime.getURL(htmlErrorFile) + "?reason=" + encodeURIComponent(reason) + "&domain=" + encodeURIComponent(getDomainNameFromURL(details.url));
+    let url = chrome.runtime.getURL(htmlErrorFile) + "?reason=" + encodeURIComponent(reason) + "&domain=" + encodeURIComponent(getDomainNameFromURL(details.url));
 
     if (stacktrace !== null) {
         url += "&stacktrace="+encodeURIComponent(stacktrace);
@@ -200,12 +295,19 @@ function redirect(details, error, certificateChain=null) {
         url += "&fingerprint="+encodeURIComponent(certificateChain[0].fingerprintSha256);
     }
 
-    browser.tabs.update(tabId, {url: url});
+    chrome.tabs.update(tabId, {url: url});
 }
 
-function shouldValidateDomain(domain) {
+async function shouldValidateDomain(domain) {
+    if (!await getConfig()) {
+        console.error("Config is not initialized");
+        return false;
+    }
+
     // ignore mapserver addresses since otherwise there would be a circular dependency which could not be resolved
-    return config.get("mapservers").every(({ domain: d }) => getDomainNameFromURL(d) !== domain);
+    const mapServers = await getConfig("mapservers");
+    console.log("Mapservers", mapServers);
+    return mapServers.every(({ domain: d }) => getDomainNameFromURL(d) !== domain);
 }
 
 function addTrustDecision(details, trustDecision) {
@@ -223,7 +325,7 @@ async function requestInfo(details) {
     cLog(details.requestId, "requestInfo ["+trimString(details.url)+"]");
 
     const domain = getDomainNameFromURL(details.url);
-    if (!shouldValidateDomain(domain)) {
+    if (!await shouldValidateDomain(domain)) {
         // cLog(details.requestId, "ignoring (no requestInfo): " + domain);
         return;
     }
@@ -250,7 +352,7 @@ async function requestInfo(details) {
 }
 
 async function getTlsCertificateChain(securityInfo) {
-    const chain = securityInfo.certificates.map(c => ({pem: window.btoa(String.fromCharCode(...c.rawDER)), fingerprintSha256: c.fingerprint.sha256, serial: c.serialNumber, isBuiltInRoot: c.isBuiltInRoot, subject: c.subject, issuer: c.issuer}));
+    const chain = securityInfo.certificates.map(c => ({pem: globalThis.btoa(String.fromCharCode(...c.rawDER)), fingerprintSha256: c.fingerprint.sha256, serial: c.serialNumber, isBuiltInRoot: c.isBuiltInRoot, subject: c.subject, issuer: c.issuer}));
     // Note: the string representation of the subject and issuer as presented by the browser may differ from the string representation of the golang library. Only use this information for output and not for making decisions.
     return chain;
 }
@@ -260,7 +362,7 @@ async function checkInfo(details) {
     const logEntry = getLogEntryForRequest(details.requestId);
     cLog(details.requestId, "checkInfo ["+trimString(details.url)+"]");
     const domain = getDomainNameFromURL(details.url);
-    if (!shouldValidateDomain(domain)) {
+    if (!await shouldValidateDomain(domain)) {
         // cLog(details.requestId, "ignoring (no checkInfo): " + domain);
         return;
     }
@@ -272,21 +374,32 @@ async function checkInfo(details) {
         // ensure that if checkInfo is called multiple times for a single request, logEntry is ignored
         cLog(details.requestId, "no log entry for uncached request: "+details);
         throw new FpkiError(errorTypes.INTERNAL_ERROR);
+    }   
+
+    let remoteInfo = null;
+    try {
+        remoteInfo = await getSecurityInfoFromNativeApp(domain);
+        cLog(details.requestId, "RECEIVED REMOTE INFO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+        cLog(details.requestId, "REMOTEINFO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"+JSON.stringify(remoteInfo))
+        //! TODO getSecurityInfo works only in Firefox, not in any other browser
+        // For use in other browsers we need to create a server that will handle this api request and call it from extension
+        // const remoteInfo = await chrome.webRequest.getSecurityInfo(details.requestId, {
+        //     certificateChain: true,
+        //     rawDER: true
+        // });
+    } catch (error) {
+        cLog(details.requestId, "Error during getSecurityInfo: " + error);
     }
 
-    const remoteInfo = await browser.webRequest.getSecurityInfo(details.requestId, {
-        certificateChain: true,
-        rawDER: true
-    });
 
-    if (remoteInfo.certificates === undefined) {
+    if (remoteInfo && remoteInfo.certificates === undefined) {
         cLog(details.requestId, "establishing non-secure http connection");
         // TODO: could also implement protection against http downgrade
         return;
     }
 
     const certificateChain = await getTlsCertificateChain(remoteInfo);
-
+    cLog(details.requestId, "certificate chain: "+JSON.stringify(certificateChain));
     if (logEntry !== null) {
         logEntry.certificateChainReceived(certificateChain);
     }
@@ -305,33 +418,34 @@ async function checkInfo(details) {
                     break;
                 }
                 const fpkiRequest = new FpkiRequest(mapserver, domain, details.requestId);
-                // cLog(details.requestId, "await fpki request for ["+domain+", "+mapserver.identity+"]");
+                cLog(details.requestId, "await fpki request for ["+domain+", "+mapserver.identity+"]");
                 const {policies, certificates, metrics} = await fpkiRequest.fetchPolicies();
                 policiesMap.set(mapserver, policies);
                 certificatesMap.set(mapserver, certificates);
                 if (logEntry !== null) {
                     logEntry.fpkiResponse(mapserver, policies, certificates, metrics);
                 }
-                // cLog(details.requestId, "await finished for fpki request for ["+domain+", "+mapserver.identity+"]");
+                cLog(details.requestId, "await finished for fpki request for ["+domain+", "+mapserver.identity+"]");
             }
 
             // remember if policy validations has been performed
             let policyChecksPerformed = false;
 
-            if (window.GOCACHEV2) {
+            if (globalThis.GOCACHEV2) {
                 // check if have a cached trust decision for this domain+leaf certificate
                 const key = domain + certificateChain[0].fingerprintSha256;
                 var trustDecision = null;
                 trustDecision = policyTrustDecisionCache.get(key);
                 var currentTime = new Date();
                 if (trustDecision === undefined || currentTime > trustDecision.validUntil) {
-                    trustDecision = policyValidateConnectionGo(certificateChain, domain);
+                    trustDecision = await policyValidateConnectionGo(certificateChain, domain);
                     if (trustDecision.policyChain.length > 0 && !trustDecision.domainExcluded) {
                         policyChecksPerformed = true;
                     }
                     policyTrustDecisionCache.set(key, trustDecision)
 
                 }
+                cLog(details.requestId, "trustDecision: "+JSON.stringify(trustDecision));
                 if (!trustDecision.domainExcluded) {
                     addTrustDecision(details, trustDecision);
                     if (trustDecision.evaluationResult !== 1) {
@@ -357,7 +471,7 @@ async function checkInfo(details) {
 
             // don't perform legacy validation if policy validation has already taken place
             if (!policyChecksPerformed) {
-                if(window.GOCACHEV2) {
+                if(globalThis.GOCACHEV2) {
                     // check if have a cached trust decision for this domain+leaf certificate
                     const key = domain+certificateChain[0].fingerprintSha256;
                     var trustDecision = null;
@@ -407,6 +521,30 @@ async function checkInfo(details) {
     }
 }
 
+
+async function getSecurityInfoFromNativeApp(domain) {
+    return new Promise((resolve, reject) => {
+        try {
+            const port = chrome.runtime.connectNative("unibonn.netsec.fpki.extension");
+            port.onMessage.addListener((response) => {
+                if (response.error) {
+                    reject(response.error)
+                } else {
+                    resolve(response.securityInfo)
+                }
+            });
+            port.onDisconnect.addListener(() => {
+                reject(new Error("Failed to connect to native app"));
+            });
+            port.postMessage({type: 'getSecurityInfo', domain: domain});
+        }
+        catch (e) {
+            console.log("Error during getSecurityInfoFromNativeApp: " + e)
+            reject(e);
+        }
+    })
+}
+
 // function extractTimings(timingEntry) {
 //     return {
 //         dnsLookup: timingEntry.domainLookupEnd-timingEntry.domainLookupStart,
@@ -418,7 +556,7 @@ async function checkInfo(details) {
 async function onCompleted(details) {
     const onCompleted = performance.now();
     const domain = getDomainNameFromURL(details.url);
-    if (!shouldValidateDomain(domain)) {
+    if (!await shouldValidateDomain(domain)) {
         // cLog(details.requestId, "ignoring (no requestInfo): " + domain);
         return;
     }
@@ -435,22 +573,3 @@ async function onCompleted(details) {
         // browser.tabs.executeScript(details.tabId, { file: "../content/sendLogEntries.js" })
     }
 }
-
-// add listener to header-received.
-browser.webRequest.onBeforeRequest.addListener(
-    requestInfo, {
-        urls: ["*://*/*"]
-    },
-    [])
-
-// add listener to header-received. 
-browser.webRequest.onHeadersReceived.addListener(
-    checkInfo, {
-        urls: ["*://*/*"]
-    },
-    ['blocking', 'responseHeaders'])
-
-browser.webRequest.onCompleted.addListener(
-    onCompleted, {
-        urls: ["*://*/*"]
-    })

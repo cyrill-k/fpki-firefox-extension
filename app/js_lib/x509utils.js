@@ -24,7 +24,7 @@ export function getSubject(cert) {
     if ("subject" in cert) {
         return cert.subject;
     } else {
-        if(window.GOCACHE) {
+        if(globalThis.GOCACHE) {
             return cert.subjectStr;
         } else {
             return convertX509NameToString(cert.tbsCertificate.subject);
@@ -36,7 +36,7 @@ export function getIssuer(cert) {
     if ("issuer" in cert) {
         return cert.issuer;
     } else {
-        if(window.GOCACHE) {
+        if(globalThis.GOCACHE) {
             return cert.IssuerStr;
         } else {
             return convertX509NameToString(cert.tbsCertificate.issuer);

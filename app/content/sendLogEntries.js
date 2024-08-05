@@ -1,4 +1,4 @@
-var port = browser.runtime.connect({
+var port = chrome.runtime.connect({
     name: "content to background communication"
 });
 

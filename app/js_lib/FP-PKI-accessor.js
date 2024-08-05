@@ -211,7 +211,9 @@ async function retrieveMissingCertificatesAndPolicies(mapResponse, requestId, ma
     const startParse = performance.now();
     const hashMap = new Map();
 
-    if (window.GOCACHEV2) {
+    if (globalThis.GOCACHEV2) {
+        console.log("Verifying MHT inclusion proof and finding missing IDs", requestId)
+        console.log("mapResponseNew", mapResponseNew)
         cLog(requestId, "Verifying MHT inclusion proof and finding missing IDs");
         let json = JSON.stringify(mapResponseNew);
         const enc = new TextEncoder();

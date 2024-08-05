@@ -4,6 +4,7 @@ import * as trust_levels from "./trust-levels.js"
 import * as misc from "./misc.js"
 import { clone } from "../../js_lib/helper.js";
 import {convertMapsToObjects, convertObjectsToMaps} from "../../js_lib/config.js";
+import { log } from "../../js_lib/console_log.js";
 
 
 /*
@@ -12,16 +13,27 @@ import {convertMapsToObjects, convertObjectsToMaps} from "../../js_lib/config.js
 */ 
 let json_config = {};
 
-var port = browser.runtime.connect({
+var port = chrome.runtime.connect({
     name: "config to background communication"
 });
 
 let set_builder; // global ca set builder class instance
 
-
 document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        /* DEV
+    try {  
+        await setupButtonEventListeners();
+        // Initialize config
+        await initConfig();
+        // Initially load settings
+        await reloadSettings();
+    } catch (e) {
+        console.log("config button setup: " + e);
+    }
+});
+
+
+async function setupButtonEventListeners() {
+/* DEV
         document.getElementById('printConfig').addEventListener('click', async () => {
             await requestConfig();
             printConfig();
@@ -32,7 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
         document.getElementById('resetConfig').addEventListener('click', async () => {
             await resetConfig();
-            reloadSettings();
+            await reloadSettings();
         });
 
         document.getElementById('uploadConfig').addEventListener('click', async () => {
@@ -41,9 +53,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             reader.onload = async function(e){
                 //port.postMessage({type: "uploadConfig", value: e.target.result});
-                const response = await browser.runtime.sendMessage({type: "uploadConfig", value: convertObjectsToMaps(JSON.parse(e.target.result))});
+                const response = await chrome.runtime.sendMessage({type: "uploadConfig", value: convertObjectsToMaps(JSON.parse(e.target.result))});
                 //setConfig(response.config);
-                console.log("RESONSE:");
+                log("RESPONSE", response)
                 console.log(response.config);
                 // Update json config without changing the reference
                 const new_json_config = convertMapsToObjects(response.config);
@@ -106,16 +118,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.log("Trust-Level deleted. Reloading Trust Preferences..")
             trust_preferences.updateTrustPreferences(json_config)
         })
-
-        // Initialize config
-        await initConfig();
-        // Initially load settings
-        await reloadSettings();
-    } catch (e) {
-        console.log("config button setup: " + e);
-    }
-});
-
+}
 
 /**
  * Prints live config object to html as JSON string
@@ -139,7 +142,8 @@ async function resetConfig() {
         ["No", "Yes"]
     );
     if (answer == "Yes") {
-        const response = await browser.runtime.sendMessage("resetConfig");
+        const response = await chrome.runtime.sendMessage("resetConfig");
+        console.log("Reseted config", response)
         const new_json_config = convertMapsToObjects(response.config);
         Object.entries(new_json_config).forEach(entry => {
             const [key, new_value] = entry
@@ -154,8 +158,9 @@ async function resetConfig() {
  * Request live config from background script to initialize config
  */
 async function initConfig() {
-    const response = await browser.runtime.sendMessage("requestConfig");
-    json_config = convertMapsToObjects(response.config);
+    const response = await chrome.runtime.sendMessage("requestConfig");
+    log("REQUESTED DEFAULT CONFIG", JSON.stringify(response))
+    json_config = response;
 }
 
 
@@ -163,7 +168,8 @@ async function initConfig() {
  * Post configuration changes to live config in background script
  */
 async function postConfig() {
-    port.postMessage({ "type": "postConfig", "value": convertObjectsToMaps(json_config) });
+    console.log("This config", json_config)
+    port.postMessage({ "type": "postConfig", "value": json_config });
 }
 
 
@@ -415,9 +421,9 @@ function setupCASetBuilderEventListeners(json_config) {
                 await misc.showPopup("Please enter a set name.", ["Ok."])
                 const y = document
                     .querySelector('input#ca-sets-builder-name')
-                    .getBoundingClientRect().top + window.pageYOffset - 25;
+                    .getBoundingClientRect().top + globalThis.pageYOffset - 25;
 
-                window.scrollTo({top: y, behavior: 'smooth'});
+                globalThis.scrollTo({top: y, behavior: 'smooth'});
                 return
             }
             let set_description = document.querySelector('input#ca-sets-builder-description').value.trim();
@@ -508,7 +514,7 @@ async function resetChanges(e) {
         return;
     }
 
-    const live_config = convertMapsToObjects((await browser.runtime.sendMessage("requestConfig")).config);
+    const live_config = convertMapsToObjects((await chrome.runtime.sendMessage("requestConfig")).config);
 
     // Mapservers
     if (e.target.classList.contains('mapservers')) {

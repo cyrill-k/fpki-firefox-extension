@@ -2760,8 +2760,8 @@ PEMEncoder.prototype.encode = function encode(data, options) {
 
   var Buffer;
   try {
-    if (typeof window !== 'undefined' && typeof window.Buffer !== 'undefined') {
-      Buffer = window.Buffer;
+    if (typeof window !== 'undefined' && typeof globalThis.Buffer !== 'undefined') {
+      Buffer = globalThis.Buffer;
     } else {
       Buffer = require('buffer').Buffer;
     }
@@ -8378,14 +8378,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getEnvAtob = exports.getEnvBtoa = void 0;
 const getEnvBtoa = () => {
     if (typeof window !== 'undefined')
-        return window.btoa; // browser
+        return globalThis.btoa; // browser
     else
         return nodeBtoa; // node
 };
 exports.getEnvBtoa = getEnvBtoa;
 const getEnvAtob = () => {
     if (typeof window !== 'undefined')
-        return window.atob; // browser
+        return globalThis.atob; // browser
     else
         return nodeAtob; // node
 };
