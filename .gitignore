@@ -12,3 +12,5 @@
 
 # DS_Store
 .DS_Store
+
+native-messaging-app/native_app.log

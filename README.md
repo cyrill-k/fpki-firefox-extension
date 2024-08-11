@@ -15,6 +15,12 @@ First, load the browser extension by visiting `about:debugging` -> `This Firefox
 - Policy mode block (issuer): https://policy-wrong-issuer.fpki.netsec.ethz.ch
 - Policy mode block (subdomains): https://policy-wrong-domain.fpki.netsec.ethz.ch
 
+## Installation
+
+The extension for chrome version requires a native python app which can be found in the folder `native-messaging-app`. This app requires python3 and installed depedendecies located in `requirements.txt`
+
+The native app also needs to be connected to extension which can be done by running `install-extension` scripts `bat` for Windows and `.sh` for Linux/MacOs respectively.
+
 ## How to run
 There are two ways to try out the extension: a quick and easy setup using an existing map server and a more involved setup including locally running your own map server.
 

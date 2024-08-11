@@ -1,0 +1,9 @@
+{
+    "name": "unibonn.netsec.fpki.extension",
+    "description": "Native Messaging App for Certificate Info",
+    "path": "path_to_script_based_on_os",
+    "type": "stdio",
+    "allowed_origins": [
+        "chrome-extension://ikpcpjfkolgekbfmbdabhpeoljfkhpnh/"
+    ]
+}
