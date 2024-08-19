@@ -14,3 +14,4 @@
 .DS_Store
 
 native-messaging-app/native_app.log
+native-messaging-app/native_app_manifest.json

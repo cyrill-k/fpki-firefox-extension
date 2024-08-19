@@ -1,8 +1,6 @@
 import {getSubject} from "../js_lib/x509utils.js"
 import {AllPolicyAttributes, PolicyAttributeToJsonKeyDict, getPolicyChainDescriptors} from "../js_lib/validation-types.js"
-import { log } from "../js_lib/console_log.js";
-import { cLog, download } from "../js_lib/helper.js";
-import { convertObjectsToMaps, serializableObjectToMaps } from "../js_lib/config.js";
+import { serializableObjectToMaps } from "../js_lib/config.js";
 
 var validationResults = null;
 var synchronizedConfig = null;
@@ -118,7 +116,6 @@ async function removeCurrentResult() {
 
 async function updateValidationResult() {
     // remove existing validation results
-    console.log("Removed current result")
     await removeCurrentResult();
 
     if (validationResults === null) {
@@ -129,15 +126,10 @@ async function updateValidationResult() {
 
     // get current tab
     const tabId = (await chrome.tabs.query({currentWindow: true, active: true}))[0].id;
-    console.log("Got tab id", tabId)
-    // get current DOM url 
-    // TODO dom url message is not sent to content js
-    //const {domUrl} = chrome.tabs.sendMessage(tabId, {request: 'get_dom_url'}).then(response => console.log("RESPONSE", response));
-    //console.log("Got dom url", domUrl)
-    console.log("validationResults inside", validationResults)
-    const tabValidationResult = validationResults.get(tabId.toString());
+    // get current DOM url
+    const response = await chrome.tabs.sendMessage(tabId, {request: 'get_dom_url'});
+    const tabValidationResult = validationResults.get(tabId.toString()).get(response.domUrl);
     const validationResult = tabValidationResult.entries().next().value;
-    console.log("vaLIDATION RESULT", validationResult)
     // get last result for each domain/mapserver
     const lastIndexMap = new Map();
     validationResult.forEach((td, index) => {
@@ -313,24 +305,14 @@ function addLegacyValidationResult(trustDecision, predecessor, index) {
 // communication from background script to popup
 port.onMessage.addListener(async function(msg, sender, sendResponse) {
     const {msgType, value, config} = msg;
-    console.log("Message received validation");
     if (msgType === "validationResults") {
-        console.log("Trust decisions received", ((value)))
         validationResults = serializableObjectToMaps(value);
-        console.log("Validation results", validationResults)
         if (!config) {
             console.error("Received undefined config");
         }
-        (async () => {
-            const variablePromise = await (1)
-            console.log("await variable", variablePromise)
-           })();
         // Deserialize config back to a Map
         synchronizedConfig = new Map(Object.entries(config));
-        console.log("synchronized confg", synchronizedConfig)
         globalThis.GOCACHE = synchronizedConfig.get("wasm-certificate-parsing");
-        console.log("Got global cache", synchronizedConfig.get("wasm-certificate-parsing"))
         await updateValidationResult(); 
     }
-    console.log("message received: " + JSON.stringify(msg));
 });

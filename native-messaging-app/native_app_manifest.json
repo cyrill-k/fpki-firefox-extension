@@ -4,6 +4,6 @@
     "path": "path_to_script_based_on_os",
     "type": "stdio",
     "allowed_origins": [
-        "chrome-extension://ikpcpjfkolgekbfmbdabhpeoljfkhpnh/"
+        "chrome-extension://<extension id from chrome://extensions page/"
     ]
 }
