@@ -1,6 +1,7 @@
 import {getSubject} from "../js_lib/x509utils.js"
 import {AllPolicyAttributes, PolicyAttributeToJsonKeyDict, getPolicyChainDescriptors} from "../js_lib/validation-types.js"
 import { serializableObjectToMaps } from "../js_lib/config.js";
+import { downloadLog } from "../js_lib/log.js";
 
 var validationResults = null;
 var synchronizedConfig = null;
@@ -11,10 +12,10 @@ var port = chrome.runtime.connect({
 document.addEventListener('DOMContentLoaded', function() {
     try {
         getElement('openConfigWindow').addEventListener('click', function() {
-            port.postMessage("openConfigWindow");
+            chrome.tabs.create({url: "../htmls/config-page/config-page.html"});
         });
         getElement('downloadLog').addEventListener('click', function() {
-            port.postMessage("downloadLog");
+            downloadLog();
         });
         getElement('showValidationResult').addEventListener('click', function() {
             port.postMessage("showValidationResult");

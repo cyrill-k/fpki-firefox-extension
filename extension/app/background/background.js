@@ -4,45 +4,12 @@ import { getDomainNameFromURL } from "../js_lib/domain.js";
 import { FpkiRequest } from "../js_lib/fpki-request.js";
 import { printMap, cLog, mapGetList, mapGetMap, mapGetSet, trimString } from "../js_lib/helper.js";
 import { config, downloadConfig, initializeConfig, getConfig, saveConfig, resetConfig, setConfig, exportConfigToJSON, getConfigRequest, convertMapsToObjects, convertMapsToSerializableObject } from "../js_lib/config.js";
-import { LogEntry, getLogEntryForRequest, downloadLog, printLogEntriesToConsole, getSerializedLogEntries } from "../js_lib/log.js";
+import { LogEntry, getLogEntryForRequest, printLogEntriesToConsole, getSerializedLogEntries } from "../js_lib/log.js";
 import { FpkiError, errorTypes } from "../js_lib/errors.js";
 import { policyValidateConnection, legacyValidateConnection, legacyValidateConnectionGo, policyValidateConnectionGo } from "../js_lib/validation.js";
 import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations, LegacyTrustDecisionGo, PolicyTrustDecisionGo, getLegacyValidationErrorMessageGo, getPolicyValidationErrorMessageGo } from "../js_lib/validation-types.js";
 import "../js_lib/wasm_exec.js";
-import { addCertificateChainToCacheIfNecessary, getCertificateEntryByHash } from "../js_lib/cache.js"
 import { VerifyAndGetMissingIDsResponseGo, AddMissingPayloadsResponseGo } from "../js_lib/FP-PKI-accessor.js";
-
-
-// let wasmInitialized = false;
-
-// // Function to load the WASM module
-// async function loadWasm() {
-//     if (wasmInitialized) {
-//         return;
-//     }
-
-//     const go = new Go(); // Assuming Go is defined in wasm_exec.js
-//     const wasmModule = await fetch(chrome.runtime.getURL("go_wasm/gocachev2.wasm"));
-//     const wasmBytes = await wasmModule.arrayBuffer();
-//     const wasmInstance = await WebAssembly.instantiate(wasmBytes, go.importObject);
-//     go.run(wasmInstance.instance);
-
-//     wasmInitialized = true;
-// }
-
-// // Ensure WASM is loaded and then initialize caches
-// loadWasm().then(() => {
-//     console.log("WASM module loaded.");
-// }).catch(error => {
-//     console.error("Error loading WASM:", error);
-// });
-
-// // Reinitialize WASM before calling Go functions
-// async function ensureWasm() {
-//     if (!wasmInitialized) {
-//         await loadWasm();
-//     }
-// }
 
 async function initialize() {
     try { 
@@ -85,7 +52,6 @@ async function initialize() {
             globalThis.PolicyTrustDecisionGo = PolicyTrustDecisionGo;
             globalThis.VerifyAndGetMissingIDsResponseGo = VerifyAndGetMissingIDsResponseGo;
             globalThis.AddMissingPayloadsResponseGo = AddMissingPayloadsResponseGo;
-            //globalThis.verifyAndGetMissingIDs = result.instance.exports.verifyAndGetMissingIDs;
             console.log('verifyAndGetMissingIDs is assigned to global scope:', globalThis.verifyAndGetMissingIDs !== undefined);
         }
     } catch (e) {
@@ -113,7 +79,6 @@ chrome.runtime.onConnect.addListener((port) => {
         case 'postConfig':
             (async () => { 
                 await setConfig(msg.value);
-                console.log("SAVE NEW CONFIG", msg.value)
                 await saveConfig();
                 await clearCaches();
             })()
@@ -155,9 +120,6 @@ chrome.runtime.onConnect.addListener((port) => {
                 })()
                 sendResponse({});
                 return true;
-            case 'openConfigWindow':
-                chrome.tabs.create({url: "../htmls/config-page/config-page.html"});
-                break;
             case 'showValidationResult':
                 getConfigRequest().then((cfg) => {
                     if (!cfg) {
@@ -170,14 +132,10 @@ chrome.runtime.onConnect.addListener((port) => {
             case 'printLog':
                 printLogEntriesToConsole();
                 break;
-            case 'downloadLog':
-                downloadLog();
-                break;
             case 'getLogEntries':
                 port.postMessage({msgType: "logEntries", value: getSerializedLogEntries()});
                 break;
             case 'requestConfig':
-                console.log("DUMMT REQUEST CONFIG")
                 port.postMessage("Hi there");
                 break;
             }
@@ -189,9 +147,7 @@ chrome.runtime.onConnect.addListener((port) => {
  * Receive messages with possibility of direct response
  */
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    console.log(request)
     if (request.type === 'log') {
-        console.log(request.data);
         sendResponse({});
         return true;
     };
