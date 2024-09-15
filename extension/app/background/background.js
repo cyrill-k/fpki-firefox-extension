@@ -10,13 +10,14 @@ import { policyValidateConnection, legacyValidateConnection, legacyValidateConne
 import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations, LegacyTrustDecisionGo, PolicyTrustDecisionGo, getLegacyValidationErrorMessageGo, getPolicyValidationErrorMessageGo } from "../js_lib/validation-types.js";
 import "../js_lib/wasm_exec.js";
 import { VerifyAndGetMissingIDsResponseGo, AddMissingPayloadsResponseGo } from "../js_lib/FP-PKI-accessor.js";
+import { logError, logInfo, REMOTE_LOKI_HOST } from "../js_lib/loki_logger.js";
 
 async function initialize() {
     try { 
         await initializeConfig();
         globalThis.GOCACHE = await getConfig("wasm-certificate-parsing");
         globalThis.GOCACHEV2 = await getConfig("wasm-certificate-caching");
-
+        
         // add listener to header-received.
         chrome.webRequest.onBeforeRequest.addListener(
             requestInfo, { urls: ["*:/\/*\/*"] },[]
@@ -46,30 +47,29 @@ async function initialize() {
             const gocachev2Result = await WebAssembly.instantiate(gocachev2Bytes, go.importObject);
             go.run(gocachev2Result.instance);
             const nCertificatesAdded = initializeGODatastructures("embedded/ca-certificates", "embedded/pca-certificates", exportConfigToJSON(await getConfig()));
-            console.log(`[Go] Initialize cache with trust roots: #certificates = ${nCertificatesAdded[0]}, #policies = ${nCertificatesAdded[1]}`);
+            logInfo(`[Go] Initialize cache with trust roots: #certificates = ${nCertificatesAdded[0]}, #policies = ${nCertificatesAdded[1]}`);
             // make js classes for encapsulating return values available to WASM
             globalThis.LegacyTrustDecisionGo = LegacyTrustDecisionGo;
             globalThis.PolicyTrustDecisionGo = PolicyTrustDecisionGo;
             globalThis.VerifyAndGetMissingIDsResponseGo = VerifyAndGetMissingIDsResponseGo;
             globalThis.AddMissingPayloadsResponseGo = AddMissingPayloadsResponseGo;
-            console.log('verifyAndGetMissingIDs is assigned to global scope:', globalThis.verifyAndGetMissingIDs !== undefined);
         }
     } catch (e) {
-        console.log("Error during initialization: " + e);
+        logError("Error during initialization: " + e);
     }
 }
 
 chrome.runtime.onInstalled.addListener(async () => {
     await initialize();
-    console.log("Extension installed");
+    logInfo("User initialized extention");
 });
 /** 
  * Receive one way messages from extension pages
  */
 chrome.runtime.onConnect.addListener((port) => {
-    console.log("Connected to port: " + port.name);
-    port.onMessage.addListener((msg, sender, sendResponse) => {
-        console.log("Received message", msg);
+    logInfo("Connected to port: " + port.name);
+    port.onMessage.addListener((msg, _sender, sendResponse) => {
+        logInfo("Received message: " + JSON.stringify(msg));
         switch (msg.type) {
         case "acceptCertificate":
             const {domain, certificateFingerprint, tabId, url} = msg;
@@ -90,7 +90,7 @@ chrome.runtime.onConnect.addListener((port) => {
                 (async () => {
                     const cfg = await getConfig();
                     if (!cfg) {
-                        console.error("Config is undefined");
+                        logError("Config is undefined");
                     } else {
                         port.postMessage({ msgType: "config", value: JSON.stringify(cfg) });
                         sendResponse({});
@@ -101,7 +101,7 @@ chrome.runtime.onConnect.addListener((port) => {
                 (async () => {
                     const cfg = await getConfig();
                     if (!cfg) {
-                        console.error("Config is undefined");
+                        logError("Config is undefined");
                     } else {
                         port.postMessage({ msgType: "config", value: JSON.stringify(cfg) });
                         sendResponse({});
@@ -109,12 +109,12 @@ chrome.runtime.onConnect.addListener((port) => {
                 })()
                 return true;
             case 'downloadConfig':
-                console.log("MSG RECV: downloadConfig");
+                logInfo("MSG RECV: downloadConfig");
                 downloadConfig()
                 break;
             case 'resetConfig':
                 exit(1);
-                console.log("MSG RECV: resetConfig");
+                logInfo("MSG RECV: resetConfig");
                 (async () => {
                     await resetConfig();
                 })()
@@ -123,7 +123,7 @@ chrome.runtime.onConnect.addListener((port) => {
             case 'showValidationResult':
                 getConfigRequest().then((cfg) => {
                     if (!cfg) {
-                        console.error("Config is undefined");
+                        logError("Config is undefined");
                     } else {
                         port.postMessage({ msgType: "validationResults", value: convertMapsToSerializableObject(trustDecisions), config: cfg });
                     }
@@ -168,7 +168,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         default:
             switch (request['type']) {
                 case "uploadConfig":
-                    console.log("uploading new config value...");
+                    logInfo("Received new config value: " + JSON.stringify(request['value']));
                     (async () => {
                     await setConfig(request['value']);
                     await saveConfig();
@@ -176,7 +176,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     })()
                     return true;
                 default:
-                    console.log(`Received unknown message: ${request} ${JSON.stringify(request)}`);
+                    logError(`Received unknown message: ${request} ${JSON.stringify(request)}`);
                     break;
                     
             }
@@ -186,7 +186,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 async function clearCaches() {
-    console.log("Clearing js and golang (WASM) caches...");
+    logInfo("Clearing js and golang (WASM) caches...");
     trustDecisions = new Map();
     legacyTrustDecisionCache = new Map();
     policyTrustDecisionCache = new Map();
@@ -217,6 +217,7 @@ const trustedCertificates = new Map();
 
 function redirect(details, error, certificateChain=null) {
     cLog(details.requestId, "verification failed! -> redirecting. Reason: " + error+ " ["+details.url+"]");
+    logError("verification failed! -> redirecting. Reason: " + error+ " ["+details.url+"]", {requestId: details.requestId});
     // if any error is caught, redirect to the blocking page, and show the error page
     let { tabId } = details;
     let htmlErrorFile;
@@ -256,14 +257,19 @@ function redirect(details, error, certificateChain=null) {
 
 async function shouldValidateDomain(domain) {
     if (!await getConfig()) {
-        console.error("Config is not initialized");
+        logError("Config is not initialized");
+        return false;
+    }
+    // Have to check before log, since we log the mapservers to loki and that brings circular dependency
+    if (domain === REMOTE_LOKI_HOST) {
         return false;
     }
 
-    // ignore mapserver addresses since otherwise there would be a circular dependency which could not be resolved
     const mapServers = await getConfig("mapservers");
-    console.log("Mapservers", mapServers);
-    return mapServers.every(({ domain: d }) => getDomainNameFromURL(d) !== domain);
+    logInfo("Mapservers", {mapservers: mapServers});
+    // ignore mapserver addresses since otherwise there would be a circular dependency which could not be resolved
+    const notMapServer = mapServers.every(({ domain: d }) => getDomainNameFromURL(d) !== domain);
+    return notMapServer;
 }
 
 function addTrustDecision(details, trustDecision) {
@@ -278,13 +284,15 @@ function addTrustDecision(details, trustDecision) {
 async function requestInfo(details) {
     const perfStart = performance.now();
     const startTimestamp = new Date();
-    cLog(details.requestId, "requestInfo ["+trimString(details.url)+"]");
 
     const domain = getDomainNameFromURL(details.url);
     if (!await shouldValidateDomain(domain)) {
         // cLog(details.requestId, "ignoring (no requestInfo): " + domain);
         return;
     }
+    cLog(details.requestId, "requestInfo ["+trimString(details.url)+"]");
+    logInfo("requestInfo ["+trimString(details.url)+"]", {requestId: details.requestId});
+
     const logEntry = new LogEntry(startTimestamp, domain, details.tabId, details.method, details.type, perfStart);
     for (const [index, mapserver] of config.get("mapservers").entries()) {
         if (index === config.get("mapserver-instances-queried")) {
@@ -299,6 +307,7 @@ async function requestInfo(details) {
             logEntry.fpkiRequestInitiateError(mapserver.identity, error.message);
             // do not redirect here for now since we want to have a single point of redirection to simplify logging
             cLog(details.requestId, "initiateFetchingPoliciesIfNecessary catch");
+            logInfo("initiateFetchingPoliciesIfNecessary catch: " + JSON.stringify(error), {requestId: details.requestId});
             redirect(details, error);
             throw error;
         });
@@ -316,27 +325,31 @@ async function getTlsCertificateChain(securityInfo) {
 async function checkInfo(details) {
     const onHeadersReceived = performance.now();
     const logEntry = getLogEntryForRequest(details.requestId);
-    cLog(details.requestId, "checkInfo ["+trimString(details.url)+"]");
     const domain = getDomainNameFromURL(details.url);
     if (!await shouldValidateDomain(domain)) {
         // cLog(details.requestId, "ignoring (no checkInfo): " + domain);
         return;
     }
+
+    cLog(details.requestId, "checkInfo ["+trimString(details.url)+"]");
+    logInfo("checkInfo ["+trimString(details.url)+"]", {requestId: details.requestId});
+    
     if (logEntry === null && details.fromCache) {
         // ensure that if checkInfo is called multiple times for a single request, logEntry is ignored
         cLog(details.requestId, "skipping log entry for cached request: "+details);
+        logInfo("skipping log entry for cached request: "+details, {requestId: details.requestId});
     }
     if (logEntry === null && !details.fromCache) {
         // ensure that if checkInfo is called multiple times for a single request, logEntry is ignored
         cLog(details.requestId, "no log entry for uncached request: "+details);
+        logInfo("no log entry for uncached request: "+details, {requestId: details.requestId});
         throw new FpkiError(errorTypes.INTERNAL_ERROR);
     }   
 
     let remoteInfo = null;
     try {
         remoteInfo = await getSecurityInfoFromNativeApp(domain);
-        cLog(details.requestId, "RECEIVED REMOTE INFO!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-        cLog(details.requestId, "REMOTEINFO !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"+JSON.stringify(remoteInfo))
+        logInfo("Received remote info: " + JSON.stringify(remoteInfo), {requestId: details.requestId});
         //! TODO getSecurityInfo works only in Firefox, not in any other browser
         // For use in other browsers we need to create a server that will handle this api request and call it from extension
         // const remoteInfo = await chrome.webRequest.getSecurityInfo(details.requestId, {
@@ -345,17 +358,20 @@ async function checkInfo(details) {
         // });
     } catch (error) {
         cLog(details.requestId, "Error during getSecurityInfo: " + error);
+        logError("Error during getSecurityInfo: " + error, {requestId: details.requestId});
     }
 
 
     if (remoteInfo && remoteInfo.certificates === undefined) {
         cLog(details.requestId, "establishing non-secure http connection");
+        logInfo("establishing non-secure http connection", {requestId: details.requestId});
         // TODO: could also implement protection against http downgrade
         return;
     }
 
     const certificateChain = await getTlsCertificateChain(remoteInfo);
     cLog(details.requestId, "certificate chain: "+JSON.stringify(certificateChain));
+    logInfo("certificate chain: "+JSON.stringify(certificateChain), {requestId: details.requestId});
     if (logEntry !== null) {
         logEntry.certificateChainReceived(certificateChain);
     }
@@ -366,6 +382,7 @@ async function checkInfo(details) {
         const certificateFingerprint = certificateChain[0].fingerprintSha256;
         if (mapGetSet(trustedCertificates, domain).has(certificateFingerprint)) {
             cLog(details.requestId, "skipping validation for domain ("+domain+") because of the trusted certificate: "+certificateFingerprint);
+            logInfo("skipping validation for domain ("+domain+") because of the trusted certificate: "+certificateFingerprint, {requestId: details.requestId});
         } else {
             const policiesMap = new Map();
             const certificatesMap = new Map();
@@ -375,6 +392,7 @@ async function checkInfo(details) {
                 }
                 const fpkiRequest = new FpkiRequest(mapserver, domain, details.requestId);
                 cLog(details.requestId, "await fpki request for ["+domain+", "+mapserver.identity+"]");
+                logInfo("await fpki request for ["+domain+", "+mapserver.identity+"]", {requestId: details.requestId});
                 const {policies, certificates, metrics} = await fpkiRequest.fetchPolicies();
                 policiesMap.set(mapserver, policies);
                 certificatesMap.set(mapserver, certificates);
@@ -382,6 +400,7 @@ async function checkInfo(details) {
                     logEntry.fpkiResponse(mapserver, policies, certificates, metrics);
                 }
                 cLog(details.requestId, "await finished for fpki request for ["+domain+", "+mapserver.identity+"]");
+                logInfo("await finished for fpki request for ["+domain+", "+mapserver.identity+"]", {requestId: details.requestId});
             }
 
             // remember if policy validations has been performed
@@ -402,6 +421,7 @@ async function checkInfo(details) {
 
                 }
                 cLog(details.requestId, "trustDecision: "+JSON.stringify(trustDecision));
+                logInfo("trustDecision: "+JSON.stringify(trustDecision), {requestId: details.requestId});
                 if (!trustDecision.domainExcluded) {
                     addTrustDecision(details, trustDecision);
                     if (trustDecision.evaluationResult !== 1) {
@@ -446,6 +466,7 @@ async function checkInfo(details) {
                     // check each policy and throw an error if one of the verifications fails
                     certificatesMap.forEach((c, m) => {
                         cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c));
+                        logInfo("starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c), {requestId: details.requestId});
                         const {trustDecision} = legacyValidateConnection(certificateChain, config, domain, c, m);
                         addTrustDecision(details, trustDecision);
                         if (hasFailedValidations(trustDecision)) {
@@ -462,6 +483,7 @@ async function checkInfo(details) {
             // TODO: what happens if a response is invalid? we should definitely log it, but we could ignore it if enough other valid responses exist
 
             cLog(details.requestId, "verification succeeded! ["+details.url+"]");
+            logInfo("verification succeeded! ["+details.url+"]", {requestId: details.requestId});
         }
     } catch (error) {
         // TODO: in case that an exception was already thrown in requestInfo, then the redirection occurs twice (but this is not an issue since they both redirect to the same error url)
@@ -495,7 +517,7 @@ async function getSecurityInfoFromNativeApp(domain) {
             port.postMessage({type: 'getSecurityInfo', domain: domain});
         }
         catch (e) {
-            console.log("Error during getSecurityInfoFromNativeApp: " + e)
+            logError("Error during getSecurityInfoFromNativeApp: " + e)
             reject(e);
         }
     })
@@ -517,10 +539,12 @@ async function onCompleted(details) {
         return;
     }
     cLog(details.requestId, "onCompleted ["+trimString(details.url)+"]");
-    // cLog(details.requestId, printLogEntriesToConsole());
+    logInfo("onCompleted ["+trimString(details.url)+"]", {requestId: details.requestId});
+
     const logEntry = getLogEntryForRequest(details.requestId);
     if (logEntry !== null) {
         cLog(details.requestId, "validation skipped (invoked onCompleted without onHeadersReceived)");
+        logInfo("validation skipped (invoked onCompleted without onHeadersReceived)", {requestId: details.requestId});
         logEntry.validationSkipped(onCompleted);
         logEntry.finalizeLogEntry(details.requestId);
     }

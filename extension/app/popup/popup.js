@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
         getElement('showValidationResult').addEventListener('click', function() {
             port.postMessage("showValidationResult");
         });
+        displayUserId();
     } catch (e) {
         console.log("popup button setup: "+e);
     }
@@ -108,6 +109,25 @@ function addCollapsibleButton(id, text, decision) {
             content.style.display = "block";
         }
     });
+}
+
+function displayUserId() {
+    chrome.storage.local.get(['userId'], function(result) {
+        if (result.userId) {
+            const userIdElement = document.getElementById("user-id");
+            if (userIdElement) {
+                userIdElement.textContent = `User ID: ${result.userId}`;
+            } else {
+                const newUserIdElement = document.createElement('div');
+                newUserIdElement.id = 'user-id';
+                newUserIdElement.textContent = `User ID: ${result.userId}`;
+
+                document.body.appendChild(newUserIdElement);
+            }
+        } else {
+            console.error("User ID not found in local storage");
+        }
+    })
 }
 
 async function removeCurrentResult() {
