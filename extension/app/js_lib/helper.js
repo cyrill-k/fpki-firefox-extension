@@ -215,3 +215,11 @@ export function clone(json_object) {
 
     return cloned_config;
 }
+
+export function trimUrlToDomain(url) {
+    const regex = /\/\/([^\/,\s]+\.[^\/,\s]+?)(?=\/|,|\s|$|\?|#)/g
+
+    const match = regex.exec(url);
+
+    return match ? match[1] : url;
+}

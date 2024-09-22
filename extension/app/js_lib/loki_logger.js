@@ -21,21 +21,34 @@ function generateUUIDv4() {
     return result;
 }
 
-function getUserId(callback) {
-  chrome.storage.local.get(['userId'], function(result) {
+export async function getUserId() {
+  try {
+    const result = await chrome.storage.session.get(['userId']);
     if (result.userId) {
-      callback(result.userId);
+      return result.userId;
     } else {
       const newUserId = generateUUIDv4();
-      chrome.storage.local.set({ userId: newUserId }, function() {
-        callback(newUserId);
-      });
+      await chrome.storage.session.set({ userId: newUserId });
+      return newUserId;
     }
-  });
+  } catch (error) {
+    console.error('Failed to get userId:', error);
+    return null;
+  }
 }
 
-function sendLogToLoki(level, message, additionalLabels = {}) {
-  getUserId(function(userId) {
+export async function clearSessionUserId() {
+  try {
+    await chrome.storage.session.remove(['userId']);
+  } catch (error) {
+    console.error('Failed to clear userId:', error);
+  }
+}
+
+async function sendLogToLoki(level, message, additionalLabels = {}) {
+  try {
+    const userId = await getUserId();
+
     const logEntry = {
       streams: [
         {
@@ -53,17 +66,16 @@ function sendLogToLoki(level, message, additionalLabels = {}) {
         }
       ]
     };
-
-    fetch(LOKI_ENDPOINT, {
+    const response = await fetch(LOKI_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(logEntry)
-    }).catch(error => {
-      console.error('Failed to send log to Loki:', error);
     });
-  });
+  } catch (error) {
+    console.error('Failed to send log to Loki:', error);
+  }
 }
 
 export function logInfo(message, additionalLabels = {}) {
@@ -78,35 +90,3 @@ export function logError(error, additionalLabels = {}) {
 }
 
 // TODO Buffering logs and sending them in batches so not to overload Loki
-// let LOG_BUFFER = [];
-// const MAX_BUFFER_SIZE = 50;
-// const FLUSH_INTERVAL = 60000;
-
-// let flushTimer = null;
-
-// export function startFlushTimer() {
-//   if (flushTimer === null) {
-//     flushTimer = setInterval(() => {
-//       flushLogBuffer();
-//     }, FLUSH_INTERVAL_MS);
-//   }
-// }
-
-// export function stopFlushTimer() {
-//   if (flushTimer !== null) {
-//     clearInterval(flushTimer);
-//     flushTimer = null;
-//   }
-// }
-
-// export function loadLogBuffer() {
-//   chrome.storage.local.get(['logBuffer'], function(result) {
-//     if (result.logBuffer && Array.isArray(result.logBuffer)) {
-//       LOG_BUFFER = result.logBuffer;
-//     }
-//   });
-// }
-
-// function saveLogBuffer() {
-//   chrome.storage.local.set({ logBuffer: LOG_BUFFER });
-// }

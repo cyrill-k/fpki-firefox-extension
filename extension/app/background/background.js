@@ -2,7 +2,7 @@
 
 import { getDomainNameFromURL } from "../js_lib/domain.js";
 import { FpkiRequest } from "../js_lib/fpki-request.js";
-import { printMap, cLog, mapGetList, mapGetMap, mapGetSet, trimString } from "../js_lib/helper.js";
+import { printMap, cLog, mapGetList, mapGetMap, mapGetSet, trimString, trimUrlToDomain } from "../js_lib/helper.js";
 import { config, downloadConfig, initializeConfig, getConfig, saveConfig, resetConfig, setConfig, exportConfigToJSON, getConfigRequest, convertMapsToObjects, convertMapsToSerializableObject } from "../js_lib/config.js";
 import { LogEntry, getLogEntryForRequest, printLogEntriesToConsole, getSerializedLogEntries } from "../js_lib/log.js";
 import { FpkiError, errorTypes } from "../js_lib/errors.js";
@@ -10,11 +10,12 @@ import { policyValidateConnection, legacyValidateConnection, legacyValidateConne
 import { hasApplicablePolicy, getShortErrorMessages, hasFailedValidations, LegacyTrustDecisionGo, PolicyTrustDecisionGo, getLegacyValidationErrorMessageGo, getPolicyValidationErrorMessageGo } from "../js_lib/validation-types.js";
 import "../js_lib/wasm_exec.js";
 import { VerifyAndGetMissingIDsResponseGo, AddMissingPayloadsResponseGo } from "../js_lib/FP-PKI-accessor.js";
-import { logError, logInfo, REMOTE_LOKI_HOST } from "../js_lib/loki_logger.js";
+import { getUserId, logError, logInfo, REMOTE_LOKI_HOST } from "../js_lib/loki_logger.js";
 
 async function initialize() {
     try { 
         await initializeConfig();
+        await getUserId();
         globalThis.GOCACHE = await getConfig("wasm-certificate-parsing");
         globalThis.GOCACHEV2 = await getConfig("wasm-certificate-caching");
         
@@ -291,7 +292,7 @@ async function requestInfo(details) {
         return;
     }
     cLog(details.requestId, "requestInfo ["+trimString(details.url)+"]");
-    logInfo("requestInfo ["+trimString(details.url)+"]", {requestId: details.requestId});
+    logInfo("requestInfo ["+trimString(trimUrlToDomain(details.url))+"]", {requestId: details.requestId});
 
     const logEntry = new LogEntry(startTimestamp, domain, details.tabId, details.method, details.type, perfStart);
     for (const [index, mapserver] of config.get("mapservers").entries()) {
@@ -332,7 +333,7 @@ async function checkInfo(details) {
     }
 
     cLog(details.requestId, "checkInfo ["+trimString(details.url)+"]");
-    logInfo("checkInfo ["+trimString(details.url)+"]", {requestId: details.requestId});
+    logInfo("checkInfo ["+trimString(trimUrlToDomain(details.url))+"]", {requestId: details.requestId});
     
     if (logEntry === null && details.fromCache) {
         // ensure that if checkInfo is called multiple times for a single request, logEntry is ignored
@@ -483,7 +484,7 @@ async function checkInfo(details) {
             // TODO: what happens if a response is invalid? we should definitely log it, but we could ignore it if enough other valid responses exist
 
             cLog(details.requestId, "verification succeeded! ["+details.url+"]");
-            logInfo("verification succeeded! ["+details.url+"]", {requestId: details.requestId});
+            logInfo("verification succeeded! ["+trimUrlToDomain(details.url)+"]", {requestId: details.requestId});
         }
     } catch (error) {
         // TODO: in case that an exception was already thrown in requestInfo, then the redirection occurs twice (but this is not an issue since they both redirect to the same error url)
@@ -523,14 +524,6 @@ async function getSecurityInfoFromNativeApp(domain) {
     })
 }
 
-// function extractTimings(timingEntry) {
-//     return {
-//         dnsLookup: timingEntry.domainLookupEnd-timingEntry.domainLookupStart,
-//         transportSetup: timingEntry.connectEnd - timingEntry.connectStart,
-//         secureTransportSetup: timingEntry.connectEnd - timingEntry.secureConnectionStart
-//     };
-// }
-
 async function onCompleted(details) {
     const onCompleted = performance.now();
     const domain = getDomainNameFromURL(details.url);
@@ -539,7 +532,7 @@ async function onCompleted(details) {
         return;
     }
     cLog(details.requestId, "onCompleted ["+trimString(details.url)+"]");
-    logInfo("onCompleted ["+trimString(details.url)+"]", {requestId: details.requestId});
+    logInfo("onCompleted ["+trimString(trimUrlToDomain(details.url))+"]", {requestId: details.requestId});
 
     const logEntry = getLogEntryForRequest(details.requestId);
     if (logEntry !== null) {
