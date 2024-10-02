@@ -21,11 +21,9 @@ export let config = null;  // Map Object
  * Returns config and initializes it first if neccessary
  */
 export async function getConfig(key = "") {
-    console.log('Getting config for key:', config, key)
     if (config === null) {
         await initializeConfig();
     }
-    console.log("Config", config)
     if (key === "") {
         return config;
     } else {
@@ -37,11 +35,19 @@ export async function getConfig(key = "") {
  * Manually Set a new config value
  */
 export async function setConfig(newConfig) {
+    console.log("Setting config to:", newConfig);
     if (isJSONString(newConfig)) {
-        newConfig = convertObjectsToMaps(JSON.parse(newConfig));
+        console.log("Setting config from JSON string");
+        config = convertObjectsToMaps(JSON.parse(newConfig));
         return;
     } else if (isMap(newConfig)) {
+        console.log("Setting config from Map");
         config = newConfig;
+        await saveConfig();
+        return;
+    } else if (typeof newConfig === 'object') {
+        console.log("config is json object");
+        config = convertObjectsToMaps(newConfig);
         await saveConfig();
         return;
     }
@@ -84,7 +90,6 @@ export async function saveConfig() {
 
 export async function getConfigRequest() {
     const config = await getConfig();
-    console.log("GOT CONFIG", config);
     const jsonConfig = convertMapsToObjects(config);
     return jsonConfig;
 }

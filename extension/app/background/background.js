@@ -12,6 +12,11 @@ import "../js_lib/wasm_exec.js";
 import { VerifyAndGetMissingIDsResponseGo, AddMissingPayloadsResponseGo } from "../js_lib/FP-PKI-accessor.js";
 import { getUserId, logError, logInfo, REMOTE_LOKI_HOST } from "../js_lib/loki_logger.js";
 
+(async () => {
+    await initialize();
+    logInfo("Extension started");
+})();
+
 async function initialize() {
     try { 
         await initializeConfig();
@@ -60,10 +65,6 @@ async function initialize() {
     }
 }
 
-chrome.runtime.onInstalled.addListener(async () => {
-    await initialize();
-    logInfo("User initialized extention");
-});
 /** 
  * Receive one way messages from extension pages
  */
@@ -78,6 +79,7 @@ chrome.runtime.onConnect.addListener((port) => {
             chrome.tabs.update(tabId, {url: url});
             break;
         case 'postConfig':
+            console.log("Received new config value: " + JSON.stringify(msg.value));
             (async () => { 
                 await setConfig(msg.value);
                 await saveConfig();
@@ -114,7 +116,6 @@ chrome.runtime.onConnect.addListener((port) => {
                 downloadConfig()
                 break;
             case 'resetConfig':
-                exit(1);
                 logInfo("MSG RECV: resetConfig");
                 (async () => {
                     await resetConfig();
@@ -162,8 +163,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 await resetConfig();
                 await saveConfig();
                 await clearCaches();
+                const config = await getConfigRequest();
+                sendResponse(config);
             })()
-            getConfigRequest().then(sendResponse);
             return true;
         
         default:
@@ -171,10 +173,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 case "uploadConfig":
                     logInfo("Received new config value: " + JSON.stringify(request['value']));
                     (async () => {
-                    await setConfig(request['value']);
-                    await saveConfig();
-                    await clearCaches();
-                    })()
+                        await setConfig(request['value']);
+                        await saveConfig();
+                        await clearCaches();
+                        sendResponse({});
+                    })();
                     return true;
                 default:
                     logError(`Received unknown message: ${request} ${JSON.stringify(request)}`);
@@ -410,9 +413,9 @@ async function checkInfo(details) {
             if (globalThis.GOCACHEV2) {
                 // check if have a cached trust decision for this domain+leaf certificate
                 const key = domain + certificateChain[0].fingerprintSha256;
-                var trustDecision = null;
+                let trustDecision = null;
                 trustDecision = policyTrustDecisionCache.get(key);
-                var currentTime = new Date();
+                const currentTime = new Date();
                 if (trustDecision === undefined || currentTime > trustDecision.validUntil) {
                     trustDecision = await policyValidateConnectionGo(certificateChain, domain);
                     if (trustDecision.policyChain.length > 0 && !trustDecision.domainExcluded) {
@@ -421,8 +424,8 @@ async function checkInfo(details) {
                     policyTrustDecisionCache.set(key, trustDecision)
 
                 }
-                cLog(details.requestId, "trustDecision: "+JSON.stringify(trustDecision));
-                logInfo("trustDecision: "+JSON.stringify(trustDecision), {requestId: details.requestId});
+                cLog(details.requestId, "trustDecision: "+ trustDecision.evaluationResult + "for domain: " + trustDecision.domain);
+                logInfo(details.requestId, "trustDecision: "+ trustDecision.evaluationResult + "for domain: " + trustDecision.domain);
                 if (!trustDecision.domainExcluded) {
                     addTrustDecision(details, trustDecision);
                     if (trustDecision.evaluationResult !== 1) {
@@ -451,9 +454,9 @@ async function checkInfo(details) {
                 if(globalThis.GOCACHEV2) {
                     // check if have a cached trust decision for this domain+leaf certificate
                     const key = domain+certificateChain[0].fingerprintSha256;
-                    var trustDecision = null;
+                    let trustDecision = null;
                     trustDecision = legacyTrustDecisionCache.get(key);
-                    var currentTime = new Date();
+                    const currentTime = new Date();
                     if (trustDecision === undefined || currentTime > trustDecision.validUntil) {
                         trustDecision = legacyValidateConnectionGo(certificateChain, domain);
                         legacyTrustDecisionCache.set(key, trustDecision)
@@ -513,7 +516,8 @@ async function getSecurityInfoFromNativeApp(domain) {
                 }
             });
             port.onDisconnect.addListener(() => {
-                reject(new Error("Failed to connect to native app"));
+                const errorMessage = chrome.runtime.lastError ? chrome.runtime.lastError.message : "Failed to connect to native app";
+                reject(new Error(errorMessage));
             });
             port.postMessage({type: 'getSecurityInfo', domain: domain});
         }
