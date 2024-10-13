@@ -2,18 +2,9 @@
 Firefox extension for F-PKI
 
 ## Folder Structure
-The [app](./app) folder contains the browser extension
-
-The [mapserver](./mapserver) folder contains the HTTP version of the map server and the tools to generate testing RPC and SP
-
-## Test browser extension
-First, load the browser extension by visiting `about:debugging` -> `This Firefox`, and then clicking `Load Temporary add-on...` and select the `manifest.json` file in the `app` folder. To test whether the extension works as expected, you can visit the following test urls for both the legacy mode and the policy mode:
-
-- Legacy mode warning: https://legacy-warn.fpki.netsec.ethz.ch
-- Legacy mode valid: https://legacy-valid.fpki.netsec.ethz.ch
-- Policy mode valid: https://policy-valid.fpki.netsec.ethz.ch
-- Policy mode block (issuer): https://policy-wrong-issuer.fpki.netsec.ethz.ch
-- Policy mode block (subdomains): https://policy-wrong-domain.fpki.netsec.ethz.ch
+The [extension](./extension) folder contains the browser extension
+The [native-messaging-app](./native-messaging-app/) folder contains native app required for chrome version of the extension
+The [mapserver](./extension/mapserver/) folder contains the HTTP version of the map server and the tools to generate testing RPC and SP
 
 ## Installation
 
@@ -23,6 +14,19 @@ First, load the browser extension by visiting `about:debugging` -> `This Firefox
 2. Based on your OS in the root folder run:
 	- For Windows: `./install-extension.bat`
 	- For Linux/MacOS: `./install-extension.sh`
+3. Based on your main browser:
+	- A) Load the browser extension by visiting `chrome://extensions/` and then click on `Load Unpacked` on the top right part of the screen. After that you should see the extension show up in your list of extension on the page. 
+Copy the `ID:....` part of the extension and insert it into `"allowed_origins"` part of `native_app_manifest.json` file in `native-messaging-app` folder.
+	- B) Load the browser extension by visiting `about:debugging` -> `This Firefox`, and then clicking `Load Temporary add-on...` and select the `manifest.json` file in the `app` folder.
+
+## Test browser extension
+To test whether the extension works as expected, you can visit the following test urls for both the legacy mode and the policy mode:
+
+- Legacy mode warning: https://legacy-warn.fpki.netsec.ethz.ch
+- Legacy mode valid: https://legacy-valid.fpki.netsec.ethz.ch
+- Policy mode valid: https://policy-valid.fpki.netsec.ethz.ch
+- Policy mode block (issuer): https://policy-wrong-issuer.fpki.netsec.ethz.ch
+- Policy mode block (subdomains): https://policy-wrong-domain.fpki.netsec.ethz.ch
 
 ## How to run
 There are two ways to try out the extension: a quick and easy setup using an existing map server and a more involved setup including locally running your own map server.
