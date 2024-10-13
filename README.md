@@ -12,12 +12,12 @@ The [mapserver](./extension/mapserver/) folder contains the HTTP version of the 
 `cd native-messaging-app`
 `pip install -r requirements.txt`
 2. Based on your OS in the root folder run:
-	- For Windows: `./install-extension.bat`
-	- For Linux/MacOS: `./install-extension.sh`
+	- For **Windows**: `./install-extension.bat`
+	- For **Linux/MacOS**: `./install-extension.sh`
 3. Based on your main browser:
-	- A) Load the browser extension by visiting `chrome://extensions/` and then click on `Load Unpacked` on the top right part of the screen. After that you should see the extension show up in your list of extension on the page. 
+	- ***Chrome/Chromium:***  Load the browser extension by visiting `chrome://extensions/` and then click on `Load Unpacked` on the top right part of the screen. After that you should see the extension show up in your list of extension on the page. 
 Copy the `ID:....` part of the extension and insert it into `"allowed_origins"` part of `native_app_manifest.json` file in `native-messaging-app` folder.
-	- B) Load the browser extension by visiting `about:debugging` -> `This Firefox`, and then clicking `Load Temporary add-on...` and select the `manifest.json` file in the `app` folder.
+	- ***Mozilla Firefox***: Load the browser extension by visiting `about:debugging` -> `This Firefox`, and then clicking `Load Temporary add-on...` and select the `manifest.json` file in the `app` folder.
 
 ## Test browser extension
 To test whether the extension works as expected, you can visit the following test urls for both the legacy mode and the policy mode:
