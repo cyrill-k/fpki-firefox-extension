@@ -6,6 +6,7 @@ from base64 import b64encode
 from datetime import datetime
 import hashlib
 from OpenSSL import SSL
+from OpenSSL import crypto
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
@@ -43,11 +44,31 @@ def load_trusted_certificates(pem_file_path):
 # Path to your single .pem file containing multiple certificates
 mozilla_ca_certs = load_trusted_certificates("certificates/cacert.pem")
 
+def convert_to_openssl_cert(cert):
+    if isinstance(cert, crypto.X509):
+        return cert
+    elif isinstance(cert, x509.Certificate):
+        # Convert from cryptography.x509.Certificate to OpenSSL.crypto.X509
+        pem_data = cert.public_bytes(encoding=serialization.Encoding.PEM)
+        return crypto.load_certificate(crypto.FILETYPE_PEM, pem_data)
+    else:
+        raise TypeError("Unsupported certificate type")
+
+
 def is_built_in_root(cert):
     try:
+        store = crypto.X509Store()
         for trusted_cert in mozilla_ca_certs:
-            if cert.fingerprint(hashes.SHA256()) == trusted_cert.fingerprint(hashes.SHA256()):
-                return True
+            store.add_cert(convert_to_openssl_cert(trusted_cert))
+        store_ctx = crypto.X509StoreContext(store, cert)
+        certPubKey = cert.get_pubkey()
+        certpubkeyString = crypto.dump_publickey(crypto.FILETYPE_PEM, certPubKey)
+        log(f"Cert pubkey: {certpubkeyString}")
+        store_ctx.verify_certificate()
+        return True
+    
+    except crypto.X509StoreContextError:
+        return False
     except Exception as e:
         log(f"Error checking if certificate is built-in root: {e}")
     return False
@@ -75,7 +96,7 @@ def get_certificate_info(cert):
                 "sha1": sha1_fingerprint,
                 "sha256": sha256_fingerprint,
             },
-            "isBuiltInRoot": is_built_in_root(x509_cert),
+            "isBuiltInRoot": is_built_in_root(cert),
             "issuer": [
                 (k.decode('utf-8') if isinstance(k, bytes) else k, 
                  v.decode('utf-8') if isinstance(v, bytes) else v) 

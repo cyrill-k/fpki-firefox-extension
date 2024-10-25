@@ -107,6 +107,7 @@ export class FpkiRequest {
                     }
                     // mapResponse = result.response;
                     mapResponseNew = resultIdsOnly.response;
+                    console.log("queryMapServerIdsWithProof response", mapResponseNew)
                     nRetries = resultIdsOnly.nRetries;
                     performanceResourceEntry = this.#getLatestPerformanceResourceEntry(resultIdsOnly.fetchUrl);
                     break;
@@ -140,12 +141,14 @@ export class FpkiRequest {
                 const policies = new Map();
 
                 // TODO: also return policies
+                console.log("Retrieve missing certificates call", mapResponse, this.requestId, mapResponseNew, this.mapserver.domain, this.mapserver.identity);
                 const { certificatesOld } = await retrieveMissingCertificatesAndPolicies(mapResponse, this.requestId, mapResponseNew, this.mapserver.domain, this.mapserver.identity);
                 cLog(this.requestId, "fetch finished for: "+this.domain);
 
                 // add policies to policy cache
                 addMapserverResponse(this.requestInitiated, this.domain, this.mapserver, policies, certificatesOld);
-
+                console.log("Retrieved certrificates: ", certificatesOld);
+                console.log("Retrieved policies: ", policies);
                 return {policies, certificates: certificatesOld, metrics};
             } catch (error) {
                 throw error;

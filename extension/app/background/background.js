@@ -14,8 +14,16 @@ import { getUserId, logError, logInfo, REMOTE_LOKI_HOST } from "../js_lib/loki_l
 
 (async () => {
     await initialize();
+    await clearCaches();
     logInfo("Extension started");
 })();
+
+let validatedDomains = new Set();
+
+setInterval(() => {
+    validatedDomains.clear();
+    logInfo("Cleared validated domains");
+}, 1000); // clear validated domains every 5 minutes
 
 async function initialize() {
     try { 
@@ -80,6 +88,7 @@ chrome.runtime.onConnect.addListener((port) => {
             break;
         case 'postConfig':
             console.log("Received new config value: " + JSON.stringify(msg.value));
+            validatedDomains.clear();
             (async () => { 
                 await setConfig(msg.value);
                 await saveConfig();
@@ -264,6 +273,11 @@ async function shouldValidateDomain(domain) {
         logError("Config is not initialized");
         return false;
     }
+
+    if (validatedDomains.has(domain)) {
+        cLog("shouldValidateDomain", "ignoring (already validated): " + domain);
+        return false;
+    }
     // Have to check before log, since we log the mapservers to loki and that brings circular dependency
     if (domain === REMOTE_LOKI_HOST) {
         return false;
@@ -294,6 +308,7 @@ async function requestInfo(details) {
         // cLog(details.requestId, "ignoring (no requestInfo): " + domain);
         return;
     }
+    validatedDomains.add(domain);
     cLog(details.requestId, "requestInfo ["+trimString(details.url)+"]");
     logInfo("requestInfo ["+trimString(trimUrlToDomain(details.url))+"]", {requestId: details.requestId});
 
@@ -343,12 +358,12 @@ async function checkInfo(details) {
         cLog(details.requestId, "skipping log entry for cached request: "+details);
         logInfo("skipping log entry for cached request: "+details, {requestId: details.requestId});
     }
-    if (logEntry === null && !details.fromCache) {
-        // ensure that if checkInfo is called multiple times for a single request, logEntry is ignored
-        cLog(details.requestId, "no log entry for uncached request: "+details);
-        logInfo("no log entry for uncached request: "+details, {requestId: details.requestId});
-        throw new FpkiError(errorTypes.INTERNAL_ERROR);
-    }   
+    // if (logEntry === null && !details.fromCache) {
+    //     // ensure that if checkInfo is called multiple times for a single request, logEntry is ignored
+    //     cLog(details.requestId, "no log entry for uncached request: "+ JSON.stringify(details));
+    //     logInfo("no log entry for uncached request: "+details, {requestId: details.requestId});
+    //     throw new FpkiError(errorTypes.INTERNAL_ERROR);
+    // }   
 
     let remoteInfo = null;
     try {
@@ -372,7 +387,7 @@ async function checkInfo(details) {
         // TODO: could also implement protection against http downgrade
         return;
     }
-
+    console.log("Remote Info: ", remoteInfo);
     const certificateChain = await getTlsCertificateChain(remoteInfo);
     cLog(details.requestId, "certificate chain: "+JSON.stringify(certificateChain));
     logInfo("certificate chain: "+JSON.stringify(certificateChain), {requestId: details.requestId});
@@ -451,7 +466,7 @@ async function checkInfo(details) {
 
             // don't perform legacy validation if policy validation has already taken place
             if (!policyChecksPerformed) {
-                if(globalThis.GOCACHEV2) {
+                if(!globalThis.GOCACHEV2) {
                     // check if have a cached trust decision for this domain+leaf certificate
                     const key = domain+certificateChain[0].fingerprintSha256;
                     let trustDecision = null;
@@ -462,15 +477,17 @@ async function checkInfo(details) {
                         legacyTrustDecisionCache.set(key, trustDecision)
 
                     }
+                    console.log("Legacy Verification result: ", JSON.stringify(trustDecision));
                     addTrustDecision(details, trustDecision);
                     if (trustDecision.evaluationResult !== 1) {
                         throw new FpkiError(errorTypes.LEGACY_MODE_VALIDATION_ERROR, getLegacyValidationErrorMessageGo(trustDecision));
                     }
                 } else {
                     // check each policy and throw an error if one of the verifications fails
+                    console.log("Performing legacy validation for domain: " + domain);
                     certificatesMap.forEach((c, m) => {
-                        cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c));
-                        logInfo("starting legacy verification for ["+domain+", "+m.identity+"] with policies: "+printMap(c), {requestId: details.requestId});
+                        cLog(details.requestId, "starting legacy verification for ["+domain+", "+m.identity+"] with certificates: "+printMap(c));
+                        logInfo("starting legacy verification for ["+domain+", "+m.identity+"] with certificates: "+printMap(c), {requestId: details.requestId});
                         const {trustDecision} = legacyValidateConnection(certificateChain, config, domain, c, m);
                         addTrustDecision(details, trustDecision);
                         if (hasFailedValidations(trustDecision)) {

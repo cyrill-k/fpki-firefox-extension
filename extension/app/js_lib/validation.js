@@ -36,7 +36,9 @@ function policyFilterHighestTrustLevelPolicies(trustPreferenceEntries, domainPol
 function policyValidateActualDomain(tlsCertificateChain, config, actualDomain, domainPolicies) {
     const caSets = config.get("ca-sets");
 
+    console.log("Get policies from config", config.get("policy-trust-preference-old"));
     const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("policy-trust-preference-old"), actualDomain);
+
     
     // get policies whose PCAs have the highest trust level (II)
     const {highestTrustLevel, highestTrustLevelPolicies} = policyFilterHighestTrustLevelPolicies(filteredTrustPreferenceEntries, domainPolicies);
@@ -65,6 +67,7 @@ function policyValidateActualDomain(tlsCertificateChain, config, actualDomain, d
 
 function policyValidateParentDomain(tlsCertificateChain, config, actualDomain, parentDomain, domainPolicies) {
     // only consider trust preference entries for the parent domain
+    console.log("Get policies from config", config.get("policy-trust-preference-old"));
     const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("policy-trust-preference-old"), parentDomain);
 
     // get policies whose PCAs have the highest trust level (II)
@@ -140,6 +143,7 @@ function legacyValidateActualDomain(connectionTrustInfo, config, actualDomain, d
 
     const trustInfos = [];
 
+    console.log("Get policies from config", config.get("legacy-trust-preference"));
     const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("legacy-trust-preference"), actualDomain);
 
     if (filteredTrustPreferenceEntries.length === 0) {
@@ -204,7 +208,7 @@ function legacyValidateActualDomain(connectionTrustInfo, config, actualDomain, d
 // validate a connection against the cached certificate chains and the 
 // user-defined preferences 
 export function legacyValidateConnectionGo(tlsCertificateChain, domainName) {
-    
+    console.log("Legacy validation started GO")
     // encode connection certificate chain as JSON
     var enc = new TextEncoder(); 
     var connectionChainArray = [];
@@ -218,6 +222,9 @@ export function legacyValidateConnectionGo(tlsCertificateChain, domainName) {
     var json = JSON.stringify(obj);
     connectionChainArray = enc.encode(json);
 
+    console.log("Connection chain array: ", JSON.stringify(connectionChainArray));
+    console.log("Domain name: ", domainName);
+    console.log("connectionChainArray.length: ", connectionChainArray.length);
     // perform validation
     const verifyLegacyStart = performance.now();
     var legacyTrustDecision = verifyLegacy(domainName, connectionChainArray, connectionChainArray.length);
@@ -262,31 +269,39 @@ export function policyValidateConnectionGo(tlsCertificateChain, domainName) {
 // check connection using the policies retrieved from a single mapserver
 // allPolicies has the following structure: {domain: {pca: SP}}, where SP has the structure: {attribute: value}, e.g., {AllowedSubdomains: ["allowed.mydomain.com"]}
 export function legacyValidateConnection(tlsCertificateChain, config, domainName, allCertificates, mapserver) {
+    console.log("Legacy validation started")
     // iterate over all certificates from all (trusted) mapservers
     // for example: the request for video.google.com, will only contain the certificates for "video.google.com"
-    // TODO: currently all certificates are included in the response, could not return certificates for the parent domain in the future
+    // TODO: currently all certificates are included in the response, could return certificates for the parent domain in the future
 
-    // get connection cert
+    // get connection certificate (first in chain)
     // TODO: ensure that the first certificate is always the actual certificate
     let connectionCert = tlsCertificateChain[0];
 
-    // get connection root cert
+    // get connection root certificate (should be last in chain)
     let connectionRootCertSubject = null;
     tlsCertificateChain.forEach((certificate, i) => {
         if (certificate.isBuiltInRoot) {
             connectionRootCertSubject = certificate.subject;
         }
     });
+    console.log("connectionRootCertSubject: ", connectionRootCertSubject);
+    console.log("tlsCertificateChain: ", tlsCertificateChain);
 
+    console.log("get ca sets", config.get("ca-sets"));
     const caSets = config.get("ca-sets");
+    console.log("Get policies from config", config.get("legacy-trust-preference"));
     const filteredTrustPreferenceEntries = filterTrustPreferenceEntries(config.get("legacy-trust-preference"), domainName);
 
     // get connection root cert trust level (I)
     let connectionRootCertTrustLevel = 0;
     let connectionOriginTrustPreference = null;
     filteredTrustPreferenceEntries.forEach(tps => {
+        console.log("tps: ", tps)
         tps.forEach(tp => {
-            if (caSets.get(tp.caSet).includes(connectionRootCertSubject)) {
+            const caSet = caSets.get(tp['ca-set']);
+            if (caSet.cas.includes(connectionRootCertSubject)) {
+                console.log("Matching trust preference found: ", tp)
                 if (tp.level > connectionRootCertTrustLevel) {
                     connectionRootCertTrustLevel = tp.level;
                     connectionOriginTrustPreference = tp;
@@ -294,10 +309,16 @@ export function legacyValidateConnection(tlsCertificateChain, config, domainName
             }
         });
     });
-
+    console.log("Connection root cert trust level: ", connectionRootCertTrustLevel);
     const connectionTrustInfo = new LegacyTrustInfo(connectionCert, tlsCertificateChain.slice(1), connectionRootCertTrustLevel, connectionOriginTrustPreference, null);
+    console.log("connectionTrustInfo: ", JSON.stringify(connectionTrustInfo));
     const certificateTrustInfos = [];
+
+    console.log("All certificates: ", JSON.stringify(allCertificates));
     allCertificates.forEach((value, key) => {
+        console.log("key: ", key);
+        console.log("value: ", value);
+        console.log("domainName: ", domainName);
         if (key == domainName) {
             // validate based on certificates for the actual domain
             const {trustInfos} = legacyValidateActualDomain(connectionTrustInfo, config, key, value);
@@ -307,6 +328,6 @@ export function legacyValidateConnection(tlsCertificateChain, config, domainName
         }
     });
     const trustDecision = new LegacyTrustDecision(mapserver, domainName, connectionTrustInfo, certificateTrustInfos);
-
+    console.log("Trust decision: ", JSON.stringify(trustDecision));
     return {trustDecision};
 }

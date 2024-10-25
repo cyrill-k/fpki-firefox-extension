@@ -61,11 +61,17 @@ export const defaultConfig = {
     },
     "mapservers": [
         {
+            "identity": "Nikita Test Map Server",
+            "domain": "http://188.245.115.147:8443",
+            "querytype": "lfpki-http-get",
+            "publickey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArrrQ5MN4mdcp5XouqmcmPG489eRtbkIn9elKOCDLgpA9OFASKM26Vskm0jwR9unrVE8NXXdRbotQfVpL7iAPGOPfoSglBXKmiAdmRG0idw6+xRlpffgHE3CDhNnz1tpVXBTE+U84f48v+sVd1gnK4oA/uT7X7D6vO5cHK1M9rmpo+SiKlcYSHvF19/qgiwF9cc1z3ug6M4SciqEbUNdW1R3BSW+9ulTZluT4Hbml4C8hkktN9zlHUpWdHzH1NlcRqzObBp7ZvB/OrKh8iA0WBXLXNzlBdB9EXSHjqJcI/sKn0Zf/5RO9QYT8wjDDbj8H+4+/wRd2q8Y10yQomIy6WQIDAQAB"
+        },
+        {
             "identity": "Netsec Test Map Server",
             "domain": "http://129.132.55.210:8080",
             "querytype": "lfpki-http-get",
             "publickey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0aluJvWMsPqLnil97uE1XQpDVB1L7byH3Kar6Ims9XiZM3UgHG7FHur+HTdGSMrdhe1iDNEgpiKxIgAVgj8sIX44z5stXxi+zuVUDTVmnSEIDbl703IbDozrXEig6zTAvi1OuxEbHpS6i60onZqL6pmBzh8emWLvFIuumGTFKESd3qyEE/ohJcp3yuM/bYH7bUhqETPO3/kjKKBizuv/pnUgKnM31aL/kXX7PsokXXn3sakeDLByfMEPmRjvB8381zPWauM5GoNj1DahhGls2KmnTfN8T6jC5Eln2Epjmq4iq0yCf/trtV6kMawsVkBO++Y1RRwPn4NbAAf/ELu6UwIDAQAB"
-        }
+        } 
     ],
     "trust-levels": {
         "Untrusted": 0,

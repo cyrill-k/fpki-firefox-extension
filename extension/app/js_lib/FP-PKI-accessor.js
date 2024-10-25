@@ -235,6 +235,7 @@ async function retrieveMissingCertificatesAndPolicies(mapResponse, requestId, ma
             let result;
             try {
                 result = await queryMapServerPayloads(mapserverDomain, getParameter, { timeout: config.get("proof-fetch-timeout"), requestId: requestId, maxTries: config.get("proof-fetch-max-tries") });
+                console.log("Result queryMapServer for missingIds", result)
             } catch (error) {
                 throw new FpkiError(errorTypes.MAPSERVER_NETWORK_ERROR, error);
             }
@@ -250,6 +251,7 @@ async function retrieveMissingCertificatesAndPolicies(mapResponse, requestId, ma
             const { processedCertificateIDs, processedPolicyIDs } = addMissingPayloads(jsonBytes, jsonBytes.length);
             cLog(requestId, `Added ${processedCertificateIDs.length} certificates and ${processedPolicyIDs.length} policies to the cache`);
 
+            console.log("processedCertificateIDs", processedCertificateIDs)
             const processedCertificatesSet = new Set(processedCertificateIDs)
             const unprovidedCertificates = missingCertificateIDs.filter((value, index) => !processedCertificatesSet.has(value));
             if (unprovidedCertificates.length > 0) {
@@ -396,17 +398,19 @@ async function fetchWithTimeout(resource, options = {}) {
 // query map server for certificate and policy IDs
 async function queryMapServerIdsWithProof(mapServerUrl, domainName, options) {
     const fetchUrl = mapServerUrl + "/getproof?domain=" + domainName;
-    console.log(`initiating request: ${trimString(fetchUrl)}`);
+    console.log(`initiating request: ${trimString(fetchUrl)} for mapserver: ${mapServerUrl}`);
     const { delay = 0, timeout = 60000, maxTries = 3, requestId } = options;
     const { response, triesLeft } = await fetchRetry(fetchUrl, delay, maxTries, timeout, requestId, 0, { keepalive: true });
+    console.log("Response" + JSON.stringify(response))
     const decodedResponse = await response.json();
-
+    console.log("decodedResponse" + JSON.stringify(decodedResponse))
     return { response: decodedResponse, fetchUrl: fetchUrl, nRetries: maxTries - triesLeft };
 }
 
 // query map server for certificate and policy payloads
 async function queryMapServerPayloads(mapServerUrl, ids, options) {
     const fetchUrl = mapServerUrl + "/getpayloads?ids=" + ids;
+    console.log(`initiating request: ${fetchUrl}`);
     console.log(`initiating request: ${trimString(fetchUrl)}`);
     const { delay = 0, timeout = 60000, maxTries = 3, requestId } = options;
     const { response, triesLeft } = await fetchRetry(fetchUrl, delay, maxTries, timeout, requestId, 0, { keepalive: true });
