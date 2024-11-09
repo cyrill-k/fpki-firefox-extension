@@ -2,6 +2,7 @@ import {getSubject} from "../js_lib/x509utils.js"
 import {AllPolicyAttributes, PolicyAttributeToJsonKeyDict, getPolicyChainDescriptors} from "../js_lib/validation-types.js"
 import { serializableObjectToMaps } from "../js_lib/config.js";
 import { downloadLog } from "../js_lib/log.js";
+import { getUserId } from "../js_lib/loki_logger.js";
 
 var validationResults = null;
 var synchronizedConfig = null;
@@ -112,15 +113,15 @@ function addCollapsibleButton(id, text, decision) {
 }
 
 function displayUserId() {
-    chrome.storage.local.get(['userId'], function(result) {
-        if (result.userId) {
+    getUserId().then((userId) => {
+        if (userId) {
             const userIdElement = document.getElementById("user-id");
             if (userIdElement) {
-                userIdElement.textContent = `User ID: ${result.userId}`;
+                userIdElement.textContent = `Session ID: ${userId}`;
             } else {
                 const newUserIdElement = document.createElement('div');
                 newUserIdElement.id = 'user-id';
-                newUserIdElement.textContent = `User ID: ${result.userId}`;
+                newUserIdElement.textContent = `Session ID: ${userId}`;
 
                 document.body.appendChild(newUserIdElement);
             }
