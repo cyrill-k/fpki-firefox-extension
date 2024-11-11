@@ -22,7 +22,6 @@ let validatedDomains = new Set();
 
 setInterval(() => {
     validatedDomains.clear();
-    logInfo("Cleared validated domains");
 }, 1000); // clear validated domains every 5 minutes
 
 async function initialize() {
