@@ -9,7 +9,9 @@ import (
 )
 
 func TestVerifyProof(t *testing.T) {
-	initSuccess := InitializeMapserverInfoCache("embedded/unit_test/validation/config.json")
+	configMap, err := ReadJsonFileAsMap("embedded/unit_test/validation/config.json")
+	require.NoError(t, err, "Read JSON config file")
+	initSuccess := InitializeMapserverInfoCache(configMap)
 	require.True(t, initSuccess)
 
 	// PoP success

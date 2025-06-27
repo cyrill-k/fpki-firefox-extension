@@ -1,68 +1,88 @@
 {
-  "mapservers": [
-    {
-      "identity": "local-mapserver",
-      "domain": "http://localhost:8080",
-      "querytype": "lfpki-http-get"
+    "mapservers": [
+        {
+            "identity": "local-mapserver",
+            "domain": "http://localhost:8080",
+            "querytype": "lfpki-http-get"
+        },
+        {
+            "identity": "ETH-mapserver-top-100k",
+            "domain": "http://129.132.55.210:8080",
+            "querytype": "lfpki-http-get"
+        }
+    ],
+    "cache-timeout": 3600000,
+    "max-connection-setup-time": 1000,
+    "proof-fetch-timeout": 10000,
+    "proof-fetch-max-tries": 3,
+    "mapserver-quorum": 2,
+    "mapserver-instances-queried": 2,
+    "send-log-entries-via-event": true,
+    "ca-sets": {
+        "1": {
+            "description": "1",
+            "cas": [
+                "SERIALNUMBER=1,CN=intmCA3"
+            ]
+        },
+        "2": {
+            "description": "2",
+            "cas": [
+                "SERIALNUMBER=1,CN=intmCA1"
+            ]
+        },
+        "3": {
+            "description": "3",
+            "cas": [
+                "SERIALNUMBER=1,CN=intmCA4"
+            ]
+        }
     },
-    {
-      "identity": "ETH-mapserver-top-100k",
-      "domain": "http://129.132.55.210:8080",
-      "querytype": "lfpki-http-get"
+    "legacy-trust-preference": {
+        "c.com": [
+            {
+                "ca-set": "1",
+                "level": "1"
+            },
+            {
+                "ca-set": "2",
+                "level": "3"
+            },
+            {
+                "ca-set": "3",
+                "level": "2"
+            }
+        ]
+    },
+    "policy-trust-preference": {
+        "*": [
+            {
+                "policy-ca-set": "Netsec Test PCAs",
+                "level": "1"
+            }
+        ]
+    },
+    "policy-ca-sets": {
+        "Netsec Test PCAs": {
+            "description": "Policy CA used for testing FP-PKI functionality in *.fpki.netsec.ethz.ch subdomains",
+            "pcas": [
+                "Netsec Test PCA"
+            ]
+        }
+    },
+    "policy-cas": {
+        "Netsec Test PCA": {
+            "publickey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA65AWEcZeMaq7iBTL//Si/bfCMdNWkp69QiBRUPMMcDdN8bjg+YXKL8cx1q/wVn5YLyih/DhGQcg8nT3gFeWCa6N5xsP7RmAEwhUKfEBB83bx4AssEk9pf+RP6ehQjepM+JVhQH78fQvi6/hioBnzoYwmiI8sAxVKRb5Ce8sGyR08PX3bsBCjKr5wbUqgy1t1ttaVhN/T8kmlGNfcOGiAIet91YtyY4huCJWhGiILzrReB+qruj/BrONIv97qz6YRpv4Srz+tNkazQgjdsbEYlRzr/KZvLmEnFwSHh4jrvDLUSQ5MVldHInXgGteHbLD4nKL8ERlhLzNM83YI3Zwu7wIDAQAB"
+        }
+    },
+    "trust-levels": {
+        "1": 1,
+        "2": 2,
+        "3": 3
+    },
+    "trust-levels-rev": {
+        "1": "1",
+        "2": "2",
+        "3": "3"
     }
-  ],
-  "cache-timeout": 3600000,
-  "max-connection-setup-time": 1000,
-  "proof-fetch-timeout": 10000,
-  "proof-fetch-max-tries": 3,
-  "mapserver-quorum": 2,
-  "mapserver-instances-queried": 2,
-  "send-log-entries-via-event": true,
-  "ca-sets": {
-    "1": [
-      "SERIALNUMBER=1,CN=intmCA3"
-    ],
-    "2": [
-      "SERIALNUMBER=1,CN=intmCA1"
-    ],
-    "3": [
-      "SERIALNUMBER=1,CN=intmCA4"
-    ]
-  },
-  "legacy-trust-preference": {
-    "c.com": [
-      {
-        "caSet": "1",
-        "level": 1
-      },
-      {
-        "caSet": "2",
-        "level": 3
-      },
-      {
-        "caSet": "3",
-        "level": 2
-      }
-    ]
-  },
-  "policy-trust-preference": {
-    "*": [
-      {
-        "pca": "pca",
-        "level": 1
-      }
-    ]
-  },
-  "root-pcas": {
-    "pca": "local PCA for testing purposes"
-  },
-  "root-cas": {
-    "GTS CA 1C3": "description: ...",
-    "DigiCert Global Root CA": "description: ...",
-    "TrustAsia TLS RSA CA": "description: ...",
-    "DigiCert SHA2 Secure Server CA": "description: ...",
-    "DigiCert Secure Site CN CA G3": "description: ...",
-    "GlobalSign Organization Validation CA - SHA256 - G2": "description: ...",
-    "DigiCert TLS Hybrid ECC SHA384 2020 CA1": "description: ..."
-  }
 }

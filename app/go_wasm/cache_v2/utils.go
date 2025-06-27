@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
 	"log"
 	"math/big"
@@ -173,4 +174,15 @@ func GetPayloadAndHash(b64payload string) ([]byte, string) {
 	}
 	hash := h.Sum(nil)
 	return payload, base64.StdEncoding.EncodeToString(hash)
+}
+
+func ReadJsonFileAsMap(filePath string) (map[string]interface{}, error) {
+	bytes, err := validationFileSystem.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var jsonMap map[string]interface{}
+	json.Unmarshal([]byte(bytes), &jsonMap)
+	return jsonMap, nil
 }

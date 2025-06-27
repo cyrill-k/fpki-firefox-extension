@@ -19,43 +19,60 @@
     "mapserver-instances-queried": 2,
     "send-log-entries-via-event": true,
     "ca-sets": {
-        "1": [
-            "SERIALNUMBER=0,CN=root"
-        ],
-        "2": [
-            "SERIALNUMBER=1,CN=intmCA2"
-        ]
+        "1": {
+            "description": "1",
+            "cas": [
+                "SERIALNUMBER=0,CN=root"
+            ]
+        },
+        "2": {
+            "description": "2",
+            "cas": [
+                "SERIALNUMBER=1,CN=intmCA2"
+            ]
+        }
     },
     "legacy-trust-preference": {
         "leaf1": [
             {
-                "caSet": "1",
-                "level": 1
+                "ca-set": "1",
+                "level": "1"
             },
             {
-                "caSet": "2",
-                "level": 2
+                "ca-set": "2",
+                "level": "2"
             }
         ]
     },
     "policy-trust-preference": {
         "*": [
             {
-                "pca": "pca",
-                "level": 1
+                "policy-ca-set": "Netsec Test PCAs",
+                "level": "1"
             }
         ]
     },
-    "root-pcas": {
-        "pca": "local PCA for testing purposes"
+    "policy-ca-sets": {
+        "Netsec Test PCAs": {
+            "description": "Policy CA used for testing FP-PKI functionality in *.fpki.netsec.ethz.ch subdomains",
+            "pcas": [
+                "Netsec Test PCA"
+            ]
+        }
     },
-    "root-cas": {
-        "GTS CA 1C3": "description: ...",
-        "DigiCert Global Root CA": "description: ...",
-        "TrustAsia TLS RSA CA": "description: ...",
-        "DigiCert SHA2 Secure Server CA": "description: ...",
-        "DigiCert Secure Site CN CA G3": "description: ...",
-        "GlobalSign Organization Validation CA - SHA256 - G2": "description: ...",
-        "DigiCert TLS Hybrid ECC SHA384 2020 CA1": "description: ..."
+    "policy-cas": {
+        "Netsec Test PCA": {
+            "publickey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA65AWEcZeMaq7iBTL//Si/bfCMdNWkp69QiBRUPMMcDdN8bjg+YXKL8cx1q/wVn5YLyih/DhGQcg8nT3gFeWCa6N5xsP7RmAEwhUKfEBB83bx4AssEk9pf+RP6ehQjepM+JVhQH78fQvi6/hioBnzoYwmiI8sAxVKRb5Ce8sGyR08PX3bsBCjKr5wbUqgy1t1ttaVhN/T8kmlGNfcOGiAIet91YtyY4huCJWhGiILzrReB+qruj/BrONIv97qz6YRpv4Srz+tNkazQgjdsbEYlRzr/KZvLmEnFwSHh4jrvDLUSQ5MVldHInXgGteHbLD4nKL8ERlhLzNM83YI3Zwu7wIDAQAB"
+        }
+    },
+    "trust-levels": {
+        "1": 1,
+        "2": 2,
+        "3": 3
+    },
+    "trust-levels-rev": {
+        "1": "1",
+        "2": "2",
+        "3": "3"
     }
 }
