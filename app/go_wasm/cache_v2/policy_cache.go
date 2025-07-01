@@ -12,6 +12,7 @@ import (
 	"github.com/netsec-ethz/fpki/pkg/common"
 	"github.com/netsec-ethz/fpki/pkg/common/crypto"
 	"github.com/netsec-ethz/fpki/pkg/util"
+	"golang.org/x/exp/slices"
 )
 
 // TODO: integrate map server proof validation
@@ -156,7 +157,7 @@ func AddPoliciesToCache(policies []*common.PolicyCertificate) []string {
 	}
 
 	fmt.Printf("[Go] Added %d policies to cache\n", len(policyCache)-nEntriesBefore)
-	fmt.Printf("[Go] Total # cache entries: %d\n", len(policyCache))
+	fmt.Printf("[Go] Total # policy cache entries: %d\n", len(policyCache))
 
 	return processedPolicyHashes
 }
@@ -231,19 +232,27 @@ func verifyPolicyAndAllocateCaches(
 	policyHash string,
 	immutablePolicyHash string,
 	immutableIssuerPolicyHash string) bool {
-	err := verifyChildWithParentPolicy(policy, parentPolicy)
-
-	// if policy is a valid child of parentPolicy, allocate new cache entries
-	if err == nil {
-		allocatePolicyCacheEntries(policy, policyHash, immutablePolicyHash, immutableIssuerPolicyHash)
-		return true
-	} else {
-		log.Printf("Parent-child verification failed: %s", err)
-		// ignore policy certificate for future requests if it wasn't added to the cache (e.g.,
-		// because it was already expired or the signature could not be verified)
+	err := verifyPolicyAttributesWellFormedness(policy.PolicyAttributes)
+	if err != nil {
+		log.Printf("policy attributes are not well formed: %s", err)
+		// ignore policy certificate for future requests if the policy attributes are not well
+		// formed
 		ignoredPolicyHashes[policyHash] = struct{}{}
 		return false
 	}
+
+	err = verifyChildWithParentPolicy(policy, parentPolicy)
+	if err != nil {
+		log.Printf("Parent-child verification failed: %s", err)
+		// ignore policy certificate for future requests if constraints are violated or if the
+		// signature could not be verified
+		ignoredPolicyHashes[policyHash] = struct{}{}
+		return false
+	}
+
+	// if policy is a valid child of parentPolicy, allocate new cache entries
+	allocatePolicyCacheEntries(policy, policyHash, immutablePolicyHash, immutableIssuerPolicyHash)
+	return true
 }
 
 // check a policy against a parent policy
@@ -251,14 +260,71 @@ func verifyPolicyAndAllocateCaches(
 // if the signature does not verify or some other constraint is violated, returns an error
 // otherwise, if the validation succeeds, it returns nil
 func verifyChildWithParentPolicy(policy *common.PolicyCertificate, parentPolicy *common.PolicyCertificate) error {
-	// TODO (cyrill): do policy validity check: validity period, domain constraints, ...
+	// check canIssue constraint
+	if !parentPolicy.CanIssue {
+		return fmt.Errorf("Parent policy does not allow issuance")
+	}
 
-	// TODO (cyrill): do parent-child validity check: validity period of child is within parent, Child domain is sub-domain of parent domain, ...
+	// check validity period constraints
+	if policy.NotBefore.Before(parentPolicy.NotBefore) {
+		return fmt.Errorf("Child policy (%v) is valid before parent policy (%v)", policy.NotBefore, parentPolicy.NotBefore)
+	}
+	if policy.NotAfter.After(parentPolicy.NotAfter) {
+		return fmt.Errorf("Child policy (%v) is valid after parent policy has expired (%v)", policy.NotAfter, parentPolicy.NotAfter)
+	}
+
+	// check domain constraint
+	if !isSameOrSubdomain(policy.Domain(), parentPolicy.Domain()) {
+		return fmt.Errorf("The child policy (%s) does not specify a subdomain of the parent policy (%s)", policy.Domain(), parentPolicy.Domain())
+	}
 
 	err := crypto.VerifyIssuerSignature(parentPolicy, policy)
 	if err != nil {
 		return fmt.Errorf("Failed to verify issuer signature: %s", err)
 	}
+	return nil
+}
+
+// checks if the policy attributes object is well formed, i.e., it only specifies one wildcard
+// subdomain and no subdomain is defined multiple times
+//
+// returns nil if the object is well formed and an error describing the violation otherwise
+func verifyPolicyAttributesWellFormedness(attr common.PolicyAttributes) error {
+	nWildcards := 0
+	if slices.Contains(attr.AllowedSubdomains, "*") {
+		nWildcards += 1
+	}
+	if slices.Contains(attr.DisallowedSubdomains, "*") {
+		nWildcards += 1
+	}
+	if slices.Contains(attr.ExcludedSubdomains, "*") {
+		nWildcards += 1
+	}
+	if nWildcards > 1 {
+		return fmt.Errorf("More than one wildcard subdomain is defined")
+	}
+
+	domainSet := map[string]struct{}{}
+	for _, domain := range attr.AllowedSubdomains {
+		if _, ok := domainSet[domain]; ok {
+			return fmt.Errorf("Subdomain '%s' is defined in more than one list", domain)
+		}
+		domainSet[domain] = struct{}{}
+	}
+	for _, domain := range attr.DisallowedSubdomains {
+		if _, ok := domainSet[domain]; ok {
+			return fmt.Errorf("Subdomain '%s' is defined in more than one list", domain)
+		}
+		domainSet[domain] = struct{}{}
+	}
+	for _, domain := range attr.ExcludedSubdomains {
+		if _, ok := domainSet[domain]; ok {
+			return fmt.Errorf("Subdomain '%s' is defined in more than one list", domain)
+		}
+		domainSet[domain] = struct{}{}
+	}
+
+	// policy attributes are well formed
 	return nil
 }
 
