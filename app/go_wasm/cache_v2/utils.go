@@ -137,6 +137,15 @@ func maxTime(times ...time.Time) (maxTime time.Time) {
 	return
 }
 
+func minTime(times ...time.Time) (minTime time.Time) {
+	for i, t := range times {
+		if i == 0 || t.Before(minTime) {
+			minTime = t
+		}
+	}
+	return
+}
+
 func TransformListToInterfaceType[T any](list []T) []interface{} {
 	t := make([]interface{}, len(list))
 	for i, e := range list {
