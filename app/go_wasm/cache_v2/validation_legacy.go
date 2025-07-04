@@ -2,7 +2,6 @@ package cache_v2
 
 import (
 	"crypto/x509"
-	"strings"
 	"time"
 )
 
@@ -122,17 +121,6 @@ func ComputeSingleCertificateTrustLevelForDomain(dnsName string, certificate *x5
 		}
 	}
 	return trustLevel
-}
-
-func generateWildcardAndParentDomain(dnsName string) []string {
-	dnsNameNormalized := strings.TrimSuffix(dnsName, ".")
-	components := strings.Split(dnsNameNormalized, ".")
-	orderedParentDomains := make([]string, 2*len(components))
-	for from := range components {
-		orderedParentDomains = append(orderedParentDomains, strings.Join(components[from:], "."))
-		orderedParentDomains = append(orderedParentDomains, strings.Join(append([]string{"*"}, components[from+1:]...), "."))
-	}
-	return orderedParentDomains
 }
 
 // compute the trust level of a certificate chain for a given

@@ -472,25 +472,6 @@ func getNewestChain(chains []*PolicyCertificateChain) (*PolicyCertificateChain, 
 	return newestChain, nil
 }
 
-// remove trailing dots from domain names
-func normalizeDomain(d string) string {
-	dNormalized := d
-	if strings.HasSuffix(dNormalized, ".") {
-		dNormalized = dNormalized[:len(dNormalized)-1]
-	}
-	return dNormalized
-}
-
-// checks whether d1 is a subdomain of d2
-// assumes that both inputs are valid domains without any wildcards
-func isSameOrSubdomain(d1, d2 string) bool {
-	d2Suffix := normalizeDomain(d2)
-	if len(d2Suffix) > 0 {
-		d2Suffix = "." + d2Suffix
-	}
-	return d1 == d2 || strings.HasSuffix(d1, d2Suffix)
-}
-
 // finds all certificates in the chain that are in the relying party's root store and returns a list
 // of their X.509 subject names
 func findRootStoreCertificateSubjects(chain []*x509.Certificate) (subjects []string) {
