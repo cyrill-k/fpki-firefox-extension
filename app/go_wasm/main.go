@@ -326,13 +326,16 @@ func verifyPolicyWrapper() js.Func {
 		policyTrustDecisionClass := js.Global().Get("PolicyTrustDecisionGo")
 
 		// parse output to JS compatible types
-		policyChain := make([]interface{}, len(policyTrustInfo.PolicyChain))
-		for i, chain := range policyTrustInfo.PolicyChain {
-			json, err := common.ToJSON(chain)
-			if err != nil {
-				panic(err.Error())
+		var policyChain []interface{}
+		if policyTrustInfo.PolicyChain != nil {
+			policyChain = make([]interface{}, len(policyTrustInfo.PolicyChain.PolicyCertificates))
+			for i, chain := range policyTrustInfo.PolicyChain.PolicyCertificates {
+				json, err := common.ToJSON(chain)
+				if err != nil {
+					panic(err.Error())
+				}
+				policyChain[i] = string(json)
 			}
-			policyChain[i] = string(json)
 		}
 		conflictingPolicies := make([]interface{}, len(policyTrustInfo.ConflictingPolicyAttributes))
 		for i, attributes := range policyTrustInfo.ConflictingPolicyAttributes {
