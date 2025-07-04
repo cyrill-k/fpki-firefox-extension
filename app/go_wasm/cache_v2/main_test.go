@@ -83,17 +83,25 @@ func regenerateTestPcaCertificateIfNecessary() (bool, error) {
 }
 
 func generatePca(pcaId int64, domain string) error {
-	privateKey, err := CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(pcaId)))
-	if err != nil {
-		return err
-	}
+	// this is run once to generate the private keys which are then hardcoded in the test files
+	// privateKey, err := CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(pcaId)))
+	// if err != nil {
+	// 	return err
+	// }
 
-	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-	p := EncodePEM(privateKeyBytes, "PRIVATE KEY")
-	err = os.WriteFile(fmt.Sprintf("embedded/unit_test/policy_cache/root_privatekeys/root_privatekey_%d.pem", pcaId), p, 0777)
+	// privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+	// p := EncodePEM(privateKeyBytes, "PRIVATE KEY")
+	// err = os.WriteFile(fmt.Sprintf("embedded/unit_test/policy_cache/root_privatekeys/root_privatekey_%d.pem", pcaId), p, 0777)
+	// if err != nil {
+	// 	return err
+	// }
+
+	pemBytes, err := cacheFileSystem.ReadFile(fmt.Sprintf("embedded/unit_test/policy_cache/root_privatekeys/root_privatekey_%d.pem", pcaId))
 	if err != nil {
 		return err
 	}
+	pemBlock, _ := pem.Decode(pemBytes)
+	privateKey, err := x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
 
 	// create certificate signing request
 	now := time.Now()
