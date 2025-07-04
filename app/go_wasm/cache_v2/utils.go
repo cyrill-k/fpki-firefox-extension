@@ -14,6 +14,7 @@ import (
 	"log"
 	"math/big"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/netsec-ethz/fpki/pkg/common"
@@ -214,6 +215,8 @@ func PolicyCertDesc(cert *common.PolicyCertificate) string {
 		desc += "signer hash=" + getIssuerHash(cert) + ", "
 	}
 	desc += fmt.Sprintf("policy attributes=%+v, ", cert.PolicyAttributes)
+	desc += fmt.Sprintf("hash=%s, ", getPolicyHash(cert))
+	desc += fmt.Sprintf("immHash=%s, ", getImmutablePolicyHash(cert))
 	desc += fmt.Sprintf("[%v, %v]", cert.NotBefore, cert.NotAfter)
 	return desc + ">"
 }
@@ -228,4 +231,30 @@ func IsSelfSignedCertificate(p *common.PolicyCertificate) (bool, error) {
 	p.SPCTs, p.IssuerSignature, p.IssuerHash = SPCTs, issuerSignature, issuerHash
 
 	return bytes.Compare(common.SHA256Hash(serializedPC), issuerHash) == 0, err
+}
+
+// remove trailing dots from domain names
+func normalizeDomain(d string) string {
+	return strings.TrimSuffix(d, ".")
+}
+
+// checks whether d1 is a subdomain of d2
+// assumes that both inputs are valid domains without any wildcards
+func isSameOrSubdomain(d1, d2 string) bool {
+	d2Suffix := normalizeDomain(d2)
+	if len(d2Suffix) > 0 {
+		d2Suffix = "." + d2Suffix
+	}
+	return d1 == d2 || strings.HasSuffix(d1, d2Suffix)
+}
+
+func generateWildcardAndParentDomain(dnsName string) []string {
+	dnsNameNormalized := normalizeDomain(dnsName)
+	components := strings.Split(dnsNameNormalized, ".")
+	orderedParentDomains := make([]string, 2*len(components))
+	for from := range components {
+		orderedParentDomains = append(orderedParentDomains, strings.Join(components[from:], "."))
+		orderedParentDomains = append(orderedParentDomains, strings.Join(append([]string{"*"}, components[from+1:]...), "."))
+	}
+	return orderedParentDomains
 }
