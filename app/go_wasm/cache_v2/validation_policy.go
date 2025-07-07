@@ -250,10 +250,7 @@ func getPolicyCertificateChainWithLatestTimestamp(immutableHash string, rootDoma
 	}
 
 	// use any of the avilable certificates to check if the certificate is self-signed
-	isSelfSigned, err := IsSelfSignedCertificate(policyCache[issuerEntry.policyHashes[0]].policy)
-	if err != nil {
-		return nil, err
-	}
+	isSelfSigned := IsSelfSignedCertificate(policyCache[issuerEntry.policyHashes[0]].policy)
 
 	var parentChain *PolicyCertificateChain
 	if rootChain == nil {
@@ -277,6 +274,7 @@ func getPolicyCertificateChainWithLatestTimestamp(immutableHash string, rootDoma
 	if parentChain == nil {
 		// if we have not yet reached a self-signed certificate or the predefined root chain, we
 		// recursively traverse the certificate chain
+		var err error
 		parentChain, err = getPolicyCertificateChainWithLatestTimestamp(issuerEntry.immutableIssuerHash, rootDomain, rootChain)
 		if err != nil {
 			return nil, err

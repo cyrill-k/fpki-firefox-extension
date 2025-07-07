@@ -1,7 +1,6 @@
 package cache_v2
 
 import (
-	"bytes"
 	"crypto"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -208,8 +207,8 @@ func PolicyCertDesc(cert *common.PolicyCertificate) string {
 	}
 	desc += fmt.Sprintf("canIssue=%v, ", cert.CanIssue)
 	desc += fmt.Sprintf("canOwn=%v, ", cert.CanOwn)
-	selfSigned, err := IsSelfSignedCertificate(cert)
-	if selfSigned && err == nil {
+	selfSigned := IsSelfSignedCertificate(cert)
+	if selfSigned {
 		desc += "self-signed cert, "
 	} else {
 		desc += "signer hash=" + getIssuerHash(cert) + ", "
@@ -221,16 +220,8 @@ func PolicyCertDesc(cert *common.PolicyCertificate) string {
 	return desc + ">"
 }
 
-func IsSelfSignedCertificate(p *common.PolicyCertificate) (bool, error) {
-	// Remove SPCTs and issuer signature and set the IssuerHash field to nil to simulate a self-signed policy certificate.
-	SPCTs, issuerSignature, issuerHash := p.SPCTs, p.IssuerSignature, p.IssuerHash
-	p.SPCTs, p.IssuerSignature, p.IssuerHash = nil, nil, nil
-
-	// Serialize and restore previously removed fields.
-	serializedPC, err := common.ToJSON(p)
-	p.SPCTs, p.IssuerSignature, p.IssuerHash = SPCTs, issuerSignature, issuerHash
-
-	return bytes.Compare(common.SHA256Hash(serializedPC), issuerHash) == 0, err
+func IsSelfSignedCertificate(p *common.PolicyCertificate) bool {
+	return p.IssuerHash == nil
 }
 
 // remove trailing dots from domain names

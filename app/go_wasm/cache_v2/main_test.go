@@ -122,6 +122,9 @@ func generatePca(pcaId int64, domain string) error {
 		return err
 	}
 
+	// set the issuer hash to nil to indicate a self-signed certificate
+	cert.IssuerHash = nil
+
 	// write it to the embedded file system
 	err = common.ToJSONFile(cert, fmt.Sprintf("embedded/unit_test/policy_cache/root_certificates/root_certificate_%d.pc", pcaId))
 	if err != nil {
