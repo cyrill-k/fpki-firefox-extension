@@ -92,6 +92,24 @@ type PolicyCertificateChain struct {
 	// DisseminationTime  time.Time
 }
 
+// returns true if the first certificate of the policy chain is the domain root certificate for the
+// provided rootDomain
+func (pcChain *PolicyCertificateChain) StartsWithDomainRootCertificate(rootDomain string) bool {
+	// if the first policy certificate is issued for the root domain and
+	if pcChain.PolicyCertificates[0].Domain() == rootDomain {
+		// if this certificate is self-signed, or
+		if len(pcChain.PolicyCertificates) == 1 {
+			return true
+		}
+
+		// if the parent certificate is issued over a different domain (an ancestor domain)
+		if pcChain.PolicyCertificates[1].Domain() != rootDomain {
+			return true
+		}
+	}
+	return false
+}
+
 func (pcChain PolicyCertificateChain) String() string {
 	str := fmt.Sprintf("<PolicyCertificateChain len=%d", len(pcChain.PolicyCertificates))
 	str += fmt.Sprintf(", DomainRootIssuanceTimestamp=%v", pcChain.DomainRootIssuanceTimestamp)
@@ -271,7 +289,10 @@ func findPolicyCertificateChainsForE2LD(domain string) ([]*PolicyCertificateChai
 		if err != nil {
 			return chains, fmt.Errorf("Failed to get policy cert chain with latest timestamp: %s", err)
 		}
-		chains = append(chains, chain)
+		// only consider chains that start with a policy certificate for the root domain, i.e., chain [Policy("example.com"), Policy("example.com"), Policy("com"), Policy("")] would be discarded
+		if chain.StartsWithDomainRootCertificate(domain) {
+			chains = append(chains, chain)
+		}
 	}
 	return chains, nil
 }
