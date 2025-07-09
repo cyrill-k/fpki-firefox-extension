@@ -82,8 +82,6 @@ func InitializePolicyCache(trustStoreDir string) int {
 			log.Fatal(err)
 		}
 
-		fmt.Printf("initializing with root (%s): %s\n", file, fileBytes)
-
 		policy, err := util.PolicyCertificateFromBytes(fileBytes)
 		if err != nil {
 			log.Fatalf("loading policy certificate from trust store (%s): %s", path, err)
@@ -128,7 +126,6 @@ func GetMissingPolicyHashesList(policyHashes []string) []string {
 // be available from the first mapserver response
 func AddPoliciesToCache(policies []*common.PolicyCertificate) []string {
 	nEntriesBefore := len(policyCache)
-	now := time.Now()
 
 	// create a map of all policies in the request, indicating whether
 	// the policy has already been processed
@@ -153,20 +150,14 @@ func AddPoliciesToCache(policies []*common.PolicyCertificate) []string {
 		if !policiesInRequestProcessed[policy] {
 			hashes, added := processPolicy(policy, policiesInRequestProcessed, policiesInRequest)
 			processedPolicyHashes = append(processedPolicyHashes, hashes...)
-			if added {
-				NCertificatesAdded++
-			} else {
-				fmt.Printf("[Go] Did not add policy: %v\n", policy)
+			if !added {
+				fmt.Printf("[Go] Did not add policy: %v\n", PolicyCertDesc(policy))
 			}
 		}
 	}
-	MS = MS + time.Now().Sub(now).Milliseconds()
-	fmt.Printf("[Go] Added %d policies to cache\n", len(policyCache)-nEntriesBefore)
-	fmt.Printf("[Go] Total # cache entries: %d\n", len(policyCache))
-	fmt.Printf("[Go] Time spent checking signatures: %d ms\n ", MSS)
 
-	MS = 0
-	NCertificatesAdded = int64(len(policyCache) - nEntriesBefore)
+	fmt.Printf("[Go] Added %d policies to cache\n", len(policyCache)-nEntriesBefore)
+	fmt.Printf("[Go] Total # policy cache entries: %d\n", len(policyCache))
 
 	return processedPolicyHashes
 }
@@ -205,7 +196,6 @@ func processPolicy(policy *common.PolicyCertificate,
 	for _, parentPolicy := range parentPolicies {
 		if parentHashes, added := processPolicy(parentPolicy, policiesInRequestProcessed, policiesInRequest); added {
 			processedPolicyHashes = append(processedPolicyHashes, parentHashes...)
-			NCertificatesAdded++
 		} else {
 			log.Printf("[Go] Did not add policy: %v\n", parentPolicy)
 		}
@@ -288,9 +278,7 @@ func verifyChildWithParentPolicy(policy *common.PolicyCertificate, parentPolicy 
 		return fmt.Errorf("The child policy (%s) does not specify a subdomain of the parent policy (%s)", policy.Domain(), parentPolicy.Domain())
 	}
 
-	now := time.Now()
 	err := crypto.VerifyIssuerSignature(parentPolicy, policy)
-	MSS = MSS + time.Now().Sub(now).Milliseconds()
 	if err != nil {
 		return fmt.Errorf("Failed to verify issuer signature: %s", err)
 	}
@@ -345,7 +333,6 @@ func allocatePolicyCacheEntries(policy *common.PolicyCertificate,
 	policyHash string,
 	immutablePolicyHash string,
 	immutableIssuerPolicyHash string) {
-	fmt.Printf("allocating policy: imm hash = %s, imm issuer hash = %s\n", immutablePolicyHash, immutableIssuerPolicyHash)
 
 	// add to policy cache
 	var policyCacheEntry *PolicyCacheEntry
