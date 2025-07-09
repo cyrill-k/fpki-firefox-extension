@@ -195,7 +195,7 @@ func InitializePolicyTrustPreferences(configMap map[string]interface{}) {
 
 // find the policy certificate chain which has the latest max timestamp in the set [issuance, SPCT time 1, SPCT time 2, ...].
 // The second parameter is an optional root chain (e.g., domain root cert to root cert) that must be used. If nil is passed as an argument, any chain is accepted. If no acceptable chain can be generated, nil is returned.
-func getPolicyCertificateChainWithLatestTimestamp(immutableHash string, rootChain *PolicyCertificateChain) (*PolicyCertificateChain, error) {
+func getPolicyCertificateChainWithLatestTimestamp(immutableHash string, rootDomain string, rootChain *PolicyCertificateChain) (*PolicyCertificateChain, error) {
 
 	if rootChain != nil {
 		if immutableHash == getImmutablePolicyHash(rootChain.PolicyCertificates[0]) {
@@ -211,7 +211,7 @@ func getPolicyCertificateChainWithLatestTimestamp(immutableHash string, rootChai
 	if !ok {
 		return nil, fmt.Errorf("Inconsistent caches: policy with immutable hash %s does not exist", immutableHash)
 	}
-	parentChain, err := getPolicyCertificateChainWithLatestTimestamp(issuerEntry.immutableIssuerHash, rootChain)
+	parentChain, err := getPolicyCertificateChainWithLatestTimestamp(issuerEntry.immutableIssuerHash, rootDomain, rootChain)
 	if err != nil {
 		return nil, err
 	}
@@ -241,9 +241,13 @@ func getPolicyCertificateChainWithLatestTimestamp(immutableHash string, rootChai
 		}
 	}
 
-	// check if current cert is domain root certificate
-	isDomainRootCertificate := minMaxTimestampPcEntry.Domain() != "" && (len(parentChain.PolicyCertificates) == 0 || parentChain.PolicyCertificates[0].Domain() == "")
-	isDomainRootCertificateParent := minMaxTimestampPcEntry.Domain() == ""
+	// check if the current cert is domain root certificate, i.e., the policy certificate issued for
+	// the root domain that is closest to the policy root store certificate. Note that the domain
+	// root certificate may itself be in the policy root store.
+	isDomainRootCertificate := minMaxTimestampPcEntry.Domain() == rootDomain && (len(parentChain.PolicyCertificates) == 0 || parentChain.PolicyCertificates[0].Domain() != rootDomain)
+
+	// check if the current cert is an ancestor to the domain root certificate
+	isDomainRootCertificateParent := len(minMaxTimestampPcEntry.Domain()) < len(rootDomain)
 
 	domainRootIssuanceTimestamp := parentChain.DomainRootIssuanceTimestamp
 	if isDomainRootCertificate {
@@ -285,7 +289,7 @@ func findPolicyCertificateChainsForE2LD(domain string) ([]*PolicyCertificateChai
 		if !ok {
 			return nil, fmt.Errorf("Inconsistent caches: policy with hash %s does not exist", leafHash)
 		}
-		chain, err := getPolicyCertificateChainWithLatestTimestamp(leafCacheEntry.immutableHash, nil)
+		chain, err := getPolicyCertificateChainWithLatestTimestamp(leafCacheEntry.immutableHash, domain, nil)
 		if err != nil {
 			return chains, fmt.Errorf("Failed to get policy cert chain with latest timestamp: %s", err)
 		}
@@ -319,7 +323,7 @@ func findPolicyCertificateChainForDomain(domain string, domainRootPolicyCertific
 				if !ok {
 					return nil, fmt.Errorf("Inconsistent caches: policy with hash %s does not exist", leafHash)
 				}
-				chain, err := getPolicyCertificateChainWithLatestTimestamp(leafCacheEntry.immutableHash, domainRootPolicyCertificateChain)
+				chain, err := getPolicyCertificateChainWithLatestTimestamp(leafCacheEntry.immutableHash, e2ld, domainRootPolicyCertificateChain)
 				if err != nil {
 					return nil, fmt.Errorf("Failed to get policy cert chain with latest timestamp: %s", err)
 				}
