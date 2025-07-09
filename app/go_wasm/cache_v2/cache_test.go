@@ -4,7 +4,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"math/big"
@@ -12,6 +11,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 const TRUST_STORE_DIR = "embedded/ca-certificates"
@@ -35,9 +36,7 @@ func contains[T comparable](l []T, e T) bool {
 func TestInitializeCache(t *testing.T) {
 	resetCache(t)
 	files, err := os.ReadDir(TRUST_STORE_DIR)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	nCertificates := InitializeCache(TRUST_STORE_DIR)
 	if len(files) != nCertificates {
 		log.Fatalf("wanted: %d, got %d", len(files), nCertificates)
@@ -57,9 +56,7 @@ func TestGetMissingCertificateHashesList(t *testing.T) {
 	// add certificate hashes of certificates in the cache to the input
 	// (those are not missing)
 	files, err := ioutil.ReadDir(TRUST_STORE_DIR)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	for _, file := range files {
 
@@ -102,57 +99,18 @@ func testSimpleChainCreate(t *testing.T, chain []*x509.Certificate, keys []*rsa.
 		privateKeys = keys
 	}
 
-	/*
-		// code to generate root
-		// uncomment this in case root certificate for testing expires
-
-		privateKey, err := CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(0))))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-		p := EncodePEM(privateKeyBytes, "PRIVATE KEY")
-		err = os.WriteFile("embedded/unit_test/root_privatekey.pem", p, 0777)
-		if err != nil {
-			return nil, nil
-		}
-		template, err := CreateCertificateTemplate(big.NewInt(int64(0)), "root", 1, 1, 1, 1, true, nil, x509.SHA256WithRSA)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		pemBytes, err := CreateCertificate(template, privateKey.Public(), template, privateKey, rand.New(rand.NewSource(int64(0))))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		err = os.WriteFile("embedded/unit_test/root_certificate.pem", pemBytes, 0777)
-		if err != nil {
-			t.Fatal(err)
-		}
-	*/
-
 	// read root certificate
 	pemBytes, err := cacheFileSystem.ReadFile("embedded/unit_test/cache/root_certificates/root_certificate.pem")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBlock, _ := pem.Decode(pemBytes)
 	certificate, err := x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBytes, err = cacheFileSystem.ReadFile("embedded/unit_test/cache/root_privatekeys/root_privatekey.pem")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBlock, _ = pem.Decode(pemBytes)
 	privateKey, err := x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
 
@@ -161,23 +119,15 @@ func testSimpleChainCreate(t *testing.T, chain []*x509.Certificate, keys []*rsa.
 	parentSigner := privateKey
 
 	template, err := CreateCertificateTemplate(big.NewInt(int64(1)), []string{"intmCA1"}, 1, 1, 1, 1, true, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	privateKey, err = CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(1))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBytes, err = CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(0))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBlock, _ = pem.Decode(pemBytes)
 	certificate, err = x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
@@ -186,24 +136,16 @@ func testSimpleChainCreate(t *testing.T, chain []*x509.Certificate, keys []*rsa.
 	parent = certificate
 	parentSigner = privateKey
 	privateKey, err = CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(2))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	template, err = CreateCertificateTemplate(big.NewInt(int64(2)), []string{"leaf1"}, 1, 1, 1, 1, false, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBytes, err = CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(0))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBlock, _ = pem.Decode(pemBytes)
 	certificate, err = x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
 
@@ -272,23 +214,15 @@ func testParentAndCertificateCachedCreate(t *testing.T) ([]*x509.Certificate, []
 
 	// create a new leaf with the same chain as leaf1
 	template, err := CreateCertificateTemplate(big.NewInt(int64(3)), []string{"leaf2"}, 1, 1, 1, 1, false, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	privateKey, err := CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(1))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBytes, err := CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(0))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBlock, _ := pem.Decode(pemBytes)
 	certificate, err := x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
@@ -329,20 +263,14 @@ func testParentCachedButDifferentCertificateCreate(t *testing.T) ([][]*x509.Cert
 	parentSigner := rootPrivateKey
 
 	template, err := CreateCertificateTemplate(big.NewInt(int64(1)), []string{"intmCA1"}, 1, 1, 1, 2, true, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	privateKey := privateKeys[1]
 	pemBytes, err := CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(0))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBlock, _ := pem.Decode(pemBytes)
 	certificate, err := x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	certificateChain1 = append(certificateChain1, certificate)
 	privateKeys1 = append(privateKeys1, privateKey)
@@ -351,23 +279,15 @@ func testParentCachedButDifferentCertificateCreate(t *testing.T) ([][]*x509.Cert
 	parent = certificate
 	parentSigner = privateKey
 	template, err = CreateCertificateTemplate(big.NewInt(int64(3)), []string{"leaf2"}, 1, 1, 1, 1, false, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	privateKey, err = CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(1))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBytes, err = CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(0))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBlock, _ = pem.Decode(pemBytes)
 	certificate, err = x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	certificateChain1 = append(certificateChain1, certificate)
 	privateKeys1 = append(privateKeys1, privateKey)
@@ -379,23 +299,15 @@ func testParentCachedButDifferentCertificateCreate(t *testing.T) ([][]*x509.Cert
 	parent = certificateChain2[1]
 	parentSigner = privateKeys2[1]
 	template, err = CreateCertificateTemplate(big.NewInt(int64(4)), []string{"leaf3"}, 1, 1, 1, 1, false, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	privateKey, err = CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(4))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBytes, err = CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(0))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBlock, _ = pem.Decode(pemBytes)
 	certificate, err = x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	certificateChain2 = append(certificateChain2, certificate)
 	privateKeys2 = append(privateKeys2, privateKey)
@@ -408,11 +320,7 @@ func testParentCachedButDifferentCertificateCreate(t *testing.T) ([][]*x509.Cert
 func verifyChainsDNSNames(t *testing.T, chains []*CertificateChainInfo, chainDNSNames [][]string) {
 	for i, chainInfo := range chains {
 		for j, certificate := range chainInfo.certificateChain {
-			if !contains(certificate.DNSNames, chainDNSNames[i][j]) {
-				fmt.Println(certificate.DNSNames)
-				t.Fatal("certificate chain incorrect")
-
-			}
+			require.Contains(t, certificate.DNSNames, chainDNSNames[i][j], "certificate chain incorrect")
 		}
 	}
 }
@@ -562,23 +470,15 @@ func testParentUncached(t *testing.T) ([][]*x509.Certificate, [][]*rsa.PrivateKe
 	parentSigner := rootPrivateKey
 
 	template, err := CreateCertificateTemplate(big.NewInt(int64(1)), []string{"intmCA2"}, 1, 1, 1, 1, true, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	privateKey, err := CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(1))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBytes, err := CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(0))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBlock, _ := pem.Decode(pemBytes)
 	certificate, err := x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	certificateChain1 = append(certificateChain1, certificate)
 	privateKeys1 = append(privateKeys1, privateKey)
@@ -587,23 +487,15 @@ func testParentUncached(t *testing.T) ([][]*x509.Certificate, [][]*rsa.PrivateKe
 	parent = certificate
 	parentSigner = privateKey
 	template, err = CreateCertificateTemplate(big.NewInt(int64(3)), []string{"leaf2"}, 1, 1, 1, 1, false, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	privateKey, err = CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(1))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBytes, err = CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(0))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBlock, _ = pem.Decode(pemBytes)
 	certificate, err = x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	certificateChain1 = append(certificateChain1, certificate)
 	privateKeys1 = append(privateKeys1, privateKey)
@@ -651,24 +543,16 @@ func testSimpleChain2IntmsCreate(t *testing.T, chain []*x509.Certificate, keys [
 
 	// read root certificate
 	pemBytes, err := cacheFileSystem.ReadFile("embedded/unit_test/cache/root_certificates/root_certificate.pem")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBlock, _ := pem.Decode(pemBytes)
 	certificate, err := x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBytes, err = cacheFileSystem.ReadFile("embedded/unit_test/cache/root_privatekeys/root_privatekey.pem")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBlock, _ = pem.Decode(pemBytes)
 	privateKey, err := x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
 
@@ -679,23 +563,15 @@ func testSimpleChain2IntmsCreate(t *testing.T, chain []*x509.Certificate, keys [
 	parentSigner := privateKey
 
 	template, err := CreateCertificateTemplate(big.NewInt(int64(1)), []string{"intmCA1"}, 1, 1, 1, 1, true, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	privateKey, err = CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(1))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBytes, err = CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(1))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBlock, _ = pem.Decode(pemBytes)
 	certificate, err = x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
@@ -705,23 +581,15 @@ func testSimpleChain2IntmsCreate(t *testing.T, chain []*x509.Certificate, keys [
 	parentSigner = privateKey
 
 	template, err = CreateCertificateTemplate(big.NewInt(int64(2)), []string{"intmCA2"}, 1, 1, 1, 1, true, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	privateKey, err = CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(2))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBytes, err = CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(2))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBlock, _ = pem.Decode(pemBytes)
 	certificate, err = x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
@@ -733,20 +601,14 @@ func testSimpleChain2IntmsCreate(t *testing.T, chain []*x509.Certificate, keys [
 	parentSigner = privateKeys[0]
 
 	template, err = CreateCertificateTemplate(big.NewInt(int64(1)), []string{"intmCA1"}, 1, 1, 1, 1, true, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	privateKey = privateKeys[1]
 	pemBytes, err = CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(1))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBlock, _ = pem.Decode(pemBytes)
 	certificate, err = x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
@@ -756,20 +618,14 @@ func testSimpleChain2IntmsCreate(t *testing.T, chain []*x509.Certificate, keys [
 	parentSigner = privateKey
 
 	template, err = CreateCertificateTemplate(big.NewInt(int64(2)), []string{"intmCA2"}, 1, 1, 1, 1, true, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	privateKey = privateKeys[2]
 	pemBytes, err = CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(2))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBlock, _ = pem.Decode(pemBytes)
 	certificate, err = x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
@@ -778,24 +634,16 @@ func testSimpleChain2IntmsCreate(t *testing.T, chain []*x509.Certificate, keys [
 	parent = certificate
 	parentSigner = privateKey
 	privateKey, err = CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(3))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	template, err = CreateCertificateTemplate(big.NewInt(int64(3)), []string{"leaf1"}, 1, 1, 1, 1, false, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBytes, err = CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(0))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	pemBlock, _ = pem.Decode(pemBytes)
 	certificate, err = x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
 

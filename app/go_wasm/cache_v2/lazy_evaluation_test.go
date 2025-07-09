@@ -4,10 +4,11 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"log"
 	"math/big"
 	"math/rand"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // (root -> intmCA3 -> c.com)
@@ -24,23 +25,15 @@ func testLazyEvaluationChain(t *testing.T, chain []*x509.Certificate, keys []*rs
 	}
 	// read root certificate
 	pemBytes, err := cacheFileSystem.ReadFile("embedded/unit_test/cache/root_certificates/root_certificate.pem")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBlock, _ := pem.Decode(pemBytes)
 	certificate, err := x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBytes, err = cacheFileSystem.ReadFile("embedded/unit_test/cache/root_privatekeys/root_privatekey.pem")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBlock, _ = pem.Decode(pemBytes)
 	privateKey, err := x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
@@ -50,18 +43,12 @@ func testLazyEvaluationChain(t *testing.T, chain []*x509.Certificate, keys []*rs
 	template, err := CreateCertificateTemplate(big.NewInt(int64(1)), []string{"intmCA3"}, 1, 1, 1, 1, true, parent, x509.SHA256WithRSA)
 
 	privateKey, err = CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(1))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBytes, err = CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(0))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBlock, _ = pem.Decode(pemBytes)
 	certificate, err = x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
 
@@ -70,42 +57,26 @@ func testLazyEvaluationChain(t *testing.T, chain []*x509.Certificate, keys []*rs
 	parent = certificate
 	parentSigner = privateKey
 	privateKey, err = CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(2))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	template, err = CreateCertificateTemplate(big.NewInt(int64(2)), []string{"c.com"}, 1, 1, 1, 1, false, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBytes, err = CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(0))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBlock, _ = pem.Decode(pemBytes)
 	certificate, err = x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
 	// b.com
 	privateKey, err = CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(2))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	template, err = CreateCertificateTemplate(big.NewInt(int64(5)), []string{"b.com"}, 1, 1, 1, 1, false, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBytes, err = CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(0))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBlock, _ = pem.Decode(pemBytes)
 	certificate, err = x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
 
@@ -124,20 +95,21 @@ func TestSuccessAfterPrune(t *testing.T) {
 
 	resetCache(t)
 	InitializeCache(trustStoreDir)
-	InitializeLegacyTrustPreferences("embedded/unit_test/validation/config_lazy_evaluation.json")
+
+	configMap, err := ReadJsonFileAsMap("embedded/unit_test/validation/config_lazy_evaluation.json")
+	require.NoError(t, err, "Read JSON config file")
+	InitializeLegacyTrustPreferences(configMap)
+
 	AddCertificatesToCache(nameConstraintChain)
 
 	// add valid chain, but above invalid chain is more trusted
 	// => invalid chain must be filtered out during lazy evaluation
-	cc, _ = testLazyEvaluationChain(nil, nil, nil)
+	cc, _ = testLazyEvaluationChain(t, nil, nil)
 	chainCCom := []*x509.Certificate{cc[2], cc[1], cc[0]}
 
 	legacyTrustInfoToVerify := NewLegacyTrustInfo("c.com", chainCCom)
 	VerifyLegacy(legacyTrustInfoToVerify)
-	if legacyTrustInfoToVerify.EvaluationResult != SUCCESS {
-		log.Fatalf("wanted: %d, got %d", SUCCESS, legacyTrustInfoToVerify.EvaluationResult)
-
-	}
+	require.Equal(t, SUCCESS, legacyTrustInfoToVerify.EvaluationResult)
 }
 
 // (root -> intmCA4 -> c.com)
@@ -152,23 +124,15 @@ func testLazyEvaluationChain1(t *testing.T, chain []*x509.Certificate, keys []*r
 	}
 	// read root certificate
 	pemBytes, err := cacheFileSystem.ReadFile("embedded/unit_test/cache/root_certificates/root_certificate.pem")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBlock, _ := pem.Decode(pemBytes)
 	certificate, err := x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBytes, err = cacheFileSystem.ReadFile("embedded/unit_test/cache/root_privatekeys/root_privatekey.pem")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBlock, _ = pem.Decode(pemBytes)
 	privateKey, err := x509.ParsePKCS1PrivateKey(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
 	// create intermediate CA 1
@@ -177,18 +141,12 @@ func testLazyEvaluationChain1(t *testing.T, chain []*x509.Certificate, keys []*r
 	template, err := CreateCertificateTemplate(big.NewInt(int64(1)), []string{"intmCA4"}, 1, 1, 1, 1, true, parent, x509.SHA256WithRSA)
 
 	privateKey, err = CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(1))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBytes, err = CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(0))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBlock, _ = pem.Decode(pemBytes)
 	certificate, err = x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
 
@@ -197,22 +155,14 @@ func testLazyEvaluationChain1(t *testing.T, chain []*x509.Certificate, keys []*r
 	parent = certificate
 	parentSigner = privateKey
 	privateKey, err = CreateAndStoreRSAPrivateKey(rand.New(rand.NewSource(int64(5))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	template, err = CreateCertificateTemplate(big.NewInt(int64(2)), []string{"c.com"}, 1, 1, 1, 1, false, parent, x509.SHA256WithRSA)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBytes, err = CreateCertificate(template, privateKey.Public(), parent, parentSigner, rand.New(rand.NewSource(int64(0))))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pemBlock, _ = pem.Decode(pemBytes)
 	certificate, err = x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	certificateChain = append(certificateChain, certificate)
 	privateKeys = append(privateKeys, privateKey)
 	return certificateChain, privateKeys
@@ -227,10 +177,14 @@ func TestNothingPruned(t *testing.T) {
 
 	resetCache(t)
 	InitializeCache(trustStoreDir)
-	InitializeLegacyTrustPreferences("embedded/unit_test/validation/config_lazy_evaluation.json")
+
+	configMap, err := ReadJsonFileAsMap("embedded/unit_test/validation/config_lazy_evaluation.json")
+	require.NoError(t, err, "Read JSON config file")
+	InitializeLegacyTrustPreferences(configMap)
+
 	AddCertificatesToCache(nameConstraintChain)
 
-	cc, _ = testLazyEvaluationChain(nil, nil, nil)
+	cc, _ = testLazyEvaluationChain(t, nil, nil)
 	chainBCom := []*x509.Certificate{cc[3], cc[1], cc[0]}
 
 	// name constraint chain is valid and therefore does not get pruned
@@ -238,9 +192,7 @@ func TestNothingPruned(t *testing.T) {
 	VerifyLegacy(legacyTrustInfoToVerify)
 	// as the name constraint chain is more trusted than the chain to verify
 	// legacy validation must fail
-	if legacyTrustInfoToVerify.EvaluationResult != FAILURE {
-		log.Fatalf("wanted: %d, got %d", FAILURE, legacyTrustInfoToVerify.EvaluationResult)
-	}
+	require.Equal(t, FAILURE, legacyTrustInfoToVerify.EvaluationResult)
 }
 
 // check that if after pruning, there is still another higher
@@ -252,7 +204,10 @@ func TestFailureAfterPrune(t *testing.T) {
 	cc, _ = testLazyEvaluationChain1(t, nil, nil)
 	resetCache(t)
 	InitializeCache(trustStoreDir)
-	InitializeLegacyTrustPreferences("embedded/unit_test/validation/config_lazy_evaluation_2.json")
+	configMap, err := ReadJsonFileAsMap("embedded/unit_test/validation/config_lazy_evaluation_2.json")
+	require.NoError(t, err, "Read JSON config file")
+	InitializeLegacyTrustPreferences(configMap)
+
 	// add invalid, but highest trusted chain to cache (name constraint cache, gets pruned)
 	AddCertificatesToCache(nameConstraintChain)
 	// add 2nd trusted certificate chain to cache, does not get pruned
@@ -260,13 +215,11 @@ func TestFailureAfterPrune(t *testing.T) {
 
 	// validate least trusted chain => should fail, as after pruning,
 	// there is still a higher trusted chain
-	cc, _ = testLazyEvaluationChain(nil, nil, nil)
+	cc, _ = testLazyEvaluationChain(t, nil, nil)
 	chainCCom := []*x509.Certificate{cc[2], cc[1], cc[0]}
 	legacyTrustInfoToVerify := NewLegacyTrustInfo("c.com", chainCCom)
 	VerifyLegacy(legacyTrustInfoToVerify)
-	if legacyTrustInfoToVerify.EvaluationResult != FAILURE {
-		log.Fatalf("wanted: %d, got %d", FAILURE, legacyTrustInfoToVerify.EvaluationResult)
-	}
+	require.Equal(t, FAILURE, legacyTrustInfoToVerify.EvaluationResult)
 }
 
 // check that if chain is the highest trusted chain after pruning
@@ -278,18 +231,19 @@ func TestSuccessAfterPruneNonEmpty(t *testing.T) {
 	cc, _ = testLazyEvaluationChain1(t, nil, nil)
 	resetCache(t)
 	InitializeCache(trustStoreDir)
-	InitializeLegacyTrustPreferences("embedded/unit_test/validation/config_lazy_evaluation_3.json")
+	configMap, err := ReadJsonFileAsMap("embedded/unit_test/validation/config_lazy_evaluation_3.json")
+	require.NoError(t, err, "Read JSON config file")
+	InitializeLegacyTrustPreferences(configMap)
+
 	// invalid highest trusted name constraint chain
 	AddCertificatesToCache(nameConstraintChain)
 	// least trusted valid chain (remains after pruning)
 	AddCertificatesToCache(cc)
 
 	// chain is more trusted than the chain remaining after pruning
-	cc, _ = testLazyEvaluationChain(nil, nil, nil)
+	cc, _ = testLazyEvaluationChain(t, nil, nil)
 	chainCCom := []*x509.Certificate{cc[2], cc[1], cc[0]}
 	legacyTrustInfoToVerify := NewLegacyTrustInfo("c.com", chainCCom)
 	VerifyLegacy(legacyTrustInfoToVerify)
-	if legacyTrustInfoToVerify.EvaluationResult != SUCCESS {
-		log.Fatalf("wanted: %d, got %d", SUCCESS, legacyTrustInfoToVerify.EvaluationResult)
-	}
+	require.Equal(t, SUCCESS, legacyTrustInfoToVerify.EvaluationResult)
 }
