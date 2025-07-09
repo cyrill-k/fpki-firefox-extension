@@ -365,6 +365,17 @@ func isSameOrSubdomain(d1, d2 string) bool {
 	return d1 == d2 || strings.HasSuffix(d1, d2Suffix)
 }
 
+// finds all certificates in the chain that are in the relying party's root store and returns a list
+// of their X.509 subject names
+func findRootStoreCertificateSubjects(chain []*x509.Certificate) (subjects []string) {
+	for _, c := range chain {
+		if entry, ok := certificateCache[GetRawCertificateHash(c)]; ok && entry.trustRoot {
+			subjects = append(subjects, c.Subject.ToRDNSequence().String())
+		}
+	}
+	return subjects
+}
+
 // Evaluate whether connection should be allowed according to
 // policy mode based on current state of the cache.
 func VerifyPolicy(trustInfo *PolicyTrustInfo) error {
@@ -405,7 +416,7 @@ func VerifyPolicy(trustInfo *PolicyTrustInfo) error {
 	trustInfo.PolicyChain = append(trustInfo.PolicyChain, applicableChain.PolicyCertificates...)
 
 	// extract policies and validate certificate based on extracted policies
-	rootCertificate := trustInfo.CertificateChain[len(trustInfo.CertificateChain)-1].Subject.ToRDNSequence().String()
+	rootStoreCertificateSubjects := findRootStoreCertificateSubjects(trustInfo.CertificateChain)
 	for idx, policyCert := range applicableChain.PolicyCertificates {
 		err := policyCert.PolicyAttributes.ValidateAttributes()
 		if err != nil {
@@ -432,8 +443,13 @@ func VerifyPolicy(trustInfo *PolicyTrustInfo) error {
 
 		// check for allowed CAs
 		if len(policyCert.PolicyAttributes.AllowedCAs) > 0 {
-			fmt.Printf("Checking if %s is contained in %+v\n", rootCertificate, policyCert.PolicyAttributes.AllowedCAs)
-			if !slices.Contains(policyCert.PolicyAttributes.AllowedCAs, rootCertificate) {
+			var chainContainsAllowedCa bool
+			for _, subject := range rootStoreCertificateSubjects {
+				if slices.Contains(policyCert.PolicyAttributes.AllowedCAs, subject) {
+					chainContainsAllowedCa = true
+				}
+			}
+			if !chainContainsAllowedCa {
 				attr := &common.PolicyAttributes{AllowedCAs: policyCert.PolicyAttributes.AllowedCAs}
 				confAttr := &ConflictingPolicyAttribute{Domain: policyCert.Domain(), Attribute: attr}
 				trustInfo.ConflictingPolicyAttributes = append(trustInfo.ConflictingPolicyAttributes, confAttr)
