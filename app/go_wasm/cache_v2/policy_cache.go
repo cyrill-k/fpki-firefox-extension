@@ -261,9 +261,23 @@ func verifyPolicyAndAllocateCaches(
 // if the signature does not verify or some other constraint is violated, returns an error
 // otherwise, if the validation succeeds, it returns nil
 func verifyChildWithParentPolicy(policy *common.PolicyCertificate, parentPolicy *common.PolicyCertificate) error {
-	// TODO (cyrill): do policy validity check: validity period, domain constraints, ...
+	// check canIssue constraint
+	if !parentPolicy.CanIssue {
+		return fmt.Errorf("Parent policy does not allow issuance")
+	}
 
-	// TODO (cyrill): do parent-child validity check: validity period of child is within parent, Child domain is sub-domain of parent domain, ...
+	// check validity period constraints
+	if policy.NotBefore.Before(parentPolicy.NotBefore) {
+		return fmt.Errorf("Child policy (%v) is valid before parent policy (%v)", policy.NotBefore, parentPolicy.NotBefore)
+	}
+	if policy.NotAfter.After(parentPolicy.NotAfter) {
+		return fmt.Errorf("Child policy (%v) is valid after parent policy has expired (%v)", policy.NotAfter, parentPolicy.NotAfter)
+	}
+
+	// check domain constraint
+	if !isSameOrSubdomain(policy.Domain(), parentPolicy.Domain()) {
+		return fmt.Errorf("The child policy (%s) does not specify a subdomain of the parent policy (%s)", policy.Domain(), parentPolicy.Domain())
+	}
 
 	now := time.Now()
 	err := crypto.VerifyIssuerSignature(parentPolicy, policy)
