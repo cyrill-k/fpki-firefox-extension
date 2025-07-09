@@ -419,7 +419,7 @@ func VerifyPolicy(trustInfo *PolicyTrustInfo) error {
 			}
 		}
 	}
-	if len(trustInfo.ConflictingPolicyAttributes) > 0 {
+	if len(trustInfo.ConflictingPolicyAttributes) > 0 && !trustInfo.DomainExcluded {
 		trustInfo.EvaluationResult = 0
 	} else {
 		trustInfo.EvaluationResult = 1
