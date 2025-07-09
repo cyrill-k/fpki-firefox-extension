@@ -7,7 +7,9 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
+	"encoding/json"
 	"encoding/pem"
+	"fmt"
 	"log"
 	"math/big"
 	"math/rand"
@@ -134,6 +136,15 @@ func maxTime(times ...time.Time) (maxTime time.Time) {
 	return
 }
 
+func minTime(times ...time.Time) (minTime time.Time) {
+	for i, t := range times {
+		if i == 0 || t.Before(minTime) {
+			minTime = t
+		}
+	}
+	return
+}
+
 func TransformListToInterfaceType[T any](list []T) []interface{} {
 	t := make([]interface{}, len(list))
 	for i, e := range list {
@@ -175,6 +186,35 @@ func GetPayloadAndHash(b64payload string) ([]byte, string) {
 	}
 	hash := h.Sum(nil)
 	return payload, base64.StdEncoding.EncodeToString(hash)
+}
+
+func ReadJsonFileAsMap(filePath string) (map[string]interface{}, error) {
+	bytes, err := validationFileSystem.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var jsonMap map[string]interface{}
+	json.Unmarshal([]byte(bytes), &jsonMap)
+	return jsonMap, nil
+}
+
+func PolicyCertDesc(cert *common.PolicyCertificate) string {
+	desc := "<"
+	if cert.Domain() != "" {
+		desc += fmt.Sprintf("domain=%v, ", cert.Domain())
+	}
+	desc += fmt.Sprintf("canIssue=%v, ", cert.CanIssue)
+	desc += fmt.Sprintf("canOwn=%v, ", cert.CanOwn)
+	selfSigned := IsSelfSignedCertificate(cert)
+	if selfSigned {
+		desc += "self-signed cert, "
+	} else {
+		desc += "signer hash=" + getIssuerHash(cert) + ", "
+	}
+	desc += fmt.Sprintf("policy attributes=%+v, ", cert.PolicyAttributes)
+	desc += fmt.Sprintf("[%v, %v]", cert.NotBefore, cert.NotAfter)
+	return desc + ">"
 }
 
 func IsSelfSignedCertificate(p *common.PolicyCertificate) bool {
