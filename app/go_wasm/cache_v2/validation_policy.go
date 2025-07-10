@@ -28,16 +28,17 @@ func NewPolicyTrustInfo(dnsName string, certificateChain []*x509.Certificate) *P
 	return policyTrustInfo
 }
 
-type PolicyTrustPreference struct {
-	// PCA public keys
-	PCAPublicKey string
+func NewDomainPolicyTrustPreferences() DomainPolicyTrustPreferences {
+	return DomainPolicyTrustPreferences{
+		PublicKeyTrustLevelMap: map[string]int{},
+	}
+}
 
-	// TODO (cyrill): also implement setting the trust preferences for specific policy certificate
-	// // Immutable hash of PCA certificate
-	// PCAImmutableHash string
+type DomainPolicyTrustPreferences struct {
+	PublicKeyTrustLevelMap map[string]int
 
-	// map CA set to TrustLevel
-	TrustLevel int
+	// TODO: also implement setting the trust preferences for specific policy certificate specified via their immutable hash
+	// ImmutableHashTrustLevelMap map[string]int
 }
 
 type ConflictingPolicyAttribute struct {
@@ -77,9 +78,9 @@ type PolicyTrustInfo struct {
 	DomainExcluded bool
 }
 
-// maps a domain name to a set of legacy trust preferences
-// to be used to compute certificate chain trust levels
-var policyTrustPreferences = map[string][]*PolicyTrustPreference{}
+// maps a domain name to a set of policy trust preferences to be used to compute policy certificate
+// chain trust levels
+var policyTrustPreferences = map[string]DomainPolicyTrustPreferences{}
 
 type PolicyCertificateChain struct {
 	PolicyCertificates                       []*common.PolicyCertificate
@@ -148,7 +149,7 @@ func NewPolicyCertificateChain() *PolicyCertificateChain {
 
 // initialize legacyTrustPreferences with a config
 func InitializePolicyTrustPreferences(configMap map[string]interface{}) {
-	policyTrustPreferences = map[string][]*PolicyTrustPreference{}
+	policyTrustPreferences = map[string]DomainPolicyTrustPreferences{}
 
 	// parse policy CA sets
 	pcaSetsMap := map[string][]string{}
@@ -175,22 +176,36 @@ func InitializePolicyTrustPreferences(configMap map[string]interface{}) {
 	// parse policy trust preferences
 	policyTrustPreferencesJSON := configMap["policy-trust-preference"].(map[string]interface{})
 	for domain, entry := range policyTrustPreferencesJSON {
-		domainTrustPreferences := []*PolicyTrustPreference{}
+		domainTrustPreferences := NewDomainPolicyTrustPreferences()
 		objects := entry.([]interface{})
 		for _, object := range objects {
 			objectMap := object.(map[string]interface{})
 			trustLevel := int(trustLevelMap[objectMap["level"].(string)].(float64))
 			pcaSetID := objectMap["policy-ca-set"].(string)
 			for _, pca := range pcaSetsMap[pcaSetID] {
-				policyTrustPreference := &PolicyTrustPreference{
-					PCAPublicKey: pcasPublicKeyMap[pca],
-					TrustLevel:   trustLevel,
-				}
-				domainTrustPreferences = append(domainTrustPreferences, policyTrustPreference)
+				domainTrustPreferences.PublicKeyTrustLevelMap[pcasPublicKeyMap[pca]] = trustLevel
 			}
 		}
 		policyTrustPreferences[domain] = domainTrustPreferences
 	}
+}
+
+// determines the highest trust level of a policy certificate according to the policy trust
+// preference
+//
+// returns 0 if no trust level can be assigned based on the trust preference
+func getPolicyCertificateTrustLevel(cert *common.PolicyCertificate) int {
+	base64PublicKey := base64.StdEncoding.EncodeToString(cert.PublicKey)
+
+	domains := generateWildcardAndParentDomain(cert.Domain())
+	highestTrustLevel := 0
+	for _, domain := range domains {
+		if trustLevel, ok := policyTrustPreferences[domain].PublicKeyTrustLevelMap[base64PublicKey]; ok {
+			highestTrustLevel = trustLevel
+		}
+	}
+
+	return highestTrustLevel
 }
 
 // find the policy certificate chain which has the latest max timestamp in the set [issuance, SPCT time 1, SPCT time 2, ...].
@@ -266,14 +281,35 @@ func getPolicyCertificateChainWithLatestTimestamp(immutableHash string, rootDoma
 		domainLatestMinMaxTimestamp = maxTime(domainLatestMinMaxTimestamp, minMaxTimestamp)
 	}
 
+	// The trust level of the chain is the maximum trust level of any certificate in the chain
+	// according to the policy trust preference. Since trust levels are assigned via a certificate's
+	// public key, we must ensure that the creator of the policy certificate knows the corresponding
+	// private key. Otherwise, an adversary can create a leaf certificate with an arbitrary policy
+	// and include a public key associated with a high trust level to convince the relying party to
+	// accept this policy.
+	var pcTrustLevel int
+	if immutableHash == base64.StdEncoding.EncodeToString(nil) {
+		// the signature of the self-signed policy certificate with its own private key is verified
+		// when the certificate is added to the policy cache
+		pcTrustLevel = getPolicyCertificateTrustLevel(minMaxTimestampPcEntry)
+	}
+	var parentPcTrustLevel int
+	if len(parentChain.PolicyCertificates) > 0 {
+		// the signature of a child policy certificate with the parent's private key is verified
+		// when the child certificate is added to the policy cache
+		parentPcTrustLevel = getPolicyCertificateTrustLevel(parentChain.PolicyCertificates[0])
+	}
+	// the final trust level is the highest trust level of this certificate, the parent certificate,
+	// and the chain leading to up to the root policy certificate
+	trustLevel := max(parentChain.TrustLevel, pcTrustLevel, parentPcTrustLevel)
+
 	return &PolicyCertificateChain{
 		PolicyCertificates:                       append([]*common.PolicyCertificate{minMaxTimestampPcEntry}, parentChain.PolicyCertificates...),
 		DomainRootIssuanceTimestamp:              domainRootIssuanceTimestamp,
 		DomainRootMinMaxTimestamp:                domainRootMinMaxTimestamp,
 		RootAndIntermediateLatestMinMaxTimestamp: rootAndIntermediateLatestMinMaxTimestamp,
 		DomainLatestMinMaxTimestamp:              domainLatestMinMaxTimestamp,
-		// todo: find trust level
-		TrustLevel: max(parentChain.TrustLevel, 0),
+		TrustLevel:                               trustLevel,
 	}, nil
 }
 
@@ -299,6 +335,24 @@ func findPolicyCertificateChainsForE2LD(domain string) ([]*PolicyCertificateChai
 		}
 	}
 	return chains, nil
+}
+
+func filterHighestTrustLevelPolicyCertificateChains(policyCertificateChains []*PolicyCertificateChain) (highestTrustLevelChains []*PolicyCertificateChain) {
+	highestTrustLevel := 0
+	// find the highest trust level
+	for _, chain := range policyCertificateChains {
+		if chain.TrustLevel > highestTrustLevel {
+			highestTrustLevel = chain.TrustLevel
+		}
+	}
+	// filter out chains with a lower trust level
+	for _, chain := range policyCertificateChains {
+		if chain.TrustLevel < highestTrustLevel {
+			continue
+		}
+		highestTrustLevelChains = append(highestTrustLevelChains, chain)
+	}
+	return highestTrustLevelChains
 }
 
 func findPolicyCertificateChainForDomain(domain string, domainRootPolicyCertificateChain *PolicyCertificateChain) (*PolicyCertificateChain, error) {
@@ -405,8 +459,11 @@ func VerifyPolicy(trustInfo *PolicyTrustInfo) error {
 		return nil
 	}
 
+	// only consider certificate chains with the highest trust level
+	highestTrustLevelE2ldChains := filterHighestTrustLevelPolicyCertificateChains(e2ldChains)
+
 	// find newest chain for e2ld
-	newestE2ldChain, err := getNewestChain(e2ldChains)
+	newestE2ldChain, err := getNewestChain(highestTrustLevelE2ldChains)
 	if err != nil {
 		return err
 	}
@@ -418,6 +475,7 @@ func VerifyPolicy(trustInfo *PolicyTrustInfo) error {
 	}
 	fmt.Printf("applicable chain: %+v\n", applicableChain)
 	trustInfo.PolicyChain = append(trustInfo.PolicyChain, applicableChain.PolicyCertificates...)
+	trustInfo.PolicyChainTrustLevel = applicableChain.TrustLevel
 
 	// extract policies and validate certificate based on extracted policies
 	rootStoreCertificateSubjects := findRootStoreCertificateSubjects(trustInfo.CertificateChain)
