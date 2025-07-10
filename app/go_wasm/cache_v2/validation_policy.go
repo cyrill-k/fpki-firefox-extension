@@ -337,6 +337,25 @@ func findPolicyCertificateChainsForE2LD(domain string) ([]*PolicyCertificateChai
 	return chains, nil
 }
 
+// returns all policy certificate chains that are currently valid, i.e., chains where the following
+// invariant holds for the leaf certificate: NotBefore <= currentTime <= NotAfter
+//
+// Note that the validity periods of all parent certificate is guaranteed to be a superset of the
+// validity period of the leaf certificate
+func removeInvalidPolicyCertificateChains(policyCertificateChains []*PolicyCertificateChain, currentTime time.Time) (validChains []*PolicyCertificateChain) {
+	for _, chain := range policyCertificateChains {
+		leafCert := chain.PolicyCertificates[0]
+		if currentTime.Before(leafCert.NotBefore) {
+			continue
+		}
+		if currentTime.After(leafCert.NotAfter) {
+			continue
+		}
+		validChains = append(validChains, chain)
+	}
+	return validChains
+}
+
 func filterHighestTrustLevelPolicyCertificateChains(policyCertificateChains []*PolicyCertificateChain) (highestTrustLevelChains []*PolicyCertificateChain) {
 	highestTrustLevel := 0
 	// find the highest trust level
@@ -459,8 +478,11 @@ func VerifyPolicy(trustInfo *PolicyTrustInfo) error {
 		return nil
 	}
 
+	// remove expired policy certificates
+	nonExpiredE2ldChains := removeInvalidPolicyCertificateChains(e2ldChains, time.Now())
+
 	// only consider certificate chains with the highest trust level
-	highestTrustLevelE2ldChains := filterHighestTrustLevelPolicyCertificateChains(e2ldChains)
+	highestTrustLevelE2ldChains := filterHighestTrustLevelPolicyCertificateChains(nonExpiredE2ldChains)
 
 	// find newest chain for e2ld
 	newestE2ldChain, err := getNewestChain(highestTrustLevelE2ldChains)
