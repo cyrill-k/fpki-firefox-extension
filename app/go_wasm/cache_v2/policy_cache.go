@@ -100,8 +100,8 @@ func InitializePolicyCache(trustStoreDir string) int {
 	return added
 }
 
-// takes a list of certificate hashes
-// and returns a list containing all certificate hashes
+// takes a list of policy certificate hashes
+// and returns a list containing all hashes
 // from the input that are not yet cached
 func GetMissingPolicyHashesList(policyHashes []string) []string {
 
@@ -130,7 +130,6 @@ func AddPoliciesToCache(policies []*common.PolicyCertificate) []string {
 	nEntriesBefore := len(policyCache)
 	now := time.Now()
 
-	// fmt.Printf("policy 0: %v\n", policies[0])
 	// create a map of all policies in the request, indicating whether
 	// the policy has already been processed
 	policiesInRequestProcessed := map[*common.PolicyCertificate]bool{}
@@ -146,7 +145,7 @@ func AddPoliciesToCache(policies []*common.PolicyCertificate) []string {
 		}
 		policiesInRequest[immutablePolicyHash] = append(policiesInRequest[immutablePolicyHash], policy)
 	}
-	// add all certificates to cache
+	// add all policy certificates to cache
 	// skip certificates that have already been added
 	// in a recursive step
 	var processedPolicyHashes []string
@@ -172,7 +171,7 @@ func AddPoliciesToCache(policies []*common.PolicyCertificate) []string {
 	return processedPolicyHashes
 }
 
-// process a certificate by potentially adding
+// process a policy certificate by potentially adding
 // it to the cache
 // recursively processes parent certificates
 // returns the hashes of all processed certificates
@@ -189,7 +188,7 @@ func processPolicy(policy *common.PolicyCertificate,
 		policiesInRequestProcessed[policy] = true
 	}()
 
-	// if have already processed the certificate in the request, return whether
+	// if we have already processed the certificate in the request, return whether
 	// it was added to the cache
 	_, inCache := policyCache[policyHash]
 	if policiesInRequestProcessed[policy] || inCache {
@@ -341,8 +340,7 @@ func verifyPolicyAttributesWellFormedness(attr common.PolicyAttributes) error {
 	return nil
 }
 
-// allocate entries in the certificateCache, dnsNameCache, subjectSKICache
-// if necessary (for non-root certificates)
+// allocate entries in the policyCache, policyDnsNameCache, immutablePolicyHash
 func allocatePolicyCacheEntries(policy *common.PolicyCertificate,
 	policyHash string,
 	immutablePolicyHash string,
