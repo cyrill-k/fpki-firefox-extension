@@ -115,7 +115,7 @@ func GetMissingPolicyHashesList(policyHashes []string) []string {
 		if ignore {
 			continue
 		}
-		if certificateCache[policyHash] == nil {
+		if policyCache[policyHash] == nil {
 			missingPolicyHashes = append(missingPolicyHashes, policyHash)
 		}
 	}
@@ -251,7 +251,7 @@ func verifyPolicyAndAllocateCaches(
 	} else {
 		// ignore certificate for future requests if it wasn't added to the cache
 		// (e.g., because it was already expired)
-		ignoredCertificateHashes[policyHash] = struct{}{}
+		ignoredPolicyHashes[policyHash] = struct{}{}
 		return false
 	}
 }
