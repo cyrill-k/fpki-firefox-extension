@@ -12,6 +12,8 @@ import (
 	"math/big"
 	"math/rand"
 	"time"
+
+	"github.com/netsec-ethz/fpki/pkg/common"
 )
 
 const CERTIFICATE = "CERTIFICATE"
@@ -173,4 +175,8 @@ func GetPayloadAndHash(b64payload string) ([]byte, string) {
 	}
 	hash := h.Sum(nil)
 	return payload, base64.StdEncoding.EncodeToString(hash)
+}
+
+func IsSelfSignedCertificate(p *common.PolicyCertificate) bool {
+	return p.IssuerHash == nil
 }

@@ -59,7 +59,7 @@ type PolicyTrustInfo struct {
 	// (might be useful to construct error messages)
 
 	// json encoded policy certifcates
-	PolicyChain                 []*common.PolicyCertificate
+	PolicyChain                 *PolicyCertificateChain
 	ConflictingPolicyAttributes []*ConflictingPolicyAttribute
 	PolicyChainTrustLevel       int `default:"0"`
 
@@ -78,6 +78,18 @@ type PolicyTrustInfo struct {
 	DomainExcluded bool
 }
 
+func (ti *PolicyTrustInfo) String() string {
+	result := "FAILURE"
+	if ti.EvaluationResult == SUCCESS {
+		result = "SUCCESS"
+	}
+	subjects := []string{}
+	for _, c := range ti.CertificateChain {
+		subjects = append(subjects, c.Subject.ToRDNSequence().String())
+	}
+	return fmt.Sprintf("<PolicyTrustInfo domain=%s, X.509 certificate chain=%s, policy certificate chain=[%s], evaluation result=%s, domain excluded=%v, max validity=%v>", ti.DNSName, strings.Join(subjects, ", "), ti.PolicyChain.StringShort(), result, ti.DomainExcluded, ti.MaxValidity)
+}
+
 // maps a domain name to a set of policy trust preferences to be used to compute policy certificate
 // chain trust levels
 var policyTrustPreferences = map[string]DomainPolicyTrustPreferences{}
@@ -89,8 +101,6 @@ type PolicyCertificateChain struct {
 	RootAndIntermediateLatestMinMaxTimestamp time.Time
 	DomainLatestMinMaxTimestamp              time.Time
 	TrustLevel                               int
-
-	// DisseminationTime  time.Time
 }
 
 // returns true if the first certificate of the policy chain is the domain root certificate for the
@@ -111,12 +121,12 @@ func (pcChain *PolicyCertificateChain) StartsWithDomainRootCertificate(rootDomai
 	return false
 }
 
-func (pcChain PolicyCertificateChain) String() string {
-	str := fmt.Sprintf("<PolicyCertificateChain len=%d", len(pcChain.PolicyCertificates))
+func (pcChain *PolicyCertificateChain) String() string {
+	str := fmt.Sprintf("<PolicyCertificateChain len=%d, TL=%d", len(pcChain.PolicyCertificates), pcChain.TrustLevel)
 	str += fmt.Sprintf(", DomainRootIssuanceTimestamp=%v", pcChain.DomainRootIssuanceTimestamp)
 	str += fmt.Sprintf(", DomainRootMinMaxTimestamp=%v", pcChain.DomainRootMinMaxTimestamp)
 	str += fmt.Sprintf(", RootAndIntermediateLatestMinMaxTimestamp=%v", pcChain.RootAndIntermediateLatestMinMaxTimestamp)
-	str += ", certs="
+	str += ", certs=["
 	for _, pc := range pcChain.PolicyCertificates {
 		if pc == nil {
 			str += "nil, "
@@ -126,14 +136,29 @@ func (pcChain PolicyCertificateChain) String() string {
 		if err != nil {
 			break
 		}
-		pcStr := fmt.Sprintf("<Policy domain=%s, attributes=%s, #SPCTs=%d, hash=%s, immHash=%s >", pc.Domain(), attributes, len(pc.SPCTs), getPolicyHash(pc), getImmutablePolicyHash(pc))
-		// pcStr, err := common.ToJSON(pc)
-		// if err != nil {
-		// break
-		// }
-		str += fmt.Sprintf("%s, ", pcStr)
+		pcStr := fmt.Sprintf("<Policy domain=%s, attributes=%s, #SPCTs=%d, hash=%s, immHash=%s>", pc.Domain(), attributes, len(pc.SPCTs), getPolicyHash(pc), getImmutablePolicyHash(pc))
+		str += fmt.Sprintf("\n%s, ", pcStr)
 	}
 	return str + ">"
+}
+
+func (pcChain *PolicyCertificateChain) StringShort() string {
+	str := fmt.Sprintf("<PolicyCertificateChain len=%d, TL=%d, attributes=[", len(pcChain.PolicyCertificates), pcChain.TrustLevel)
+	for i, pc := range pcChain.PolicyCertificates {
+		if i > 0 {
+			str += ", "
+		}
+		attributes, err := json.Marshal(pc.PolicyAttributes)
+		if err != nil {
+			break
+		}
+		domain := pc.Domain()
+		if domain == "" {
+			domain = "*"
+		}
+		str += fmt.Sprintf("%s: %s", domain, attributes)
+	}
+	return str + "]>"
 }
 
 func NewPolicyCertificateChain() *PolicyCertificateChain {
@@ -208,30 +233,55 @@ func getPolicyCertificateTrustLevel(cert *common.PolicyCertificate) int {
 	return highestTrustLevel
 }
 
-// find the policy certificate chain which has the latest max timestamp in the set [issuance, SPCT time 1, SPCT time 2, ...].
-// The second parameter is an optional root chain (e.g., domain root cert to root cert) that must be used. If nil is passed as an argument, any chain is accepted. If no acceptable chain can be generated, nil is returned.
+// find the policy certificate chain starting with the certificate with the specified immutable hash
+// (first parameter). If multiple certificates with the same immutable hash exist, choose the
+// certificate that has the latest max timestamp in the set [issuance, SPCT time 1, SPCT time 2,
+// ...].
+//
+// The second parameter specified the root domain of this chain, i.e., the domain that consists of the public suffix + one label, such as example.com
+//
+// The third parameter is an optional root chain (e.g., chain starting with the domain root cert and
+// ending in the root cert) that must be used. If nil is passed as an argument, the chain can have
+// an arbitrary chain ending. If no acceptable chain starting from the given immutable hash can be generated, nil is returned.
 func getPolicyCertificateChainWithLatestTimestamp(immutableHash string, rootDomain string, rootChain *PolicyCertificateChain) (*PolicyCertificateChain, error) {
-
-	if rootChain != nil {
-		if immutableHash == getImmutablePolicyHash(rootChain.PolicyCertificates[0]) {
-			return rootChain, nil
-		}
-	} else {
-		if immutableHash == base64.StdEncoding.EncodeToString(nil) {
-			return NewPolicyCertificateChain(), nil
-		}
-	}
-
 	issuerEntry, ok := immutablePolicyCache[immutableHash]
 	if !ok {
 		return nil, fmt.Errorf("Inconsistent caches: policy with immutable hash %s does not exist", immutableHash)
 	}
-	parentChain, err := getPolicyCertificateChainWithLatestTimestamp(issuerEntry.immutableIssuerHash, rootDomain, rootChain)
-	if err != nil {
-		return nil, err
+
+	// use any of the avilable certificates to check if the certificate is self-signed
+	isSelfSigned := IsSelfSignedCertificate(policyCache[issuerEntry.policyHashes[0]].policy)
+
+	var parentChain *PolicyCertificateChain
+	if rootChain == nil {
+		// if we do not have a predefined root chain
+		if isSelfSigned {
+			// start a new policy certificate chain starting at this self-signed certificate
+			parentChain = NewPolicyCertificateChain()
+		}
+	} else {
+		// if we must arrive at a predefined root chain
+		if immutableHash == getImmutablePolicyHash(rootChain.PolicyCertificates[0]) {
+			// return the predefined root chain that we arrived on
+			return rootChain, nil
+		}
+		if isSelfSigned {
+			// if we should have arrived at a predefined rootChain but encountered a self-signed
+			// certificate, we abort the certificate policy chain search
+			return nil, nil
+		}
 	}
 	if parentChain == nil {
-		return nil, nil
+		// if we have not yet reached a self-signed certificate or the predefined root chain, we
+		// recursively traverse the certificate chain
+		var err error
+		parentChain, err = getPolicyCertificateChainWithLatestTimestamp(issuerEntry.immutableIssuerHash, rootDomain, rootChain)
+		if err != nil {
+			return nil, err
+		}
+		if parentChain == nil {
+			return nil, nil
+		}
 	}
 
 	// find certificate with latest hash
@@ -262,7 +312,7 @@ func getPolicyCertificateChainWithLatestTimestamp(immutableHash string, rootDoma
 	isDomainRootCertificate := minMaxTimestampPcEntry.Domain() == rootDomain && (len(parentChain.PolicyCertificates) == 0 || parentChain.PolicyCertificates[0].Domain() != rootDomain)
 
 	// check if the current cert is an ancestor to the domain root certificate
-	isDomainRootCertificateParent := len(minMaxTimestampPcEntry.Domain()) < len(rootDomain)
+	isDomainRootCertificateAncestor := len(minMaxTimestampPcEntry.Domain()) < len(rootDomain)
 
 	domainRootIssuanceTimestamp := parentChain.DomainRootIssuanceTimestamp
 	if isDomainRootCertificate {
@@ -273,11 +323,11 @@ func getPolicyCertificateChainWithLatestTimestamp(immutableHash string, rootDoma
 		domainRootMinMaxTimestamp = minMaxTimestamp
 	}
 	rootAndIntermediateLatestMinMaxTimestamp := parentChain.RootAndIntermediateLatestMinMaxTimestamp
-	if isDomainRootCertificateParent {
+	if isDomainRootCertificateAncestor {
 		rootAndIntermediateLatestMinMaxTimestamp = maxTime(rootAndIntermediateLatestMinMaxTimestamp, minMaxTimestamp)
 	}
 	domainLatestMinMaxTimestamp := parentChain.DomainLatestMinMaxTimestamp
-	if !isDomainRootCertificate && !isDomainRootCertificateParent {
+	if !isDomainRootCertificate && !isDomainRootCertificateAncestor {
 		domainLatestMinMaxTimestamp = maxTime(domainLatestMinMaxTimestamp, minMaxTimestamp)
 	}
 
@@ -288,7 +338,7 @@ func getPolicyCertificateChainWithLatestTimestamp(immutableHash string, rootDoma
 	// and include a public key associated with a high trust level to convince the relying party to
 	// accept this policy.
 	var pcTrustLevel int
-	if immutableHash == base64.StdEncoding.EncodeToString(nil) {
+	if isSelfSigned {
 		// the signature of the self-signed policy certificate with its own private key is verified
 		// when the certificate is added to the policy cache
 		pcTrustLevel = getPolicyCertificateTrustLevel(minMaxTimestampPcEntry)
@@ -313,8 +363,8 @@ func getPolicyCertificateChainWithLatestTimestamp(immutableHash string, rootDoma
 	}, nil
 }
 
-func findPolicyCertificateChainsForE2LD(domain string) ([]*PolicyCertificateChain, error) {
-	leafHashes, ok := policyDnsNameCache[domain]
+func findAllPolicyCertificateChainsForRootDomain(rootDomain string) ([]*PolicyCertificateChain, error) {
+	leafHashes, ok := policyDnsNameCache[rootDomain]
 	if !ok {
 		return nil, nil
 	}
@@ -325,12 +375,12 @@ func findPolicyCertificateChainsForE2LD(domain string) ([]*PolicyCertificateChai
 		if !ok {
 			return nil, fmt.Errorf("Inconsistent caches: policy with hash %s does not exist", leafHash)
 		}
-		chain, err := getPolicyCertificateChainWithLatestTimestamp(leafCacheEntry.immutableHash, domain, nil)
+		chain, err := getPolicyCertificateChainWithLatestTimestamp(leafCacheEntry.immutableHash, rootDomain, nil)
 		if err != nil {
 			return chains, fmt.Errorf("Failed to get policy cert chain with latest timestamp: %s", err)
 		}
 		// only consider chains that start with a policy certificate for the root domain, i.e., chain [Policy("example.com"), Policy("example.com"), Policy("com"), Policy("")] would be discarded
-		if chain.StartsWithDomainRootCertificate(domain) {
+		if chain.StartsWithDomainRootCertificate(rootDomain) {
 			chains = append(chains, chain)
 		}
 	}
@@ -374,15 +424,14 @@ func filterHighestTrustLevelPolicyCertificateChains(policyCertificateChains []*P
 	return highestTrustLevelChains
 }
 
-func findPolicyCertificateChainForDomain(domain string, domainRootPolicyCertificateChain *PolicyCertificateChain) (*PolicyCertificateChain, error) {
-	e2ld := domainRootPolicyCertificateChain.PolicyCertificates[0].Domain()
-	subdomainsString, found := strings.CutSuffix(domain, e2ld)
+func findNewestPolicyCertificateChainForDomain(domain string, rootDomain string, domainRootPolicyCertificateChain *PolicyCertificateChain) (*PolicyCertificateChain, error) {
+	subdomainsString, found := strings.CutSuffix(domain, rootDomain)
 	if !found {
 		return nil, fmt.Errorf("Domain is not a subdomain of e2ld")
 	}
 	subdomains := strings.Split(subdomainsString, ".")
 
-	currentDomain := e2ld
+	currentDomain := rootDomain
 	var finalChain *PolicyCertificateChain
 	for i := 0; i < len(subdomains); i++ {
 		// skip last item since it is an empty string
@@ -396,7 +445,7 @@ func findPolicyCertificateChainForDomain(domain string, domainRootPolicyCertific
 				if !ok {
 					return nil, fmt.Errorf("Inconsistent caches: policy with hash %s does not exist", leafHash)
 				}
-				chain, err := getPolicyCertificateChainWithLatestTimestamp(leafCacheEntry.immutableHash, e2ld, domainRootPolicyCertificateChain)
+				chain, err := getPolicyCertificateChainWithLatestTimestamp(leafCacheEntry.immutableHash, rootDomain, domainRootPolicyCertificateChain)
 				if err != nil {
 					return nil, fmt.Errorf("Failed to get policy cert chain with latest timestamp: %s", err)
 				}
@@ -460,26 +509,30 @@ func VerifyPolicy(trustInfo *PolicyTrustInfo) error {
 	if err != nil {
 		return fmt.Errorf("Failed to get E2LD of %s: %s", trustInfo.DNSName, err)
 	}
-
-	// TODO (cyrill): ensure that enough map servers are queried and that enough full responses were returned
-
-	// debug
-	// fmt.Printf("root cert subject: %s\n", trustInfo.CertificateChain[len(trustInfo.CertificateChain)-1].Subject.ToRDNSequence().String())
+	// TODO: ensure that enough map servers are queried and that enough full responses were returned
 
 	// get all certificate chains for the E2LD
-	e2ldChains, err := findPolicyCertificateChainsForE2LD(e2ld)
+	e2ldChains, err := findAllPolicyCertificateChainsForRootDomain(e2ld)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("domain root chains: %+v\n", e2ldChains)
+
+	// fmt.Printf("%d domain root policy chains found:\n", len(e2ldChains))
+	// for _, chain := range e2ldChains {
+	// 	fmt.Printf("    %s\n", chain.StringShort())
+	// }
+
 	if len(e2ldChains) == 0 {
 		// no applicable policy certificates exist
-		trustInfo.EvaluationResult = 1
+		trustInfo.EvaluationResult = SUCCESS
 		return nil
 	}
 
 	// remove expired policy certificates
 	nonExpiredE2ldChains := removeInvalidPolicyCertificateChains(e2ldChains, time.Now())
+
+	// TODO: could also remove the expired policy certificates from the policy cache and add them to
+	// ignoredPolicyHashes
 
 	// only consider certificate chains with the highest trust level
 	highestTrustLevelE2ldChains := filterHighestTrustLevelPolicyCertificateChains(nonExpiredE2ldChains)
@@ -491,13 +544,14 @@ func VerifyPolicy(trustInfo *PolicyTrustInfo) error {
 	}
 
 	// find newest chain containing e2ld
-	applicableChain, err := findPolicyCertificateChainForDomain(trustInfo.DNSName, newestE2ldChain)
+	applicableChain, err := findNewestPolicyCertificateChainForDomain(trustInfo.DNSName, e2ld, newestE2ldChain)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("applicable chain: %+v\n", applicableChain)
-	trustInfo.PolicyChain = append(trustInfo.PolicyChain, applicableChain.PolicyCertificates...)
+	trustInfo.PolicyChain = applicableChain
 	trustInfo.PolicyChainTrustLevel = applicableChain.TrustLevel
+
+	// fmt.Printf("Applicable domain policy chain selected: %+v\n", applicableChain.StringShort())
 
 	// extract policies and validate certificate based on extracted policies
 	rootStoreCertificateSubjects := findRootStoreCertificateSubjects(trustInfo.CertificateChain)
@@ -541,9 +595,9 @@ func VerifyPolicy(trustInfo *PolicyTrustInfo) error {
 		}
 	}
 	if len(trustInfo.ConflictingPolicyAttributes) > 0 && !trustInfo.DomainExcluded {
-		trustInfo.EvaluationResult = 0
+		trustInfo.EvaluationResult = FAILURE
 	} else {
-		trustInfo.EvaluationResult = 1
+		trustInfo.EvaluationResult = SUCCESS
 	}
 
 	return nil
